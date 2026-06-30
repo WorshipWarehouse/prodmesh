@@ -29,6 +29,12 @@ function standardModes({ page = 1, row = 3 } = {}) {
   ];
 }
 
+// Build a single mode. `match` = the roomState value (case-insensitive) that
+// means this mode is active; `loc` = [page, row, column] of the Companion button.
+function mode(id, label, color, match, [page, row, column], extra = {}) {
+  return { id, label, color, match, press: { page, row, column }, ...extra };
+}
+
 export const rooms = {
   // ── Local test against the Companion running on THIS machine ────────────────
   'local-test': {
@@ -45,14 +51,18 @@ export const rooms = {
   'north-main': {
     id: 'north-main',
     name: 'North · Main Auditorium',
-    // TEMP (dev testing): pointed at this Mac's Companion so the Auditorium
-    // Status page is live during development.
-    // BEFORE DEPLOY ON-SITE: revert host → '192.0.2.31' and mock → true
-    // (or false once that room's Companion is confirmed wired).
-    mock: false,
-    companion: { host: '127.0.0.1', port: 8000 }, // TEMP — real: 192.0.2.31 (Producer)
+    mock: true, // ← set false once this room's Companion is confirmed wired
+    companion: { host: '192.0.2.31', port: 8000 }, // Producer machine
     state: { variable: 'roomState' },
-    modes: standardModes(),
+    // Auditorium-specific modes. Button locations [page, row, column].
+    modes: [
+      mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),
+      mode('second', 'Second Service', '#ff9f0a', 'SECOND', [3, 0, 2]),
+      mode('womens', "Midweek", '#ff6fae', 'WOMENS', [3, 0, 3]),
+      mode('ya', 'Evening', '#32ade6', 'YA', [3, 0, 4]),
+      mode('event', 'Event', '#af7bf0', 'EVENT', [3, 0, 5]),
+      mode('standby', 'Standby', '#8b97a8', 'STANDBY', [3, 3, 1], { isStandby: true }),
+    ],
   },
 
   'north-youth': {
