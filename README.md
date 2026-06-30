@@ -107,9 +107,19 @@ npm start        # → every PC opens http://<lan-box-ip>:8080
 # (PORT=9000 npm start to change the port)
 ```
 
-To survive reboots, keep `npm start` running with a process manager (`pm2`, a
-`launchd` plist, etc.) and give the box a stable IP or `.local` hostname so the
-URL never changes.
+### Auto-start on boot / login
+
+Use the cross-platform installer instead of running `npm start` by hand — it sets
+up a **launchd** service on macOS or a **systemd** service on Linux, so the
+dashboard starts automatically and restarts if it crashes:
+
+```bash
+./deploy/install-service.sh
+```
+
+See [`deploy/README.md`](deploy/README.md) for managing, updating, and removing
+the service. Give the box a stable IP or `.local` hostname so the URL never
+changes.
 
 ### Notes for the all-Mac setup
 
