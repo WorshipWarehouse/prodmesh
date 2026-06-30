@@ -51,7 +51,7 @@ export const rooms = {
   'north-main': {
     id: 'north-main',
     name: 'North · Main Auditorium',
-    mock: true, // ← set false once this room's Companion is confirmed wired
+    mock: false, // LIVE — Companion runs on this same (Producer) Mac in production
     companion: { host: '192.0.2.31', port: 8000 }, // Producer machine
     state: { variable: 'roomState' },
     // Auditorium-specific modes. Button locations [page, row, column].
