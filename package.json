@@ -9,6 +9,7 @@
     "dev:api": "node --watch server/index.js",
     "build": "tsc -b && vite build",
     "start": "NODE_ENV=production node server/index.js",
+    "update": "bash deploy/update.sh",
     "lint": "oxlint",
     "preview": "vite preview"
   },

@@ -29,12 +29,18 @@ service (safe to use as an "update" step after `git pull`).
 | Restart | re-run installer, or `launchctl kickstart -k gui/$(id -u)/com.prodmesh.dashboard` | `sudo systemctl restart prodmesh` |
 | Remove | `./deploy/uninstall-service.sh` | `./deploy/uninstall-service.sh` |
 
-## Updating after a code change
+## Updating
+
+One command pulls the latest, rebuilds, and restarts the service:
 
 ```bash
-git pull
-./deploy/install-service.sh    # rebuilds and reloads the service
+./deploy/update.sh      # or:  npm run update
 ```
+
+It aborts if the box has uncommitted local edits (so it never clobbers a
+hand-edited `rooms.config.js`), only runs `npm ci` when dependencies actually
+changed, and shows you exactly which commits landed. Room Macs pick up frontend
+changes on their next browser refresh.
 
 ## Notes
 
