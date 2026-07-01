@@ -18,6 +18,10 @@ with Main / Youth / Chapel / Elementary Chapel auditoriums.
 
 ## Architecture
 
+> **Returning to this project?** Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+> (mental model, patterns, invariants, gotchas) and [`docs/STATE.md`](docs/STATE.md)
+> (what's live vs mock + roadmap) first. Decisions are in [`docs/decisions/`](docs/decisions/).
+
 ```
 Browser (Quick Access + Room Status)
         │  /api/*
