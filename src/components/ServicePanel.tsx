@@ -98,15 +98,26 @@ export function ServicePanel({ roomId }: { roomId: string }) {
                 {open ? '▾' : '▸'} Order of Service ({next.items.length})
               </button>
               {open && (
-                <ol className="svc__items">
-                  {next.items.map((it) => (
-                    <li key={it.id} className="svc__item">
-                      <span className="svc__item-title">{it.title}</span>
-                      {it.type && <span className="svc__item-type">{it.type}</span>}
-                      {it.length != null && <span className="svc__item-len">{fmtLength(it.length)}</span>}
-                    </li>
-                  ))}
-                </ol>
+                <ul className="svc__items">
+                  {next.items.map((it) => {
+                    const type = it.type ?? 'item';
+                    if (type === 'header') {
+                      return (
+                        <li key={it.id} className="svc__item svc__item--header">
+                          <span className="svc__item-title">{it.title}</span>
+                        </li>
+                      );
+                    }
+                    const icon = type === 'song' ? '🎵' : type === 'media' ? '🎬' : '•';
+                    return (
+                      <li key={it.id} className={`svc__item svc__item--${type}`}>
+                        <span className="svc__item-icon" aria-hidden>{icon}</span>
+                        <span className="svc__item-title">{it.title}</span>
+                        {it.length ? <span className="svc__item-len">{fmtLength(it.length)}</span> : null}
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </div>
           )}

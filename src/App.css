@@ -890,7 +890,6 @@ body {
   list-style: none;
   margin: 8px 0 0;
   padding: 0;
-  counter-reset: item;
 }
 
 .svc__item {
@@ -904,12 +903,11 @@ body {
   margin-bottom: 6px;
 }
 
-.svc__item::before {
-  counter-increment: item;
-  content: counter(item);
+.svc__item-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
   color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  min-width: 18px;
 }
 
 .svc__item-title {
@@ -917,21 +915,46 @@ body {
   font-weight: 500;
 }
 
-.svc__item-type {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-dim);
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  padding: 2px 8px;
-  border-radius: 999px;
-}
-
 .svc__item-len {
   color: var(--text-dim);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* Section headers — dividers between sections, not boxed rows */
+.svc__item--header {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  margin: 16px 0 6px;
+  padding: 4px 2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.svc__item--header:first-child {
+  margin-top: 0;
+}
+
+.svc__item--header .svc__item-title {
+  font-weight: 700;
+}
+
+/* Songs — music-note accent + colored title + left bar */
+.svc__item--song {
+  border-left: 3px solid #5b8def;
+}
+
+.svc__item--song .svc__item-icon {
+  color: inherit;
+}
+
+.svc__item--song .svc__item-title {
+  color: #a9c7ff;
+  font-weight: 600;
 }
 
 .svc__later {
