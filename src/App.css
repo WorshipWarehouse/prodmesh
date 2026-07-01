@@ -810,7 +810,17 @@ body {
 
 .svc__legend .svc__time {
   margin-right: 0;
-  cursor: default;
+  cursor: pointer;
+}
+
+/* Hovering a legend chip dims the OTHER time type, emphasizing the hovered one. */
+.svc__times .svc__time {
+  transition: opacity 0.15s ease;
+}
+
+.svc__next:has(.svc__legend .svc__time--service:hover) .svc__times .svc__time--rehearsal,
+.svc__next:has(.svc__legend .svc__time--rehearsal:hover) .svc__times .svc__time--service {
+  opacity: 0.18;
 }
 
 /* ── Service panel (Room Status) ───────────────────────────────────────── */
