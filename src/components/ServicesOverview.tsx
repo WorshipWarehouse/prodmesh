@@ -45,7 +45,8 @@ export function ServicesOverview() {
               <>
                 <div className="ovcard__date">{s.next.dates}</div>
                 <div className="ovcard__times">
-                  {s.next.times.map((t) => (
+                  {/* Overview stays glanceable: service times only. */}
+                  {s.next.times.filter((t) => t.type === 'service').map((t) => (
                     <span key={t.id} className="svc__time">{fmtTime(t.startsAt, t.name)}</span>
                   ))}
                 </div>

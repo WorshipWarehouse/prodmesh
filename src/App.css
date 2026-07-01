@@ -791,6 +791,28 @@ body {
   margin-right: 6px;
 }
 
+/* Rehearsal times stand out in purple; services keep the neutral chip. */
+.svc__time--rehearsal {
+  color: #c79bff;
+  background: rgba(175, 123, 240, 0.14);
+  border-color: rgba(175, 123, 240, 0.45);
+}
+
+.svc__legend {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+.svc__legend .svc__time {
+  margin-right: 0;
+  cursor: default;
+}
+
 /* ── Service panel (Room Status) ───────────────────────────────────────── */
 .svc {
   background: var(--bg-raised);

@@ -58,9 +58,21 @@ export function ServicePanel({ roomId }: { roomId: string }) {
           {next.dates && <div className="svc__date">{next.dates}</div>}
           <div className="svc__times">
             {next.times.map((t) => (
-              <span key={t.id} className="svc__time">{fmtTime(t.startsAt, t.name)}</span>
+              <span
+                key={t.id}
+                className={`svc__time svc__time--${t.type ?? 'service'}`}
+                title={t.type === 'rehearsal' ? `Rehearsal${t.name ? ` — ${t.name}` : ''}` : t.name ?? undefined}
+              >
+                {fmtTime(t.startsAt, t.name)}
+              </span>
             ))}
           </div>
+          {next.times.some((t) => t.type === 'rehearsal') && (
+            <div className="svc__legend">
+              <span className="svc__time svc__time--service">service</span>
+              <span className="svc__time svc__time--rehearsal">rehearsal</span>
+            </div>
+          )}
 
           {next.items.length > 0 && (
             <div className="svc__order">

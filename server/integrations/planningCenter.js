@@ -91,14 +91,19 @@ export function getUpcomingPlans(serviceType, limit = 3) {
   });
 }
 
-/** The SERVICE times for a plan (rehearsals/auditions/etc. are filtered out). */
+// We surface services + rehearsals; other time types (auditions, meetings,
+// sound-checks tagged "other") are noise for this display.
+const SHOWN_TIME_TYPES = new Set(['service', 'rehearsal']);
+
+/** A plan's service + rehearsal times, chronological. (Auditions/meetings out.) */
 export function getPlanTimes(serviceType, planId) {
   return cached(`times:${planId}`, async () => {
     if (!isConfigured()) return mockTimes();
     const body = await pcGet(`/service_types/${serviceType.id}/plans/${planId}/plan_times`);
     return (body.data ?? [])
-      .filter((t) => t.attributes?.time_type === 'service')
-      .map(normalizeTime);
+      .filter((t) => SHOWN_TIME_TYPES.has(t.attributes?.time_type))
+      .map(normalizeTime)
+      .sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
   });
 }
 
@@ -145,8 +150,9 @@ function mockTimes() {
     return t.toISOString();
   };
   return [
-    { id: 'svc-1', name: '9:00 AM', startsAt: at(9), endsAt: at(10), type: 'service' },
-    { id: 'svc-2', name: '11:00 AM', startsAt: at(11), endsAt: at(12), type: 'service' },
+    { id: 'reh-1', name: 'Run Through', startsAt: at(8), endsAt: at(9), type: 'rehearsal' },
+    { id: 'svc-1', name: '1st Service', startsAt: at(9), endsAt: at(10), type: 'service' },
+    { id: 'svc-2', name: '2nd Service', startsAt: at(11), endsAt: at(12), type: 'service' },
   ];
 }
 

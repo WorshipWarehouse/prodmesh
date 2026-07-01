@@ -26,11 +26,16 @@ test('getUpcomingPlans (mock) returns summaries; times hydrated separately', asy
   assert.ok(new Date(plans[0].sortDate) <= new Date(plans[1].sortDate));
 });
 
-test('getPlanTimes (mock) returns service times', async () => {
+test('getPlanTimes (mock) returns service + rehearsal times, chronological', async () => {
   const times = await pco.getPlanTimes(ST, 'plan-1');
   assert.ok(times.length > 0);
   assert.ok(times[0].startsAt);
-  assert.ok(times.every((t) => t.type === 'service'));
+  assert.ok(times.every((t) => ['service', 'rehearsal'].includes(t.type)));
+  assert.ok(times.some((t) => t.type === 'rehearsal'));
+  // sorted ascending by start
+  for (let i = 1; i < times.length; i++) {
+    assert.ok(new Date(times[i - 1].startsAt) <= new Date(times[i].startsAt));
+  }
 });
 
 test('getPlanItems (mock) returns a sequenced order of service', async () => {

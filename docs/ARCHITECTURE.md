@@ -107,9 +107,10 @@ Express server (server/)
 - **`vnc://` screen sharing** only opens Screen Sharing.app on a **Mac** client.
 - **`crypto.randomUUID()` needs a secure context** (https/localhost) — it throws
   on `http://<lan-ip>`. Use a manual id generator in the browser.
-- **Planning Center plan_times mix in rehearsals/auditions/soundchecks** — filter
-  to `time_type === 'service'`. Fetch times per-plan, not via `include` (the
-  included array is ambiguous across multiple plans).
+- **Planning Center plan_times mix in rehearsals/auditions/soundchecks** — we show
+  `service` + `rehearsal` (rehearsals in purple), and drop the rest. Fetch times
+  per-plan, not via `include` (the included array is ambiguous across plans). The
+  Quick Access overview shows service times only; Room Status shows both.
 - **A room hosts multiple PC service types** (the Auditorium = Sunday/Second Service/
   Midweek/Evening). Map rooms to an array and merge.
 - **PC Calendar, not Services, is the authoritative event→room→time source.**
