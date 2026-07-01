@@ -207,9 +207,16 @@ app.get('/api/rooms/:id/run/:planId/stream', async (req, res) => {
 
   send('status', { configured: true });
   try {
-    await ppro.pollActive(
+    await ppro.pollRunState(
       pp,
-      (active) => send('active', { itemId: ppro.mapIndexToItemId(items, active), index: active.index, name: active.name }),
+      (s) =>
+        send('active', {
+          itemId: ppro.mapIndexToItemId(items, { index: s.itemIndex, name: s.itemName }),
+          index: s.itemIndex,
+          name: s.itemName,
+          slideIndex: s.slideIndex,
+          slideCount: s.slideCount,
+        }),
       abort.signal,
     );
   } catch (err) {

@@ -53,6 +53,10 @@ export function RunOfShow() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [follow, setFollow] = useState(true);
   const [ppConnected, setPpConnected] = useState<boolean | null>(null);
+  const [progress, setProgress] = useState<{ index: number | null; count: number | null }>({
+    index: null,
+    count: null,
+  });
 
   useEffect(() => {
     getRoom(roomId).then(setRoom).catch(() => setError('Room not found'));
@@ -89,6 +93,7 @@ export function RunOfShow() {
       const d = JSON.parse((e as MessageEvent).data);
       lastPpRef.current = d.itemId ?? null;
       if (followRef.current && d.itemId) setCurrent(d.itemId);
+      setProgress({ index: d.slideIndex ?? null, count: d.slideCount ?? null });
     });
     es.onerror = () => setPpConnected(false);
     return () => es.close();
@@ -162,6 +167,19 @@ export function RunOfShow() {
             <span className="ros-track__label">Now</span>
             <span className="ros-track__title">{currentItem ? currentItem.title : '—'}</span>
           </div>
+          {progress.count != null && progress.index != null && (
+            <div className="ros-progress">
+              <div className="ros-progress__bar">
+                <div
+                  className="ros-progress__fill"
+                  style={{ width: `${Math.min(100, ((progress.index + 1) / progress.count) * 100)}%` }}
+                />
+              </div>
+              <span className="ros-progress__label">
+                Slide {progress.index + 1} / {progress.count}
+              </span>
+            </div>
+          )}
           <div className="ros-track__buttons">
             <button className="btn" onClick={() => step(-1)} disabled={idx <= 0}>◀ Prev</button>
             <button className="btn btn--primary" onClick={() => step(1)} disabled={idx >= 0 && idx >= trackable.length - 1}>

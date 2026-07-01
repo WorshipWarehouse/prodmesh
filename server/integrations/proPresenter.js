@@ -59,13 +59,55 @@ export function mapIndexToItemId(items, active) {
 
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
-/** One-shot read of the current active item. */
-export async function readActive(pp, signal) {
-  const timeout = AbortSignal.timeout(3000);
-  const sig = signal ? AbortSignal.any([signal, timeout]) : timeout;
-  const res = await fetch(`${baseUrl(pp)}/v1/playlist/active`, { signal: sig });
+function withTimeout(signal, ms = 3000) {
+  const timeout = AbortSignal.timeout(ms);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+async function ppGet(pp, path, signal) {
+  const res = await fetch(`${baseUrl(pp)}${path}`, { signal: withTimeout(signal) });
   if (!res.ok) throw new Error(`ProPresenter ${res.status}`);
-  return parseActive(await res.json());
+  return res.json();
+}
+
+/** One-shot read of the current active playlist item. */
+export async function readActive(pp, signal) {
+  return parseActive(await ppGet(pp, '/v1/playlist/active', signal));
+}
+
+/** Current slide position within the active presentation. */
+export async function readSlide(pp, signal) {
+  const pi = (await ppGet(pp, '/v1/presentation/slide_index', signal)).presentation_index;
+  return {
+    slideIndex: pi?.index ?? null,
+    presUuid: pi?.presentation_id?.uuid ?? null,
+    presName: pi?.presentation_id?.name ?? null,
+  };
+}
+
+/**
+ * Total slide count of the active presentation. Uses the current arrangement's
+ * expanded sequence (songs repeat groups); falls back to the raw group sum when
+ * no arrangement is selected.
+ */
+export function slideTotal(pres) {
+  if (!pres) return null;
+  const gcount = {};
+  for (const g of pres.groups ?? []) gcount[g.uuid] = (g.slides ?? []).length;
+  const cur = pres.current_arrangement;
+  if (cur) {
+    const arr = (pres.arrangements ?? []).find((a) => a.id?.uuid === cur);
+    if (arr && Array.isArray(arr.groups)) {
+      const t = arr.groups.reduce((s, u) => s + (gcount[typeof u === 'string' ? u : u?.uuid] || 0), 0);
+      if (t > 0) return t;
+    }
+  }
+  const raw = Object.values(gcount).reduce((a, b) => a + b, 0);
+  return raw || null;
+}
+
+async function readSlideCount(pp, signal) {
+  return slideTotal((await ppGet(pp, '/v1/presentation/active', signal)).presentation);
 }
 
 function sleep(ms, signal) {
@@ -76,25 +118,44 @@ function sleep(ms, signal) {
 }
 
 /**
- * Poll the active item and call onState(active) whenever it CHANGES, until the
- * signal aborts. We poll (rather than stream) because /v1/playlist/active's
- * chunked response only sends the initial state — it does not push item changes.
- * The browser still gets real-time push, via our SSE.
+ * Poll the active item + slide progress, calling onState(state) whenever any of
+ * them changes, until the signal aborts. We poll (rather than stream) because
+ * /v1/playlist/active's chunked response only sends the initial state. The
+ * browser still gets real-time push, via our SSE.
+ *
+ * state = { itemIndex, itemName, slideIndex, slideCount, presName }
  */
-export async function pollActive(pp, onState, signal, intervalMs = 1000) {
+export async function pollRunState(pp, onState, signal, intervalMs = 800) {
   let lastKey;
   let fails = 0;
+  const countCache = { uuid: null, count: null };
   while (!signal.aborted) {
     try {
-      const active = await readActive(pp, signal);
+      const [item, slide] = await Promise.all([readActive(pp, signal), readSlide(pp, signal)]);
       fails = 0;
-      const key = active.index == null ? 'none' : `${active.index}:${active.name ?? ''}`;
+      // Refresh the (expensive) slide count only when the presentation changes.
+      if (slide.presUuid && slide.presUuid !== countCache.uuid) {
+        try {
+          countCache.count = await readSlideCount(pp, signal);
+        } catch {
+          countCache.count = null;
+        }
+        countCache.uuid = slide.presUuid;
+      }
+      const state = {
+        itemIndex: item.index,
+        itemName: item.name,
+        slideIndex: slide.slideIndex,
+        slideCount: slide.presUuid === countCache.uuid ? countCache.count : null,
+        presName: slide.presName,
+      };
+      const key = JSON.stringify([state.itemIndex, state.slideIndex, state.slideCount]);
       if (key !== lastKey) {
         lastKey = key;
-        onState(active);
+        onState(state);
       }
     } catch (err) {
-      if (++fails >= 3) throw err; // give up after sustained failure → SSE shows offline
+      if (++fails >= 3) throw err; // sustained failure → SSE shows offline
     }
     await sleep(intervalMs, signal);
   }

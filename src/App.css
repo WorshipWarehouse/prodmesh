@@ -972,10 +972,48 @@ body {
   border-color: #34c759;
   background: rgba(52, 199, 89, 0.14);
   box-shadow: inset 3px 0 0 #34c759;
+  animation: current-pulse 1.6s ease-in-out infinite;
 }
 
 .svc__item--current .svc__item-icon {
   color: #34c759;
+}
+
+@keyframes current-pulse {
+  0%, 100% { background: rgba(52, 199, 89, 0.1); }
+  50% { background: rgba(52, 199, 89, 0.22); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .svc__item--current { animation: none; }
+}
+
+/* Slide progress bar (Now widget) */
+.ros-progress {
+  margin-top: 10px;
+}
+
+.ros-progress__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.ros-progress__fill {
+  height: 100%;
+  background: #34c759;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.ros-progress__label {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Section headers — dividers between sections, not boxed rows */

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseActive, mapIndexToItemId, isConfigured } from './proPresenter.js';
+import { parseActive, mapIndexToItemId, isConfigured, slideTotal } from './proPresenter.js';
 
 test('isConfigured needs a host', () => {
   assert.equal(isConfigured(null), false);
@@ -56,4 +56,33 @@ test('mapIndexToItemId falls back to name when index is off', () => {
 test('mapIndexToItemId returns null when nothing is active', () => {
   assert.equal(mapIndexToItemId(items, { index: null, name: null }), null);
   assert.equal(mapIndexToItemId(items, null), null);
+});
+
+test('slideTotal sums raw groups when no arrangement is selected', () => {
+  const pres = {
+    current_arrangement: '',
+    groups: [
+      { uuid: 'g1', slides: [1] },
+      { uuid: 'g2', slides: [1, 2, 3] },
+      { uuid: 'g3', slides: [1, 2] },
+    ],
+    arrangements: [{ id: { uuid: 'a1' }, groups: ['g1', 'g2'] }],
+  };
+  assert.equal(slideTotal(pres), 6);
+});
+
+test('slideTotal expands the selected arrangement (groups repeat)', () => {
+  const pres = {
+    current_arrangement: 'a1',
+    groups: [
+      { uuid: 'v', slides: [1, 2] }, // verse: 2 slides
+      { uuid: 'c', slides: [1] }, // chorus: 1 slide
+    ],
+    arrangements: [{ id: { uuid: 'a1' }, groups: ['v', 'c', 'v', 'c', 'c'] }], // 2+1+2+1+1 = 7
+  };
+  assert.equal(slideTotal(pres), 7);
+});
+
+test('slideTotal handles null', () => {
+  assert.equal(slideTotal(null), null);
 });
