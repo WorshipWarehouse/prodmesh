@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getRoomService, type RoomService } from '../api';
+import { OrderOfService } from './OrderOfService';
 
 const REFRESH_MS = 5 * 60 * 1000;
 
@@ -14,13 +16,6 @@ function fmtTime(iso: string | null, fallback: string | null, serviceDay?: strin
     return `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
   }
   return time;
-}
-
-function fmtLength(sec: number | null) {
-  if (!sec) return '';
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return s ? `${m}:${String(s).padStart(2, '0')}` : `${m} min`;
 }
 
 export function ServicePanel({ roomId }: { roomId: string }) {
@@ -72,8 +67,20 @@ export function ServicePanel({ roomId }: { roomId: string }) {
             {next.times.map((t) => {
               const time = fmtTime(t.startsAt, t.name, serviceDay);
               // Rehearsals show their name (e.g. "2:00 PM · Run Through");
-              // services stay as a bare clock time.
+              // services stay as a bare clock time and link into the Run of Show.
               const label = t.type === 'rehearsal' && t.name && t.startsAt ? `${time} · ${t.name}` : time;
+              if (t.type === 'service') {
+                return (
+                  <Link
+                    key={t.id}
+                    to={`/room/${roomId}/run/${next.id}?time=${t.id}`}
+                    className="svc__time svc__time--service svc__time--link"
+                    title="Open Run of Show"
+                  >
+                    {label}
+                  </Link>
+                );
+              }
               return (
                 <span
                   key={t.id}
@@ -97,34 +104,7 @@ export function ServicePanel({ roomId }: { roomId: string }) {
               <button className="svc__toggle" onClick={() => setOpen((o) => !o)}>
                 {open ? '▾' : '▸'} Order of Service ({next.items.length})
               </button>
-              {open && (
-                <ul className="svc__items">
-                  {next.items.map((it) => {
-                    const type = it.type ?? 'item';
-                    if (type === 'header') {
-                      return (
-                        <li key={it.id} className="svc__item svc__item--header">
-                          <span className="svc__item-title">{it.title}</span>
-                        </li>
-                      );
-                    }
-                    const icon = type === 'song' ? '🎵' : type === 'media' ? '🎬' : '•';
-                    return (
-                      <li key={it.id} className={`svc__item svc__item--${type}`}>
-                        <span className="svc__item-icon" aria-hidden>{icon}</span>
-                        <span className="svc__item-title">{it.title}</span>
-                        {it.leader && (
-                          <span className="svc__item-leader" title="Leader">{it.leader}</span>
-                        )}
-                        {it.key && (
-                          <span className="svc__item-key" title="Key">{it.key}</span>
-                        )}
-                        {it.length ? <span className="svc__item-len">{fmtLength(it.length)}</span> : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              {open && <OrderOfService items={next.items} />}
             </div>
           )}
         </div>

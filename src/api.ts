@@ -217,6 +217,11 @@ export interface ServicesOverview {
 export const getRoomService = (id: string) =>
   getJson<RoomService>(`/api/rooms/${encodeURIComponent(id)}/service`);
 
+export const getRoomPlan = (id: string, planId: string) =>
+  getJson<{ live: boolean; plan: ServicePlan }>(
+    `/api/rooms/${encodeURIComponent(id)}/plan/${encodeURIComponent(planId)}`,
+  );
+
 export const getServicesOverview = () => getJson<ServicesOverview>('/api/services');
 
 export const triggerUpdate = () =>

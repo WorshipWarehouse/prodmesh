@@ -40,16 +40,20 @@ Notes:
 
 ## Roadmap / open threads (roughly prioritized)
 
-1. **PC Calendar integration** — authoritative event→room→time. Unlocks:
+1. **Run of Show — Phase 2 (ProPresenter live tracking).** Phase 1 shipped
+   (clickable service times → `/room/:id/run/:planId`, order of service +
+   countdown + manual tracking). Next: per-room ProPresenter client + SSE to
+   auto-advance the current item. Official API (7.9+); PC plan is pushed to PP as
+   a playlist, so map by playlist index/name. See ADR 0003.
+2. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
-2. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
+3. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
    `mock: false`. (Auditorium is the template.)
-3. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
-4. **ProPresenter "order of service" tracker** — live "where are we in the service"
-   using the PC order-of-service (already normalized) + ProPresenter API.
+4. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
 5. **Confirm production deployment** on the Producer Mac via `deploy/install-service.sh`
    (dev has happened on jbeale's Mac; verify the box is running the service).
+6. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
 
 ## Deferred tech debt (known, low-risk)
 

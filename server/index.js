@@ -148,6 +148,27 @@ app.get('/api/services', async (_req, res) => {
   res.json({ live: pco.isConfigured(), services: out });
 });
 
+// A specific plan for a room, fully hydrated (times + order of service).
+// Used by the Run of Show view.
+app.get('/api/rooms/:id/plan/:planId', async (req, res) => {
+  const room = rooms[req.params.id];
+  if (!room?.planningCenter?.serviceTypes?.length) {
+    return res.status(404).json({ error: 'No plans for this room' });
+  }
+  try {
+    const plan = (await upcomingForRoom(room.planningCenter, 10)).find((p) => p.id === req.params.planId);
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+    const st = stOf(plan);
+    [plan.times, plan.items] = await Promise.all([
+      pco.getPlanTimes(st, plan.id),
+      pco.getPlanItems(st, plan.id),
+    ]);
+    res.json({ live: pco.isConfigured(), plan });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message ?? err) });
+  }
+});
+
 // One room's upcoming plans, with the next plan's times + order of service.
 app.get('/api/rooms/:id/service', async (req, res) => {
   const room = rooms[req.params.id];
