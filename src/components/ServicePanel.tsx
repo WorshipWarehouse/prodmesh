@@ -69,15 +69,21 @@ export function ServicePanel({ roomId }: { roomId: string }) {
           <div className="svc__plan">{next.title}</div>
           {next.dates && <div className="svc__date">{next.dates}</div>}
           <div className="svc__times">
-            {next.times.map((t) => (
-              <span
-                key={t.id}
-                className={`svc__time svc__time--${t.type ?? 'service'}`}
-                title={t.type === 'rehearsal' ? `Rehearsal${t.name ? ` — ${t.name}` : ''}` : t.name ?? undefined}
-              >
-                {fmtTime(t.startsAt, t.name, serviceDay)}
-              </span>
-            ))}
+            {next.times.map((t) => {
+              const time = fmtTime(t.startsAt, t.name, serviceDay);
+              // Rehearsals show their name (e.g. "2:00 PM · Run Through");
+              // services stay as a bare clock time.
+              const label = t.type === 'rehearsal' && t.name && t.startsAt ? `${time} · ${t.name}` : time;
+              return (
+                <span
+                  key={t.id}
+                  className={`svc__time svc__time--${t.type ?? 'service'}`}
+                  title={t.type === 'rehearsal' ? 'Rehearsal' : t.name ?? undefined}
+                >
+                  {label}
+                </span>
+              );
+            })}
           </div>
           {next.times.some((t) => t.type === 'rehearsal') && (
             <div className="svc__legend">
