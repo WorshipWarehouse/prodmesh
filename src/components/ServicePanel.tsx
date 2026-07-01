@@ -3,12 +3,17 @@ import { getRoomService, type RoomService } from '../api';
 
 const REFRESH_MS = 5 * 60 * 1000;
 
-function fmtTime(iso: string | null, fallback: string | null) {
+// Clock time, prefixed with a short weekday when it's NOT on the service day
+// (so a mid-week rehearsal reads "Wed 6:30 PM" instead of a bare time).
+function fmtTime(iso: string | null, fallback: string | null, serviceDay?: string | null) {
   if (!iso) return fallback ?? '';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? fallback ?? ''
-    : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (Number.isNaN(d.getTime())) return fallback ?? '';
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (serviceDay && d.toDateString() !== serviceDay) {
+    return `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+  }
+  return time;
 }
 
 function fmtLength(sec: number | null) {
@@ -39,6 +44,13 @@ export function ServicePanel({ roomId }: { roomId: string }) {
   const next = service.plans[0] ?? null;
   const later = service.plans.slice(1);
 
+  // The service day = the first service time's day (fallback: first time).
+  const serviceDay = (() => {
+    if (!next) return null;
+    const svc = next.times.find((t) => t.type === 'service') ?? next.times[0];
+    return svc?.startsAt ? new Date(svc.startsAt).toDateString() : null;
+  })();
+
   return (
     <section className="svc">
       <div className="svc__head">
@@ -63,7 +75,7 @@ export function ServicePanel({ roomId }: { roomId: string }) {
                 className={`svc__time svc__time--${t.type ?? 'service'}`}
                 title={t.type === 'rehearsal' ? `Rehearsal${t.name ? ` — ${t.name}` : ''}` : t.name ?? undefined}
               >
-                {fmtTime(t.startsAt, t.name)}
+                {fmtTime(t.startsAt, t.name, serviceDay)}
               </span>
             ))}
           </div>
