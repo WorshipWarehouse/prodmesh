@@ -8,21 +8,27 @@ test('isConfigured needs a host', () => {
   assert.equal(isConfigured({ host: '127.0.0.1' }), true);
 });
 
-test('parseActive pulls the active playlist item', () => {
+test('parseActive pulls the active playlist item (fields nested under .id)', () => {
+  // Shape verified against the live ProPresenter API.
   const body = {
     presentation: {
       playlist: { uuid: 'p1', name: 'Colossians …', index: 2 },
-      item: { uuid: 'pres1', name: 'Goodness Of God' },
-      playlist_item: { uuid: 'i7', name: 'Goodness Of God', index: 7 },
+      item: { uuid: 'pres1', name: 'Break Out', index: 4294967295 },
+      playlist_item: {
+        id: { uuid: 'i5', name: 'Break Out', index: 5 },
+        type: 'presentation',
+        is_pco: true,
+      },
     },
   };
   assert.deepEqual(parseActive(body), {
-    index: 7,
-    name: 'Goodness Of God',
-    uuid: 'i7',
+    index: 5,
+    name: 'Break Out',
+    uuid: 'i5',
     playlistName: 'Colossians …',
   });
-  assert.deepEqual(parseActive({ presentation: null }), {
+  // Nothing triggered → playlist_item is null.
+  assert.deepEqual(parseActive({ presentation: { playlist: null, playlist_item: null } }), {
     index: null, name: null, uuid: null, playlistName: null,
   });
 });

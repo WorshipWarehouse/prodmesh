@@ -19,13 +19,14 @@ function baseUrl(pp) {
 // ── Mapping (pure, tested) ────────────────────────────────────────────────────
 
 // Extract the active presentation playlist item from a /v1/playlist/active body.
+// The item's fields live under `playlist_item.id` (verified against live API).
 export function parseActive(state) {
   const p = state?.presentation ?? {};
-  const item = p.playlist_item ?? null;
+  const id = p.playlist_item?.id ?? null;
   return {
-    index: item?.index ?? null,
-    name: item?.name ?? null,
-    uuid: item?.uuid ?? null,
+    index: id?.index ?? null,
+    name: id?.name ?? null,
+    uuid: id?.uuid ?? null,
     playlistName: p.playlist?.name ?? null,
   };
 }
