@@ -38,11 +38,14 @@ test('getPlanTimes (mock) returns service + rehearsal times, chronological', asy
   }
 });
 
-test('getPlanItems (mock) returns a sequenced order of service', async () => {
+test('getPlanItems (mock) returns a sequenced order of service with key + leader', async () => {
   const items = await pco.getPlanItems(ST, 'plan-1');
   assert.ok(items.length > 0);
   assert.equal(items[0].sequence, 1);
   assert.ok(items.every((i) => typeof i.title === 'string'));
+  // songs carry a key; some items carry a leader
+  assert.ok(items.some((i) => i.type === 'song' && i.key));
+  assert.ok(items.some((i) => i.leader));
 });
 
 test('results are cached (same reference within TTL)', async () => {

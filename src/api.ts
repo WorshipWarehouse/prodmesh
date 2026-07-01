@@ -178,6 +178,8 @@ export interface PlanItem {
   title: string;
   type: string | null;
   length: number | null;
+  key: string | null; // song key, e.g. "D"
+  leader: string | null; // from the item's "Leader" note
   description: string | null;
 }
 

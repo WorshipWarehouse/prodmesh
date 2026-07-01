@@ -113,6 +113,8 @@ Express server (server/)
   Quick Access overview shows service times only; Room Status shows both.
 - **A room hosts multiple PC service types** (the Auditorium = Sunday/Second Service/
   Midweek/Evening). Map rooms to an array and merge.
+- **Song key** is `item.key_name`; **item "Leader"** is not a field — it's an
+  *item note* in the "Leader" category (fetch items with `include=item_notes`).
 - **PC Calendar, not Services, is the authoritative event→room→time source.**
   Services doesn't reliably know the physical room. See ADR 0001.
 - **launchd/systemd don't inherit your PATH** — the service installer bakes in the

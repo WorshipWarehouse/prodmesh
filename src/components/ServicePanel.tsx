@@ -113,6 +113,12 @@ export function ServicePanel({ roomId }: { roomId: string }) {
                       <li key={it.id} className={`svc__item svc__item--${type}`}>
                         <span className="svc__item-icon" aria-hidden>{icon}</span>
                         <span className="svc__item-title">{it.title}</span>
+                        {it.leader && (
+                          <span className="svc__item-leader" title="Leader">{it.leader}</span>
+                        )}
+                        {it.key && (
+                          <span className="svc__item-key" title="Key">{it.key}</span>
+                        )}
                         {it.length ? <span className="svc__item-len">{fmtLength(it.length)}</span> : null}
                       </li>
                     );

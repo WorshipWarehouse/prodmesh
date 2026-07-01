@@ -67,14 +67,25 @@ function normalizeTime(t) {
   return { id: t.id, name: a.name ?? null, startsAt: a.starts_at ?? null, endsAt: a.ends_at ?? null, type: a.time_type ?? null };
 }
 
-function normalizeItem(it) {
+function normalizeItem(it, notesById = new Map()) {
   const a = it.attributes ?? {};
+  // "Leader" is a per-item note (category "Leader"), not a first-class field.
+  let leader = null;
+  for (const ref of it.relationships?.item_notes?.data ?? []) {
+    const note = notesById.get(ref.id);
+    if (note && String(note.category_name).toLowerCase() === 'leader') {
+      leader = String(note.content ?? '').trim() || null;
+      break;
+    }
+  }
   return {
     id: it.id,
-    sequence: a.sequence ?? null, // ⓘ
-    title: a.title ?? '', // ⓘ
-    type: a.item_type ?? null, // ⓘ e.g. "song", "header", "media"
-    length: a.length ?? null, // ⓘ seconds
+    sequence: a.sequence ?? null,
+    title: a.title ?? '',
+    type: a.item_type ?? null, // e.g. "song", "header", "item"
+    length: a.length ?? null, // seconds
+    key: a.key_name || null, // song key, e.g. "D"
+    leader,
     description: a.description ?? null,
   };
 }
@@ -107,12 +118,17 @@ export function getPlanTimes(serviceType, planId) {
   });
 }
 
-/** The order-of-service items for one plan. */
+/** The order-of-service items for one plan (with song key + leader note). */
 export function getPlanItems(serviceType, planId) {
   return cached(`items:${planId}`, async () => {
     if (!isConfigured()) return mockItems();
-    const body = await pcGet(`/service_types/${serviceType.id}/plans/${planId}/items?per_page=100&order=sequence`);
-    return (body.data ?? []).map(normalizeItem);
+    const body = await pcGet(
+      `/service_types/${serviceType.id}/plans/${planId}/items?per_page=100&order=sequence&include=item_notes`,
+    );
+    const notesById = new Map(
+      (body.included ?? []).filter((i) => i.type === 'ItemNote').map((n) => [n.id, n.attributes]),
+    );
+    return (body.data ?? []).map((d) => normalizeItem(d, notesById));
   });
 }
 
@@ -158,22 +174,25 @@ function mockTimes() {
 
 function mockItems() {
   const rows = [
-    ['Countdown', 'media', 300],
-    ['Welcome', 'header', 120],
-    ['Worship Set', 'header', null],
-    ['Song — Praise', 'song', 300],
-    ['Song — Great Are You Lord', 'song', 330],
-    ['Announcements', 'media', 180],
-    ['Message', 'header', 1800],
-    ['Response Song', 'song', 300],
-    ['Dismissal', 'header', 120],
+    { title: 'Countdown', type: 'media', length: 300 },
+    { title: 'Welcome', type: 'header' },
+    { title: 'Announcements', type: 'item', length: 180, leader: 'Pastor Dave' },
+    { title: 'Worship Set', type: 'header' },
+    { title: 'Praise', type: 'song', length: 300, key: 'G', leader: 'Avery' },
+    { title: 'Great Are You Lord', type: 'song', length: 330, key: 'A', leader: 'Riley' },
+    { title: 'Message', type: 'header' },
+    { title: 'Sermon', type: 'item', length: 1800, leader: 'Koby' },
+    { title: 'Response Song', type: 'song', length: 300, key: 'D', leader: 'Avery' },
+    { title: 'Dismissal', type: 'header' },
   ];
-  return rows.map(([title, type, length], i) => ({
+  return rows.map((r, i) => ({
     id: `mock-item-${i}`,
     sequence: i + 1,
-    title,
-    type,
-    length,
+    title: r.title,
+    type: r.type,
+    length: r.length ?? null,
+    key: r.key ?? null,
+    leader: r.leader ?? null,
     description: null,
   }));
 }

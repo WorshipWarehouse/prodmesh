@@ -921,6 +921,33 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Leader name (from the "Leader" item note) */
+.svc__item-leader {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.svc__item-leader::before {
+  content: '👤';
+  font-size: 0.72rem;
+}
+
+/* Song key badge */
+.svc__item-key {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a9c7ff;
+  background: rgba(91, 141, 239, 0.15);
+  border: 1px solid rgba(91, 141, 239, 0.4);
+  border-radius: 6px;
+  padding: 1px 8px;
+  min-width: 24px;
+  text-align: center;
+}
+
 /* Section headers — dividers between sections, not boxed rows */
 .svc__item--header {
   background: transparent;
