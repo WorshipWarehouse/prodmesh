@@ -14,10 +14,16 @@ import { existsSync } from 'node:fs';
 
 import { rooms } from './rooms.config.js';
 import { readCustomVariable, pressButton } from './companion.js';
+import { publicRoom, rawToModeId } from './roomModel.js';
+import { validateRooms } from './validate.js';
 import * as settings from './settings.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const PORT = process.env.PORT ?? (process.env.NODE_ENV === 'production' ? 8080 : 3001);
+
+// Fail fast on a malformed room config instead of erroring deep in a request.
+validateRooms(rooms);
 
 // Require a valid admin bearer token. Attach to any admin-only route.
 function requireAdmin(req, res, next) {
@@ -32,27 +38,6 @@ for (const id of Object.keys(rooms)) mockState[id] = 'standby';
 
 const app = express();
 app.use(express.json());
-
-// Public view of a room: just what the UI needs to render (no button locations).
-function publicRoom(room) {
-  return {
-    id: room.id,
-    name: room.name,
-    hasCompanion: Boolean(room.companion?.host) && !room.mock,
-    modes: room.modes.map((m) => ({
-      id: m.id,
-      label: m.label,
-      color: m.color,
-      isStandby: Boolean(m.isStandby),
-    })),
-  };
-}
-
-function rawToModeId(room, raw) {
-  const v = (raw ?? '').trim().toLowerCase();
-  const hit = room.modes.find((m) => (m.match ?? m.id).toLowerCase() === v);
-  return hit ? hit.id : null;
-}
 
 // ── API ──────────────────────────────────────────────────────────────────────
 
@@ -167,7 +152,11 @@ app.post('/api/settings/pins', (req, res) => {
 });
 
 app.put('/api/settings/schedules', requireAdmin, (req, res) => {
-  settings.setSchedules(req.body?.schedules);
+  try {
+    settings.setSchedules(req.body?.schedules);
+  } catch (err) {
+    return res.status(400).json({ error: String(err.message ?? err) });
+  }
   res.json({ ok: true, schedules: settings.getPublicSettings().schedules });
 });
 
@@ -206,6 +195,11 @@ if (existsSync(distDir)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Production dashboard server on http://localhost:${PORT}`);
-});
+// Only start listening when run directly (not when imported by tests).
+if (process.argv[1] === __filename) {
+  app.listen(PORT, () => {
+    console.log(`Production dashboard server on http://localhost:${PORT}`);
+  });
+}
+
+export { app };

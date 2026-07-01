@@ -95,9 +95,24 @@ npm install
 npm run dev      # web (http://localhost:5173) + API proxy (http://localhost:3001)
 npm run build    # production build → dist/
 npm start        # serve built app + API on one port (default 8080)
+npm test         # backend test suite (node --test)
 ```
 
 In dev, Vite proxies `/api` to the Express server automatically.
+
+## Testing & CI
+
+Backend logic is covered by `node --test` (zero deps) under `server/*.test.js`:
+settings/PIN/lock engine, config validation, room mapping, and full API
+auth + lockout flows (against mock-mode rooms, so no Companion needed). Run
+`npm test`. GitHub Actions (`.github/workflows/ci.yml`) runs build + tests on
+every push and PR.
+
+## Integration secrets
+
+Tokens for external services (Planning Center, etc.) go in a git-ignored
+`server/data/secrets.json` — copy `server/secrets.example.json` and fill it in,
+or set `PRODMESH_SECRET_*` env vars. Read them via `getSecret('planningCenter.appId')`.
 
 ## Deploy on the always-on LAN box
 

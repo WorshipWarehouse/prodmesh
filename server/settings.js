@@ -13,9 +13,11 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { validateSchedules } from './validate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, 'data');
+// Overridable so tests (and alternate deployments) can point at their own dir.
+const DATA_DIR = process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data');
 const FILE = join(DATA_DIR, 'settings.json');
 
 // First-run defaults. A Sunday lock on the Auditorium is pre-seeded as an
@@ -95,7 +97,7 @@ export function setPins({ admin, override } = {}) {
 
 export function setSchedules(schedules) {
   const s = load();
-  s.schedules = schedules ?? {};
+  s.schedules = validateSchedules(schedules);
   persist();
 }
 
