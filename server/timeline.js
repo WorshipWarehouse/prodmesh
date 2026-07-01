@@ -73,6 +73,20 @@ export function recordActive(instanceId, ctx, entry, nowMs = Date.now()) {
   persist(instanceId, tl);
 }
 
+/** Close out the last (open) item — called when a show ends. */
+export function finalize(instanceId, nowMs = Date.now()) {
+  const f = fileFor(instanceId);
+  const tl = cache.get(instanceId) ?? (existsSync(f) ? load(instanceId) : null);
+  if (!tl) return;
+  const last = tl.items[tl.items.length - 1];
+  if (last && last.endedAt == null) {
+    last.endedAt = nowMs;
+    last.actualSeconds = Math.max(0, Math.round((nowMs - last.startedAt) / 1000));
+  }
+  tl.endedAt = nowMs;
+  persist(instanceId, tl);
+}
+
 /** Build the planned-vs-actual report for a service instance. */
 export function getReport(instanceId, nowMs = Date.now()) {
   const f = fileFor(instanceId);

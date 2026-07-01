@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   getRoom,
   getRoomPlan,
+  startShow,
+  endShow,
+  setShowCurrent,
   type RoomMeta,
   type ServicePlan,
   type PlanTime,
+  type ShowState,
 } from '../api';
 import { OrderOfService } from '../components/OrderOfService';
 import { Clock } from '../components/Clock';
@@ -18,7 +22,6 @@ function timeLabel(t: PlanTime | null) {
   return [t.name, clock].filter(Boolean).join(' · ');
 }
 
-// Countdown to (or elapsed since) the selected service time.
 function Countdown({ time }: { time: PlanTime | null }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -45,18 +48,13 @@ function Countdown({ time }: { time: PlanTime | null }) {
 export function RunOfShow() {
   const { roomId = '', planId = '' } = useParams();
   const [params] = useSearchParams();
-  const timeId = params.get('time');
+  const timeId = params.get('time') || 'default';
 
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [plan, setPlan] = useState<ServicePlan | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const [follow, setFollow] = useState(true);
-  const [ppConnected, setPpConnected] = useState<boolean | null>(null);
-  const [progress, setProgress] = useState<{ index: number | null; count: number | null }>({
-    index: null,
-    count: null,
-  });
+  const [state, setState] = useState<ShowState>({ active: false });
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     getRoom(roomId).then(setRoom).catch(() => setError('Room not found'));
@@ -65,50 +63,18 @@ export function RunOfShow() {
     getRoomPlan(roomId, planId).then((r) => setPlan(r.plan)).catch(() => setError('Plan not found'));
   }, [roomId, planId]);
 
-  // Restore/persist the tracked position so a refresh keeps our place.
+  // The server is the source of truth; we just render its show state.
   useEffect(() => {
-    setCurrentId(localStorage.getItem(`ros:${planId}`) || null);
-  }, [planId]);
-  const setCurrent = useCallback(
-    (id: string | null) => {
-      setCurrentId(id);
-      if (id) localStorage.setItem(`ros:${planId}`, id);
-      else localStorage.removeItem(`ros:${planId}`);
-    },
-    [planId],
-  );
-
-  // Live ProPresenter tracking via SSE. In "follow" mode it auto-advances the
-  // highlight; a manual tap drops out of follow (override) until re-enabled.
-  const followRef = useRef(follow);
-  followRef.current = follow;
-  const lastPpRef = useRef<string | null>(null);
-  useEffect(() => {
-    const es = new EventSource(
-      `/api/rooms/${roomId}/run/${planId}/stream${timeId ? `?time=${encodeURIComponent(timeId)}` : ''}`,
-    );
-    es.addEventListener('status', (e) => {
-      const d = JSON.parse((e as MessageEvent).data);
-      setPpConnected(Boolean(d.configured) && d.online !== false);
+    const es = new EventSource(`/api/rooms/${roomId}/show/stream`);
+    es.addEventListener('state', (e) => {
+      try {
+        setState(JSON.parse((e as MessageEvent).data));
+      } catch {
+        /* ignore */
+      }
     });
-    es.addEventListener('active', (e) => {
-      const d = JSON.parse((e as MessageEvent).data);
-      lastPpRef.current = d.itemId ?? null;
-      if (followRef.current && d.itemId) setCurrent(d.itemId);
-      setProgress({ index: d.slideIndex ?? null, count: d.slideCount ?? null });
-    });
-    es.onerror = () => setPpConnected(false);
     return () => es.close();
-  }, [roomId, planId, timeId, setCurrent]);
-
-  const selectManually = (id: string) => {
-    setFollow(false);
-    setCurrent(id);
-  };
-  const resumeFollow = () => {
-    setFollow(true);
-    if (lastPpRef.current) setCurrent(lastPpRef.current);
-  };
+  }, [roomId]);
 
   if (error) {
     return (
@@ -120,16 +86,34 @@ export function RunOfShow() {
   }
   if (!room || !plan) return <div className="ros ros--msg">Loading…</div>;
 
+  const isThisShow = state.active && state.planId === planId && state.timeId === timeId;
+  const isOtherShow = state.active && !isThisShow;
+  const cur = isThisShow ? state.current : null;
+  const currentId = cur?.itemId ?? null;
+  const follow = isThisShow ? Boolean(state.follow) : false;
+  const ppConnected = isThisShow ? state.ppConnected : null;
+
   const selectedTime =
     plan.times.find((t) => t.id === timeId) ?? plan.times.find((t) => t.type === 'service') ?? null;
   const trackable = plan.items.filter((i) => (i.type ?? 'item') !== 'header');
   const idx = trackable.findIndex((i) => i.id === currentId);
-  const step = (delta: number) => {
-    setFollow(false); // manual navigation overrides follow
-    const n = idx < 0 ? (delta > 0 ? 0 : -1) : idx + delta;
-    if (n >= 0 && n < trackable.length) setCurrent(trackable[n].id);
-  };
   const currentItem = idx >= 0 ? trackable[idx] : null;
+
+  const act = async (fn: () => Promise<ShowState>) => {
+    setBusy(true);
+    try {
+      setState(await fn());
+    } catch {
+      /* SSE will reconcile */
+    } finally {
+      setBusy(false);
+    }
+  };
+  const pick = (itemId: string) => act(() => setShowCurrent(roomId, { itemId }));
+  const step = (delta: number) => {
+    const n = idx < 0 ? (delta > 0 ? 0 : -1) : idx + delta;
+    if (n >= 0 && n < trackable.length) pick(trackable[n].id);
+  };
 
   return (
     <div className="ros">
@@ -145,7 +129,7 @@ export function RunOfShow() {
           <Clock />
           <Link
             className="btn btn--sm"
-            to={`/room/${roomId}/run/${planId}/report${timeId ? `?time=${timeId}` : ''}`}
+            to={`/room/${roomId}/run/${planId}/report${timeId !== 'default' ? `?time=${timeId}` : ''}`}
           >
             📊 Timing report
           </Link>
@@ -154,62 +138,81 @@ export function RunOfShow() {
 
       <section className="ros__widgets">
         <Countdown time={selectedTime} />
+
         <div className="ros-track">
-          <div
-            className={`ros-track__status ros-track__status--${
-              ppConnected === null ? 'idle' : !ppConnected ? 'off' : follow ? 'follow' : 'manual'
-            }`}
-          >
-            <span>
-              {ppConnected === null
-                ? '· connecting to ProPresenter…'
-                : !ppConnected
-                  ? '○ ProPresenter offline — manual mode'
-                  : follow
-                    ? '● Following ProPresenter'
-                    : '❙❙ Manual override'}
-            </span>
-            {ppConnected && !follow && (
-              <button className="btn btn--sm" onClick={resumeFollow}>Resume follow</button>
-            )}
-          </div>
-          <div className="ros-track__now">
-            <span className="ros-track__label">Now</span>
-            <span className="ros-track__title">{currentItem ? currentItem.title : '—'}</span>
-          </div>
-          {progress.count != null && progress.index != null && (
-            <div className="ros-progress">
-              <div className="ros-progress__bar">
-                <div
-                  className="ros-progress__fill"
-                  style={{ width: `${Math.min(100, ((progress.index + 1) / progress.count) * 100)}%` }}
-                />
-              </div>
-              <span className="ros-progress__label">
-                Slide {progress.index + 1} / {progress.count}
-              </span>
+          {isOtherShow ? (
+            <div className="ros-track__status ros-track__status--off">
+              <span>■ Another show is live in this room</span>
+              <Link className="btn btn--sm" to={`/room/${roomId}/run/${state.planId}?time=${state.timeId}`}>
+                Go to it
+              </Link>
             </div>
+          ) : !isThisShow ? (
+            <div className="ros-track__start">
+              <span className="ros-track__status ros-track__status--idle">No show running</span>
+              <button className="btn btn--primary" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
+                ▶ Start Show
+              </button>
+            </div>
+          ) : (
+            <>
+              <div
+                className={`ros-track__status ros-track__status--${
+                  ppConnected == null ? 'idle' : !ppConnected ? 'off' : follow ? 'follow' : 'manual'
+                }`}
+              >
+                <span>
+                  {ppConnected == null
+                    ? '· connecting to ProPresenter…'
+                    : !ppConnected
+                      ? '○ ProPresenter offline — manual mode'
+                      : follow
+                        ? '● Following ProPresenter'
+                        : '❙❙ Manual override'}
+                </span>
+                {ppConnected && !follow && (
+                  <button className="btn btn--sm" disabled={busy} onClick={() => act(() => setShowCurrent(roomId, { follow: true }))}>
+                    Resume follow
+                  </button>
+                )}
+              </div>
+              <div className="ros-track__now">
+                <span className="ros-track__label">Now</span>
+                <span className="ros-track__title">{currentItem ? currentItem.title : '—'}</span>
+              </div>
+              {cur?.slideCount != null && cur?.slideIndex != null && (
+                <div className="ros-progress">
+                  <div className="ros-progress__bar">
+                    <div
+                      className="ros-progress__fill"
+                      style={{ width: `${Math.min(100, ((cur.slideIndex + 1) / cur.slideCount) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="ros-progress__label">Slide {cur.slideIndex + 1} / {cur.slideCount}</span>
+                </div>
+              )}
+              <div className="ros-track__buttons">
+                <button className="btn" disabled={busy || idx <= 0} onClick={() => step(-1)}>◀ Prev</button>
+                <button className="btn btn--primary" disabled={busy || (idx >= 0 && idx >= trackable.length - 1)} onClick={() => step(1)}>
+                  Next ▶
+                </button>
+                <button className="btn btn--ghost" disabled={busy} onClick={() => act(() => endShow(roomId))}>
+                  ■ End Show
+                </button>
+              </div>
+            </>
           )}
-          <div className="ros-track__buttons">
-            <button className="btn" onClick={() => step(-1)} disabled={idx <= 0}>◀ Prev</button>
-            <button className="btn btn--primary" onClick={() => step(1)} disabled={idx >= 0 && idx >= trackable.length - 1}>
-              Next ▶
-            </button>
-            <button
-              className="btn btn--ghost"
-              onClick={() => { setFollow(false); setCurrent(null); }}
-              disabled={idx < 0}
-            >
-              Reset
-            </button>
-          </div>
         </div>
       </section>
 
       <section className="ros__order">
         <h2 className="ros__order-title">Run of Show</h2>
-        <p className="ros__hint">Follows ProPresenter live. Tap an item to override; “Resume follow” to hand control back.</p>
-        <OrderOfService items={plan.items} currentId={currentId} onSelect={selectManually} />
+        <p className="ros__hint">
+          {isThisShow
+            ? 'Following ProPresenter live. Tap an item to override.'
+            : 'Start the show to track it live and record timing.'}
+        </p>
+        <OrderOfService items={plan.items} currentId={currentId} onSelect={isThisShow ? pick : undefined} />
       </section>
     </div>
   );

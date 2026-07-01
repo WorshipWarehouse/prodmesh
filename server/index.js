@@ -18,8 +18,8 @@ import { publicRoom, rawToModeId } from './roomModel.js';
 import { validateRooms } from './validate.js';
 import * as settings from './settings.js';
 import * as pco from './integrations/planningCenter.js';
-import * as ppro from './integrations/proPresenter.js';
 import * as timeline from './timeline.js';
+import * as show from './showManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -178,10 +178,11 @@ app.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   res.json(report ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } });
 });
 
-// Live Run of Show tracking: streams the active order-of-service item id from
-// ProPresenter (mapped from its active playlist item) to the browser via SSE.
-app.get('/api/rooms/:id/run/:planId/stream', async (req, res) => {
-  const room = rooms[req.params.id];
+// ── Show session (server-coordinated Run of Show) ──────────────────────────────
+
+// Room-level show state stream (SSE). Browsers are pure views into this.
+app.get('/api/rooms/:id/show/stream', (req, res) => {
+  const roomId = req.params.id;
   res.set({
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -189,63 +190,38 @@ app.get('/api/rooms/:id/run/:planId/stream', async (req, res) => {
     'X-Accel-Buffering': 'no',
   });
   res.flushHeaders?.();
-  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-
   const hb = setInterval(() => res.write(': ping\n\n'), 20000);
-  const abort = new AbortController();
+  show.subscribe(roomId, res);
   req.on('close', () => {
     clearInterval(hb);
-    abort.abort();
+    show.unsubscribe(roomId, res);
   });
+});
 
-  const pp = room?.proPresenter;
-  if (!ppro.isConfigured(pp)) {
-    send('status', { configured: false });
-    return; // keep the connection open (heartbeat) but nothing to stream
-  }
+app.get('/api/rooms/:id/show', (req, res) => res.json(show.getState(req.params.id)));
 
-  // Load the plan's items once, for index → item-id mapping.
-  let items = [];
+app.post('/api/rooms/:id/show/start', async (req, res) => {
+  if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
   try {
-    const plan = (await upcomingForRoom(room.planningCenter ?? {}, 10)).find((p) => p.id === req.params.planId);
-    if (plan) items = await pco.getPlanItems(stOf(plan), plan.id);
-  } catch {
-    /* items stay [] — we'll still stream raw index/name */
-  }
-  const itemById = new Map(items.map((i) => [i.id, i]));
-
-  // Record timing per service instance (plan + selected service time).
-  const timeId = String(req.query.time || 'default');
-  const instanceId = `${req.params.planId}__${timeId}`;
-  const ctx = { roomId: req.params.id, planId: req.params.planId, timeId };
-
-  send('status', { configured: true });
-  try {
-    await ppro.pollRunState(
-      pp,
-      (s) => {
-        const itemId = ppro.mapIndexToItemId(items, { index: s.itemIndex, name: s.itemName });
-        if (itemId) {
-          const pc = itemById.get(itemId);
-          timeline.recordActive(instanceId, ctx, {
-            itemId,
-            itemName: pc?.title ?? s.itemName,
-            itemIndex: s.itemIndex,
-            plannedLength: pc?.length ?? null,
-          });
-        }
-        send('active', {
-          itemId,
-          index: s.itemIndex,
-          name: s.itemName,
-          slideIndex: s.slideIndex,
-          slideCount: s.slideCount,
-        });
-      },
-      abort.signal,
-    );
+    res.json(await show.startShow(req.params.id, req.body?.planId, String(req.body?.timeId || 'default')));
   } catch (err) {
-    if (!abort.signal.aborted) send('status', { configured: true, online: false, error: String(err.message ?? err) });
+    res.status(err.code === 'conflict' ? 409 : 400).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.post('/api/rooms/:id/show/end', (req, res) => {
+  try {
+    res.json(show.endShow(req.params.id));
+  } catch (err) {
+    res.status(err.code === 'not_found' ? 409 : 400).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.post('/api/rooms/:id/show/current', (req, res) => {
+  try {
+    res.json(show.setCurrent(req.params.id, { itemId: req.body?.itemId, follow: req.body?.follow }));
+  } catch (err) {
+    res.status(err.code === 'not_found' ? 409 : 400).json({ error: String(err.message ?? err) });
   }
 });
 
@@ -353,6 +329,7 @@ if (existsSync(distDir)) {
 
 // Only start listening when run directly (not when imported by tests).
 if (process.argv[1] === __filename) {
+  show.restoreShows().catch(() => {}); // resume any show that was active before restart
   app.listen(PORT, () => {
     console.log(`Production dashboard server on http://localhost:${PORT}`);
   });

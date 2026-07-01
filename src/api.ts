@@ -242,6 +242,46 @@ export const getReport = (id: string, planId: string, timeId?: string | null) =>
       (timeId ? `?time=${encodeURIComponent(timeId)}` : ''),
   );
 
+// ── Show session (server-coordinated Run of Show) ─────────────────────────────
+
+export interface ShowCurrent {
+  itemId: string | null;
+  itemIndex: number | null;
+  itemName: string | null;
+  slideIndex: number | null;
+  slideCount: number | null;
+}
+
+export interface ShowState {
+  active: boolean;
+  roomId?: string;
+  planId?: string;
+  timeId?: string;
+  startedAt?: number;
+  follow?: boolean;
+  ppConnected?: boolean | null;
+  current?: ShowCurrent;
+}
+
+async function postJson<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+export const startShow = (roomId: string, planId: string, timeId: string) =>
+  postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/start`, { planId, timeId });
+
+export const endShow = (roomId: string) =>
+  postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/end`, {});
+
+export const setShowCurrent = (roomId: string, body: { itemId?: string; follow?: boolean }) =>
+  postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/current`, body);
+
 export const getServicesOverview = () => getJson<ServicesOverview>('/api/services');
 
 export const triggerUpdate = () =>

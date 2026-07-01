@@ -1172,6 +1172,14 @@ body {
   font-weight: 700;
 }
 
+.ros-track__start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 100%;
+}
+
 .ros-track__buttons {
   display: flex;
   gap: 10px;
