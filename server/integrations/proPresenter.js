@@ -60,58 +60,42 @@ export function mapIndexToItemId(items, active) {
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 /** One-shot read of the current active item. */
-export async function readActive(pp) {
-  const res = await fetch(`${baseUrl(pp)}/v1/playlist/active`, {
-    signal: AbortSignal.timeout(3000),
-  });
+export async function readActive(pp, signal) {
+  const timeout = AbortSignal.timeout(3000);
+  const sig = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const res = await fetch(`${baseUrl(pp)}/v1/playlist/active`, { signal: sig });
   if (!res.ok) throw new Error(`ProPresenter ${res.status}`);
   return parseActive(await res.json());
 }
 
-// Pull complete JSON objects out of a growing buffer (chunked stream framing).
-function takeJson(buf) {
-  const start = buf.indexOf('{');
-  if (start < 0) return null;
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-  for (let i = start; i < buf.length; i++) {
-    const c = buf[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (c === '\\') esc = true;
-      else if (c === '"') inStr = false;
-    } else if (c === '"') inStr = true;
-    else if (c === '{') depth++;
-    else if (c === '}' && --depth === 0) {
-      return { json: buf.slice(start, i + 1), rest: buf.slice(i + 1) };
-    }
-  }
-  return null;
+function sleep(ms, signal) {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+  });
 }
 
 /**
- * Subscribe to active-item changes. Calls onState(active) for each update until
- * the signal aborts or the connection ends.
+ * Poll the active item and call onState(active) whenever it CHANGES, until the
+ * signal aborts. We poll (rather than stream) because /v1/playlist/active's
+ * chunked response only sends the initial state — it does not push item changes.
+ * The browser still gets real-time push, via our SSE.
  */
-export async function subscribeActive(pp, onState, signal) {
-  const res = await fetch(`${baseUrl(pp)}/v1/playlist/active?chunked=true`, { signal });
-  if (!res.ok || !res.body) throw new Error(`ProPresenter ${res.status}`);
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let out;
-    while ((out = takeJson(buf))) {
-      buf = out.rest;
-      try {
-        onState(parseActive(JSON.parse(out.json)));
-      } catch {
-        /* skip malformed frame */
+export async function pollActive(pp, onState, signal, intervalMs = 1000) {
+  let lastKey;
+  let fails = 0;
+  while (!signal.aborted) {
+    try {
+      const active = await readActive(pp, signal);
+      fails = 0;
+      const key = active.index == null ? 'none' : `${active.index}:${active.name ?? ''}`;
+      if (key !== lastKey) {
+        lastKey = key;
+        onState(active);
       }
+    } catch (err) {
+      if (++fails >= 3) throw err; // give up after sustained failure → SSE shows offline
     }
+    await sleep(intervalMs, signal);
   }
 }

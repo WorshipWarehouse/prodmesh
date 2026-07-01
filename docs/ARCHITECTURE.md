@@ -115,6 +115,11 @@ Express server (server/)
   Midweek/Evening). Map rooms to an array and merge.
 - **Song key** is `item.key_name`; **item "Leader"** is not a field — it's an
   *item note* in the "Leader" category (fetch items with `include=item_notes`).
+- **ProPresenter API is on its own port** (62202 here; 49310 is the legacy WS,
+  won't speak HTTP). The active item's fields nest under `playlist_item.id`. And
+  `/v1/playlist/active?chunked=true` only sends the INITIAL state — it does NOT
+  push item changes — so we **poll** `/v1/playlist/active` (~1s) and push to the
+  browser via SSE.
 - **PC Calendar, not Services, is the authoritative event→room→time source.**
   Services doesn't reliably know the physical room. See ADR 0001.
 - **launchd/systemd don't inherit your PATH** — the service installer bakes in the

@@ -207,7 +207,7 @@ app.get('/api/rooms/:id/run/:planId/stream', async (req, res) => {
 
   send('status', { configured: true });
   try {
-    await ppro.subscribeActive(
+    await ppro.pollActive(
       pp,
       (active) => send('active', { itemId: ppro.mapIndexToItemId(items, active), index: active.index, name: active.name }),
       abort.signal,
