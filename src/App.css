@@ -754,3 +754,200 @@ body {
   font-size: 0.85rem;
   color: var(--text);
 }
+
+/* ── Planning Center: service badge (shared) ───────────────────────────── */
+.svc__badge {
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.svc__badge--live {
+  color: #34c759;
+  background: rgba(52, 199, 89, 0.12);
+  border: 1px solid rgba(52, 199, 89, 0.35);
+}
+
+.svc__badge--mock {
+  color: var(--text-dim);
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+}
+
+.svc__muted {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.svc__time {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  margin-right: 6px;
+}
+
+/* ── Service panel (Room Status) ───────────────────────────────────────── */
+.svc {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.svc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.svc__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.svc__series {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.svc__plan {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.svc__date {
+  color: var(--text-dim);
+  margin: 2px 0 10px;
+}
+
+.svc__times {
+  margin-bottom: 12px;
+}
+
+.svc__toggle {
+  background: none;
+  border: none;
+  color: #5b8def;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.svc__items {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  counter-reset: item;
+}
+
+.svc__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.svc__item::before {
+  counter-increment: item;
+  content: counter(item);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+}
+
+.svc__item-title {
+  flex: 1;
+  font-weight: 500;
+}
+
+.svc__item-type {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.svc__item-len {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.svc__later {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+/* ── Services overview (Quick Access) ──────────────────────────────────── */
+.overview {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.overview__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.overview__title {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.overview__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.ovcard {
+  display: block;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.ovcard:hover {
+  background: var(--bg-tile-hover);
+  border-color: #5b8def;
+}
+
+.ovcard__room {
+  font-weight: 650;
+}
+
+.ovcard__type {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.ovcard__date {
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}

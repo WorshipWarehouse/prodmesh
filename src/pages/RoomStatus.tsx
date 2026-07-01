@@ -10,6 +10,7 @@ import {
   type RoomState,
 } from '../api';
 import { Clock } from '../components/Clock';
+import { ServicePanel } from '../components/ServicePanel';
 import logoUrl from '../assets/logo.png';
 
 const POLL_MS = 4000;
@@ -167,6 +168,8 @@ export function RoomStatus() {
           })}
         </div>
       </section>
+
+      <ServicePanel roomId={roomId} />
 
       <footer className="status__footer">
         <Link className="status__back" to="/">

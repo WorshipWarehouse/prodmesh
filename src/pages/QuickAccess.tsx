@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { church } from '../config/dashboard.config';
 import { SiteSection } from '../components/SiteSection';
+import { ServicesOverview } from '../components/ServicesOverview';
 import { Clock } from '../components/Clock';
 import logoUrl from '../assets/logo.png';
 
@@ -22,6 +23,7 @@ export function QuickAccess() {
       </header>
 
       <main className="app__sites">
+        <ServicesOverview />
         {church.sites.map((site) => (
           <SiteSection key={site.id} site={site} />
         ))}

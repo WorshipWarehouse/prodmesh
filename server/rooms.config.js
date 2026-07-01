@@ -43,6 +43,10 @@ export const rooms = {
     mock: false, // live — talks to the Companion on 127.0.0.1:8000
     companion: { host: '127.0.0.1', port: 8000 },
     state: { variable: 'roomState' },
+    // Planning Center service type this room's plans come from.
+    // Replace serviceTypeId with the real PC id once a token is connected;
+    // until then it runs on mock plan data.
+    planningCenter: { serviceTypeId: 'PLACEHOLDER-test', serviceTypeName: 'Test Service' },
     modes: standardModes(),
   },
 
@@ -54,6 +58,7 @@ export const rooms = {
     mock: false, // LIVE — Companion runs on this same (Producer) Mac in production
     companion: { host: '192.0.2.31', port: 8000 }, // Producer machine
     state: { variable: 'roomState' },
+    planningCenter: { serviceTypeId: 'PLACEHOLDER-north-weekend', serviceTypeName: 'North Weekend' },
     // Auditorium-specific modes. Button locations [page, row, column].
     modes: [
       mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),
@@ -71,6 +76,7 @@ export const rooms = {
     mock: true,
     companion: { host: '192.0.2.150', port: 8000 }, // Lighting machine
     state: { variable: 'roomState' },
+    planningCenter: { serviceTypeId: 'PLACEHOLDER-hsm', serviceTypeName: 'Youth Midweek' },
     modes: standardModes(),
   },
 
@@ -80,6 +86,7 @@ export const rooms = {
     mock: true,
     companion: { host: '192.0.2.101', port: 8000 }, // Chapel-Mac machine
     state: { variable: 'roomState' },
+    planningCenter: { serviceTypeId: 'PLACEHOLDER-msm', serviceTypeName: 'Chapel Midweek' },
     modes: standardModes(),
   },
 };

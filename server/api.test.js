@@ -74,3 +74,18 @@ test('room state exposes protection info', async () => {
 test('unknown room returns 404', async () => {
   assert.equal((await fetch(base + '/api/rooms/nope/state')).status, 404);
 });
+
+test('services overview lists configured rooms (mock)', async () => {
+  const body = await (await fetch(base + '/api/services')).json();
+  assert.equal(body.live, false); // no PC token in tests
+  assert.ok(body.services.length > 0);
+  assert.ok(body.services.every((s) => s.roomId && s.serviceType));
+});
+
+test("room service returns the next plan with an order of service", async () => {
+  const body = await (await fetch(`${base}/api/rooms/north-main/service`)).json();
+  assert.equal(body.configured, true);
+  assert.ok(body.plans.length > 0);
+  assert.ok(body.plans[0].items.length > 0); // items filled for the next plan
+  assert.ok(body.plans[0].times.length > 0);
+});

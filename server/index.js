@@ -17,6 +17,7 @@ import { readCustomVariable, pressButton } from './companion.js';
 import { publicRoom, rawToModeId } from './roomModel.js';
 import { validateRooms } from './validate.js';
 import * as settings from './settings.js';
+import * as pco from './integrations/planningCenter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -112,6 +113,42 @@ app.post('/api/rooms/:id/mode', async (req, res) => {
       online: false,
       error: String(err.message ?? err),
     });
+  }
+});
+
+// ── Planning Center Services (read-only plan display) ──────────────────────────
+
+// Overview: next service per configured room (for Quick Access).
+app.get('/api/services', async (_req, res) => {
+  const out = [];
+  for (const room of Object.values(rooms)) {
+    const pc = room.planningCenter;
+    if (!pc?.serviceTypeId) continue;
+    const st = { id: pc.serviceTypeId, name: pc.serviceTypeName };
+    try {
+      const plans = await pco.getUpcomingPlans(st, 1);
+      out.push({ roomId: room.id, roomName: room.name, serviceType: st.name, next: plans[0] ?? null });
+    } catch (err) {
+      out.push({ roomId: room.id, roomName: room.name, serviceType: st.name, next: null, error: String(err.message ?? err) });
+    }
+  }
+  res.json({ live: pco.isConfigured(), services: out });
+});
+
+// One room's upcoming plans, with the next plan's order of service.
+app.get('/api/rooms/:id/service', async (req, res) => {
+  const room = rooms[req.params.id];
+  if (!room) return res.status(404).json({ error: 'Unknown room' });
+  const pc = room.planningCenter;
+  if (!pc?.serviceTypeId) return res.json({ configured: false, live: pco.isConfigured(), plans: [] });
+
+  const st = { id: pc.serviceTypeId, name: pc.serviceTypeName };
+  try {
+    const plans = await pco.getUpcomingPlans(st, 3);
+    if (plans[0]) plans[0].items = await pco.getPlanItems(st, plans[0].id);
+    res.json({ configured: true, live: pco.isConfigured(), plans });
+  } catch (err) {
+    res.status(502).json({ configured: true, live: pco.isConfigured(), plans: [], error: String(err.message ?? err) });
   }
 });
 

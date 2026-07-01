@@ -162,6 +162,61 @@ export interface Version {
 
 export const getVersion = () => getJson<Version>('/api/system/version');
 
+// ── Planning Center Services ──────────────────────────────────────────────────
+
+export interface PlanTime {
+  id: string;
+  name: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  type: string | null;
+}
+
+export interface PlanItem {
+  id: string;
+  sequence: number | null;
+  title: string;
+  type: string | null;
+  length: number | null;
+  description: string | null;
+}
+
+export interface ServicePlan {
+  id: string;
+  serviceTypeId: string;
+  serviceTypeName: string;
+  title: string;
+  seriesTitle: string | null;
+  dates: string | null;
+  sortDate: string | null;
+  times: PlanTime[];
+  items: PlanItem[];
+  _mock?: boolean;
+}
+
+export interface RoomService {
+  configured: boolean;
+  live: boolean;
+  plans: ServicePlan[];
+  error?: string;
+}
+
+export interface ServicesOverview {
+  live: boolean;
+  services: {
+    roomId: string;
+    roomName: string;
+    serviceType: string;
+    next: ServicePlan | null;
+    error?: string;
+  }[];
+}
+
+export const getRoomService = (id: string) =>
+  getJson<RoomService>(`/api/rooms/${encodeURIComponent(id)}/service`);
+
+export const getServicesOverview = () => getJson<ServicesOverview>('/api/services');
+
 export const triggerUpdate = () =>
   fetch('/api/system/update', { method: 'POST', headers: authHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
