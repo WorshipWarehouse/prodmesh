@@ -4,6 +4,7 @@ import {
   getRoom,
   getRoomState,
   setRoomMode,
+  OverrideRequiredError,
   type RoomMeta,
   type RoomMode,
   type RoomState,
@@ -19,9 +20,10 @@ export function RoomStatus() {
   const [state, setState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<RoomMode | null>(null); // confirm dialog
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Load room metadata once.
   useEffect(() => {
     let active = true;
     getRoom(roomId)
@@ -36,31 +38,53 @@ export function RoomStatus() {
     try {
       setState(await getRoomState(roomId));
     } catch {
-      /* keep last state; the online badge will reflect trouble */
+      /* keep last state */
     }
   }, [roomId]);
 
-  // Poll current state.
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, POLL_MS);
     return () => clearInterval(id);
   }, [refresh]);
 
+  const protection = state?.protection;
+  const isLocked = useCallback(
+    (modeId: string) =>
+      Boolean(protection?.enforced && protection.lockedModes.includes(modeId)),
+    [protection],
+  );
+
+  const openConfirm = (mode: RoomMode) => {
+    setPin('');
+    setPinError(null);
+    setPending(mode);
+  };
+
   const confirmMode = useCallback(async () => {
     if (!pending) return;
+    const locked = isLocked(pending.id);
+    if (locked && !pin) {
+      setPinError('Enter the override PIN to continue.');
+      return;
+    }
     setBusy(true);
+    setPinError(null);
     try {
-      const next = await setRoomMode(roomId, pending.id);
+      const next = await setRoomMode(roomId, pending.id, locked ? pin : undefined);
       setState(next);
-    } catch {
-      /* surfaced via state badge on next poll */
+      setPending(null);
+    } catch (err) {
+      if (err instanceof OverrideRequiredError) {
+        setPinError('Incorrect override PIN.');
+      } else {
+        setPinError('Something went wrong — try again.');
+      }
     } finally {
       setBusy(false);
-      setPending(null);
       refresh();
     }
-  }, [pending, roomId, refresh]);
+  }, [pending, roomId, pin, isLocked, refresh]);
 
   if (error) {
     return (
@@ -79,9 +103,8 @@ export function RoomStatus() {
 
   const currentMode = room.modes.find((m) => m.id === state.mode) ?? null;
   const inStandby = currentMode?.isStandby ?? false;
-
-  // Active modes are always shown; the Standby button only when not already idle.
   const buttons = room.modes.filter((m) => !m.isStandby || !inStandby);
+  const showProtection = Boolean(protection?.active && protection.enforced);
 
   return (
     <div className="status">
@@ -95,6 +118,16 @@ export function RoomStatus() {
         </div>
         <Clock />
       </header>
+
+      {showProtection && (
+        <div className="protbar">
+          🔒 <strong>{protection!.label}</strong> — locked:{' '}
+          {protection!.lockedModes
+            .map((id) => room.modes.find((m) => m.id === id)?.label ?? id)
+            .join(', ')}{' '}
+          <span className="protbar__hint">(override PIN required)</span>
+        </div>
+      )}
 
       <section
         className="status__current"
@@ -112,6 +145,7 @@ export function RoomStatus() {
         <div className="status__buttons">
           {buttons.map((mode) => {
             const isActive = mode.id === state.mode;
+            const locked = isLocked(mode.id);
             return (
               <button
                 key={mode.id}
@@ -121,9 +155,12 @@ export function RoomStatus() {
                 }`}
                 style={{ ['--mode-color' as string]: mode.color }}
                 disabled={isActive}
-                onClick={() => setPending(mode)}
+                onClick={() => openConfirm(mode)}
               >
-                <span className="mode-btn__label">{mode.label}</span>
+                <span className="mode-btn__label">
+                  {locked && <span aria-label="locked">🔒 </span>}
+                  {mode.label}
+                </span>
                 {isActive && <span className="mode-btn__active">Active now</span>}
               </button>
             );
@@ -144,6 +181,27 @@ export function RoomStatus() {
               Switch <strong>{room.name}</strong> to{' '}
               <strong style={{ color: pending.color }}>{pending.label}</strong>?
             </p>
+
+            {isLocked(pending.id) && (
+              <div className="confirm__lock">
+                <label className="confirm__lock-label" htmlFor="override-pin">
+                  🔒 This change is locked ({protection!.label}). Enter override PIN:
+                </label>
+                <input
+                  id="override-pin"
+                  className="confirm__pin"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {pinError && <p className="confirm__error">{pinError}</p>}
+
             <div className="confirm__buttons">
               <button
                 type="button"

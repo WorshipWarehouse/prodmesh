@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { church } from '../config/dashboard.config';
 import { SiteSection } from '../components/SiteSection';
 import { Clock } from '../components/Clock';
@@ -14,7 +15,10 @@ export function QuickAccess() {
             <p className="app__subtitle">Quick Access</p>
           </div>
         </div>
-        <Clock />
+        <div className="app__header-right">
+          <Clock />
+          <Link className="gear" to="/settings" title="Settings" aria-label="Settings">⚙️</Link>
+        </div>
       </header>
 
       <main className="app__sites">
