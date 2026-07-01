@@ -14,18 +14,23 @@ test('isConfigured is false without credentials', () => {
   assert.equal(pco.isConfigured(), false);
 });
 
-test('getUpcomingPlans (mock) returns the requested count, normalized', async () => {
+test('getUpcomingPlans (mock) returns summaries; times hydrated separately', async () => {
   const plans = await pco.getUpcomingPlans(ST, 2);
   assert.equal(plans.length, 2);
   for (const p of plans) {
     assert.equal(p.serviceTypeName, 'Weekend');
     assert.ok(p.title);
-    assert.ok(Array.isArray(p.times) && p.times.length > 0);
-    assert.ok(p.times[0].startsAt);
+    assert.deepEqual(p.times, []); // not hydrated yet
     assert.ok(p.sortDate);
   }
-  // Ordered soonest-first.
   assert.ok(new Date(plans[0].sortDate) <= new Date(plans[1].sortDate));
+});
+
+test('getPlanTimes (mock) returns service times', async () => {
+  const times = await pco.getPlanTimes(ST, 'plan-1');
+  assert.ok(times.length > 0);
+  assert.ok(times[0].startsAt);
+  assert.ok(times.every((t) => t.type === 'service'));
 });
 
 test('getPlanItems (mock) returns a sequenced order of service', async () => {

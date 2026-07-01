@@ -118,34 +118,52 @@ app.post('/api/rooms/:id/mode', async (req, res) => {
 
 // ── Planning Center Services (read-only plan display) ──────────────────────────
 
+const stOf = (plan) => ({ id: plan.serviceTypeId, name: plan.serviceTypeName });
+
+// Upcoming plans across ALL of a room's service types, soonest first.
+async function upcomingForRoom(pc, limit) {
+  const types = pc.serviceTypes ?? [];
+  const lists = await Promise.all(
+    types.map((st) => pco.getUpcomingPlans(st, limit).catch(() => [])),
+  );
+  return lists
+    .flat()
+    .sort((a, b) => new Date(a.sortDate) - new Date(b.sortDate))
+    .slice(0, limit);
+}
+
 // Overview: next service per configured room (for Quick Access).
 app.get('/api/services', async (_req, res) => {
   const out = [];
   for (const room of Object.values(rooms)) {
-    const pc = room.planningCenter;
-    if (!pc?.serviceTypeId) continue;
-    const st = { id: pc.serviceTypeId, name: pc.serviceTypeName };
+    if (!room.planningCenter?.serviceTypes?.length) continue;
     try {
-      const plans = await pco.getUpcomingPlans(st, 1);
-      out.push({ roomId: room.id, roomName: room.name, serviceType: st.name, next: plans[0] ?? null });
+      const [next] = await upcomingForRoom(room.planningCenter, 1);
+      if (next) next.times = await pco.getPlanTimes(stOf(next), next.id);
+      out.push({ roomId: room.id, roomName: room.name, serviceType: next?.serviceTypeName ?? null, next: next ?? null });
     } catch (err) {
-      out.push({ roomId: room.id, roomName: room.name, serviceType: st.name, next: null, error: String(err.message ?? err) });
+      out.push({ roomId: room.id, roomName: room.name, serviceType: null, next: null, error: String(err.message ?? err) });
     }
   }
   res.json({ live: pco.isConfigured(), services: out });
 });
 
-// One room's upcoming plans, with the next plan's order of service.
+// One room's upcoming plans, with the next plan's times + order of service.
 app.get('/api/rooms/:id/service', async (req, res) => {
   const room = rooms[req.params.id];
   if (!room) return res.status(404).json({ error: 'Unknown room' });
-  const pc = room.planningCenter;
-  if (!pc?.serviceTypeId) return res.json({ configured: false, live: pco.isConfigured(), plans: [] });
-
-  const st = { id: pc.serviceTypeId, name: pc.serviceTypeName };
+  if (!room.planningCenter?.serviceTypes?.length) {
+    return res.json({ configured: false, live: pco.isConfigured(), plans: [] });
+  }
   try {
-    const plans = await pco.getUpcomingPlans(st, 3);
-    if (plans[0]) plans[0].items = await pco.getPlanItems(st, plans[0].id);
+    const plans = await upcomingForRoom(room.planningCenter, 3);
+    if (plans[0]) {
+      const st = stOf(plans[0]);
+      [plans[0].times, plans[0].items] = await Promise.all([
+        pco.getPlanTimes(st, plans[0].id),
+        pco.getPlanItems(st, plans[0].id),
+      ]);
+    }
     res.json({ configured: true, live: pco.isConfigured(), plans });
   } catch (err) {
     res.status(502).json({ configured: true, live: pco.isConfigured(), plans: [], error: String(err.message ?? err) });

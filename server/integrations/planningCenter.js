@@ -46,29 +46,25 @@ async function pcGet(path) {
   return res.json();
 }
 
-// ── Normalizers (JSON:API → our clean shapes) ─────────────────────────────────
-function normalizePlan(serviceType, data, included = []) {
+// ── Normalizers (JSON:API → our clean shapes) — field names verified live ─────
+function normalizePlan(serviceType, data) {
   const a = data.attributes ?? {};
-  const timeIds = new Set((data.relationships?.plan_times?.data ?? []).map((t) => t.id));
-  const times = included
-    .filter((i) => i.type === 'PlanTime' && timeIds.has(i.id))
-    .map(normalizeTime);
   return {
     id: data.id,
     serviceTypeId: serviceType.id,
     serviceTypeName: serviceType.name,
-    title: a.title || a.series_title || 'Service', // ⓘ
-    seriesTitle: a.series_title ?? null, // ⓘ
-    dates: a.dates ?? null, // ⓘ human string, e.g. "July 5, 2026"
-    sortDate: a.sort_date ?? null, // ⓘ ISO
-    times,
-    items: [], // filled on demand via getPlanItems()
+    title: a.title || a.series_title || 'Service',
+    seriesTitle: a.series_title ?? null,
+    dates: a.dates ?? null, // human string, e.g. "July 5, 2026"
+    sortDate: a.sort_date ?? null, // ISO
+    times: [], // hydrated via getPlanTimes()
+    items: [], // hydrated via getPlanItems()
   };
 }
 
 function normalizeTime(t) {
   const a = t.attributes ?? {};
-  return { id: t.id, name: a.name ?? null, startsAt: a.starts_at ?? null, endsAt: a.ends_at ?? null, type: a.time_type ?? null }; // ⓘ
+  return { id: t.id, name: a.name ?? null, startsAt: a.starts_at ?? null, endsAt: a.ends_at ?? null, type: a.time_type ?? null };
 }
 
 function normalizeItem(it) {
@@ -85,14 +81,24 @@ function normalizeItem(it) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** Upcoming plans for a service type ({ id, name }). Summaries (no items). */
+/** Upcoming plans for a service type ({ id, name }). Summaries — times/items
+ *  are hydrated separately (see getPlanTimes / getPlanItems). */
 export function getUpcomingPlans(serviceType, limit = 3) {
   return cached(`plans:${serviceType.id}:${limit}`, async () => {
     if (!isConfigured()) return mockPlans(serviceType, limit);
-    const body = await pcGet(
-      `/service_types/${serviceType.id}/plans?filter=future&order=sort_date&per_page=${limit}&include=plan_times`,
-    );
-    return (body.data ?? []).map((d) => normalizePlan(serviceType, d, body.included ?? []));
+    const body = await pcGet(`/service_types/${serviceType.id}/plans?filter=future&order=sort_date&per_page=${limit}`);
+    return (body.data ?? []).map((d) => normalizePlan(serviceType, d));
+  });
+}
+
+/** The SERVICE times for a plan (rehearsals/auditions/etc. are filtered out). */
+export function getPlanTimes(serviceType, planId) {
+  return cached(`times:${planId}`, async () => {
+    if (!isConfigured()) return mockTimes();
+    const body = await pcGet(`/service_types/${serviceType.id}/plans/${planId}/plan_times`);
+    return (body.data ?? [])
+      .filter((t) => t.attributes?.time_type === 'service')
+      .map(normalizeTime);
   });
 }
 
@@ -116,11 +122,6 @@ function nextSunday(offsetWeeks = 0) {
 function mockPlans(serviceType, limit) {
   return Array.from({ length: limit }, (_, i) => {
     const day = nextSunday(i);
-    const at = (h) => {
-      const t = new Date(day);
-      t.setHours(h, 0, 0, 0);
-      return t.toISOString();
-    };
     return {
       id: `mock-${serviceType.id}-${i}`,
       serviceTypeId: serviceType.id,
@@ -129,14 +130,24 @@ function mockPlans(serviceType, limit) {
       seriesTitle: 'Summer in the Psalms',
       dates: day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }),
       sortDate: day.toISOString(),
-      times: [
-        { id: `${i}-1`, name: '9:00 AM', startsAt: at(9), endsAt: at(10), type: 'service' },
-        { id: `${i}-2`, name: '11:00 AM', startsAt: at(11), endsAt: at(12), type: 'service' },
-      ],
+      times: [],
       items: [],
       _mock: true,
     };
   });
+}
+
+function mockTimes() {
+  const day = nextSunday(0);
+  const at = (h) => {
+    const t = new Date(day);
+    t.setHours(h, 0, 0, 0);
+    return t.toISOString();
+  };
+  return [
+    { id: 'svc-1', name: '9:00 AM', startsAt: at(9), endsAt: at(10), type: 'service' },
+    { id: 'svc-2', name: '11:00 AM', startsAt: at(11), endsAt: at(12), type: 'service' },
+  ];
 }
 
 function mockItems() {

@@ -52,6 +52,7 @@ export function ServicePanel({ roomId }: { roomId: string }) {
 
       {next && (
         <div className="svc__next">
+          <div className="svc__type-name">{next.serviceTypeName}</div>
           {next.seriesTitle && <div className="svc__series">{next.seriesTitle}</div>}
           <div className="svc__plan">{next.title}</div>
           {next.dates && <div className="svc__date">{next.dates}</div>}
