@@ -63,7 +63,8 @@ export const rooms = {
         { id: '500002', name: 'Second Service' },
         { id: '500003', name: "Midweek" },
         { id: '500004', name: 'Evening' },
-        // TODO: confirm which "Special Events" type maps here (265639 vs 987878)
+        // "Special Events" (265639) intentionally omitted: its plans aren't
+        // reliably in this room. Add once Calendar can confirm room (see ADR 0001).
       ],
     },
     // Auditorium-specific modes. Button locations [page, row, column].
