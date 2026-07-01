@@ -40,11 +40,14 @@ Notes:
 
 ## Roadmap / open threads (roughly prioritized)
 
-1. **Run of Show — Phase 2 (ProPresenter live tracking).** Phase 1 shipped
-   (clickable service times → `/room/:id/run/:planId`, order of service +
-   countdown + manual tracking). Next: per-room ProPresenter client + SSE to
-   auto-advance the current item. Official API (7.9+); PC plan is pushed to PP as
-   a playlist, so map by playlist index/name. See ADR 0003.
+1. **Run of Show — Phase 2 (ProPresenter live tracking) — BUILT, verifying.**
+   Per-room ProPresenter client (`integrations/proPresenter.js`) + SSE endpoint
+   (`/api/rooms/:id/run/:planId/stream`) stream the active playlist item; the view
+   auto-advances in "follow" mode with manual override. Official API on port
+   **62202** (not 49310 = legacy WS). Mapping is by playlist index (PC push
+   preserves order) with tolerant name fallback. See ADR 0003.
+   - Remaining: confirm the live highlight moves when a slide is triggered; set
+     each room's real PP API port on-site (PP picks an ephemeral port per machine).
 2. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.

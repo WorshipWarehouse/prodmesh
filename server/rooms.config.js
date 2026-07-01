@@ -46,6 +46,8 @@ export const rooms = {
     // Planning Center service type(s) whose plans feed this room. A room can
     // host several (the soonest upcoming plan across them is shown).
     planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] }, // live demo
+    // ProPresenter API (official 7.9+). Port is per-machine (PP picks it).
+    proPresenter: { host: '127.0.0.1', port: 62202 },
     modes: standardModes(),
   },
 
@@ -67,6 +69,7 @@ export const rooms = {
         // reliably in this room. Add once Calendar can confirm room (see ADR 0001).
       ],
     },
+    proPresenter: { host: '192.0.2.74', port: 62202 }, // ProPresenter (confirm port on-site)
     // Auditorium-specific modes. Button locations [page, row, column].
     modes: [
       mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),

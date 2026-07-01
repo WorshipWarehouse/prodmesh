@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   getRoom,
@@ -51,6 +51,8 @@ export function RunOfShow() {
   const [plan, setPlan] = useState<ServicePlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const [follow, setFollow] = useState(true);
+  const [ppConnected, setPpConnected] = useState<boolean | null>(null);
 
   useEffect(() => {
     getRoom(roomId).then(setRoom).catch(() => setError('Room not found'));
@@ -72,6 +74,35 @@ export function RunOfShow() {
     [planId],
   );
 
+  // Live ProPresenter tracking via SSE. In "follow" mode it auto-advances the
+  // highlight; a manual tap drops out of follow (override) until re-enabled.
+  const followRef = useRef(follow);
+  followRef.current = follow;
+  const lastPpRef = useRef<string | null>(null);
+  useEffect(() => {
+    const es = new EventSource(`/api/rooms/${roomId}/run/${planId}/stream`);
+    es.addEventListener('status', (e) => {
+      const d = JSON.parse((e as MessageEvent).data);
+      setPpConnected(Boolean(d.configured) && d.online !== false);
+    });
+    es.addEventListener('active', (e) => {
+      const d = JSON.parse((e as MessageEvent).data);
+      lastPpRef.current = d.itemId ?? null;
+      if (followRef.current && d.itemId) setCurrent(d.itemId);
+    });
+    es.onerror = () => setPpConnected(false);
+    return () => es.close();
+  }, [roomId, planId, setCurrent]);
+
+  const selectManually = (id: string) => {
+    setFollow(false);
+    setCurrent(id);
+  };
+  const resumeFollow = () => {
+    setFollow(true);
+    if (lastPpRef.current) setCurrent(lastPpRef.current);
+  };
+
   if (error) {
     return (
       <div className="ros ros--msg">
@@ -87,6 +118,7 @@ export function RunOfShow() {
   const trackable = plan.items.filter((i) => (i.type ?? 'item') !== 'header');
   const idx = trackable.findIndex((i) => i.id === currentId);
   const step = (delta: number) => {
+    setFollow(false); // manual navigation overrides follow
     const n = idx < 0 ? (delta > 0 ? 0 : -1) : idx + delta;
     if (n >= 0 && n < trackable.length) setCurrent(trackable[n].id);
   };
@@ -108,6 +140,24 @@ export function RunOfShow() {
       <section className="ros__widgets">
         <Countdown time={selectedTime} />
         <div className="ros-track">
+          <div
+            className={`ros-track__status ros-track__status--${
+              ppConnected === null ? 'idle' : !ppConnected ? 'off' : follow ? 'follow' : 'manual'
+            }`}
+          >
+            <span>
+              {ppConnected === null
+                ? '· connecting to ProPresenter…'
+                : !ppConnected
+                  ? '○ ProPresenter offline — manual mode'
+                  : follow
+                    ? '● Following ProPresenter'
+                    : '❙❙ Manual override'}
+            </span>
+            {ppConnected && !follow && (
+              <button className="btn btn--sm" onClick={resumeFollow}>Resume follow</button>
+            )}
+          </div>
           <div className="ros-track__now">
             <span className="ros-track__label">Now</span>
             <span className="ros-track__title">{currentItem ? currentItem.title : '—'}</span>
@@ -117,15 +167,21 @@ export function RunOfShow() {
             <button className="btn btn--primary" onClick={() => step(1)} disabled={idx >= 0 && idx >= trackable.length - 1}>
               Next ▶
             </button>
-            <button className="btn btn--ghost" onClick={() => setCurrent(null)} disabled={idx < 0}>Reset</button>
+            <button
+              className="btn btn--ghost"
+              onClick={() => { setFollow(false); setCurrent(null); }}
+              disabled={idx < 0}
+            >
+              Reset
+            </button>
           </div>
         </div>
       </section>
 
       <section className="ros__order">
         <h2 className="ros__order-title">Run of Show</h2>
-        <p className="ros__hint">Tap an item to mark where you are. (Live ProPresenter auto-tracking coming next.)</p>
-        <OrderOfService items={plan.items} currentId={currentId} onSelect={setCurrent} />
+        <p className="ros__hint">Follows ProPresenter live. Tap an item to override; “Resume follow” to hand control back.</p>
+        <OrderOfService items={plan.items} currentId={currentId} onSelect={selectManually} />
       </section>
     </div>
   );

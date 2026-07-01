@@ -18,6 +18,7 @@ import { publicRoom, rawToModeId } from './roomModel.js';
 import { validateRooms } from './validate.js';
 import * as settings from './settings.js';
 import * as pco from './integrations/planningCenter.js';
+import * as ppro from './integrations/proPresenter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -166,6 +167,53 @@ app.get('/api/rooms/:id/plan/:planId', async (req, res) => {
     res.json({ live: pco.isConfigured(), plan });
   } catch (err) {
     res.status(502).json({ error: String(err.message ?? err) });
+  }
+});
+
+// Live Run of Show tracking: streams the active order-of-service item id from
+// ProPresenter (mapped from its active playlist item) to the browser via SSE.
+app.get('/api/rooms/:id/run/:planId/stream', async (req, res) => {
+  const room = rooms[req.params.id];
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders?.();
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  const hb = setInterval(() => res.write(': ping\n\n'), 20000);
+  const abort = new AbortController();
+  req.on('close', () => {
+    clearInterval(hb);
+    abort.abort();
+  });
+
+  const pp = room?.proPresenter;
+  if (!ppro.isConfigured(pp)) {
+    send('status', { configured: false });
+    return; // keep the connection open (heartbeat) but nothing to stream
+  }
+
+  // Load the plan's items once, for index → item-id mapping.
+  let items = [];
+  try {
+    const plan = (await upcomingForRoom(room.planningCenter ?? {}, 10)).find((p) => p.id === req.params.planId);
+    if (plan) items = await pco.getPlanItems(stOf(plan), plan.id);
+  } catch {
+    /* items stay [] — we'll still stream raw index/name */
+  }
+
+  send('status', { configured: true });
+  try {
+    await ppro.subscribeActive(
+      pp,
+      (active) => send('active', { itemId: ppro.mapIndexToItemId(items, active), index: active.index, name: active.name }),
+      abort.signal,
+    );
+  } catch (err) {
+    if (!abort.signal.aborted) send('status', { configured: true, online: false, error: String(err.message ?? err) });
   }
 });
 

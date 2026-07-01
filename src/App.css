@@ -1107,6 +1107,20 @@ body {
   justify-content: center;
 }
 
+.ros-track__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ros-track__status--follow { color: #34c759; }
+.ros-track__status--manual { color: #ffb020; }
+.ros-track__status--off { color: var(--text-dim); }
+.ros-track__status--idle { color: var(--text-faint); }
+
 .ros-track__label {
   font-size: 0.78rem;
   text-transform: uppercase;
