@@ -84,7 +84,9 @@ export function RunOfShow() {
   followRef.current = follow;
   const lastPpRef = useRef<string | null>(null);
   useEffect(() => {
-    const es = new EventSource(`/api/rooms/${roomId}/run/${planId}/stream`);
+    const es = new EventSource(
+      `/api/rooms/${roomId}/run/${planId}/stream${timeId ? `?time=${encodeURIComponent(timeId)}` : ''}`,
+    );
     es.addEventListener('status', (e) => {
       const d = JSON.parse((e as MessageEvent).data);
       setPpConnected(Boolean(d.configured) && d.online !== false);
@@ -97,7 +99,7 @@ export function RunOfShow() {
     });
     es.onerror = () => setPpConnected(false);
     return () => es.close();
-  }, [roomId, planId, setCurrent]);
+  }, [roomId, planId, timeId, setCurrent]);
 
   const selectManually = (id: string) => {
     setFollow(false);
@@ -139,7 +141,15 @@ export function RunOfShow() {
             {[plan.serviceTypeName, plan.seriesTitle, plan.dates].filter(Boolean).join(' · ')}
           </p>
         </div>
-        <Clock />
+        <div className="ros__header-right">
+          <Clock />
+          <Link
+            className="btn btn--sm"
+            to={`/room/${roomId}/run/${planId}/report${timeId ? `?time=${timeId}` : ''}`}
+          >
+            📊 Timing report
+          </Link>
+        </div>
       </header>
 
       <section className="ros__widgets">

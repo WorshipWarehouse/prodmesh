@@ -36,6 +36,8 @@ Notes:
 - Room Status mode control with confirm + schedule-based **lockouts** (Override PIN).
 - Settings UI: Admin/Override PINs, schedule editor, system self-update.
 - PC Services plan display on Quick Access + Room Status (real data).
+- Run of Show: live ProPresenter follow, slide progress, and a **timing report**
+  (planned vs actual per item, recorded server-side per service time) for debriefs.
 - Deploy/update scripts (launchd/systemd), tests, CI.
 
 ## Roadmap / open threads (roughly prioritized)

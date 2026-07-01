@@ -19,6 +19,7 @@ import { validateRooms } from './validate.js';
 import * as settings from './settings.js';
 import * as pco from './integrations/planningCenter.js';
 import * as ppro from './integrations/proPresenter.js';
+import * as timeline from './timeline.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -170,6 +171,13 @@ app.get('/api/rooms/:id/plan/:planId', async (req, res) => {
   }
 });
 
+// Timing report for a service instance (planned vs actual per item).
+app.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
+  const timeId = String(req.query.time || 'default');
+  const report = timeline.getReport(`${req.params.planId}__${timeId}`);
+  res.json(report ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } });
+});
+
 // Live Run of Show tracking: streams the active order-of-service item id from
 // ProPresenter (mapped from its active playlist item) to the browser via SSE.
 app.get('/api/rooms/:id/run/:planId/stream', async (req, res) => {
@@ -204,19 +212,36 @@ app.get('/api/rooms/:id/run/:planId/stream', async (req, res) => {
   } catch {
     /* items stay [] — we'll still stream raw index/name */
   }
+  const itemById = new Map(items.map((i) => [i.id, i]));
+
+  // Record timing per service instance (plan + selected service time).
+  const timeId = String(req.query.time || 'default');
+  const instanceId = `${req.params.planId}__${timeId}`;
+  const ctx = { roomId: req.params.id, planId: req.params.planId, timeId };
 
   send('status', { configured: true });
   try {
     await ppro.pollRunState(
       pp,
-      (s) =>
+      (s) => {
+        const itemId = ppro.mapIndexToItemId(items, { index: s.itemIndex, name: s.itemName });
+        if (itemId) {
+          const pc = itemById.get(itemId);
+          timeline.recordActive(instanceId, ctx, {
+            itemId,
+            itemName: pc?.title ?? s.itemName,
+            itemIndex: s.itemIndex,
+            plannedLength: pc?.length ?? null,
+          });
+        }
         send('active', {
-          itemId: ppro.mapIndexToItemId(items, { index: s.itemIndex, name: s.itemName }),
+          itemId,
           index: s.itemIndex,
           name: s.itemName,
           slideIndex: s.slideIndex,
           slideCount: s.slideCount,
-        }),
+        });
+      },
       abort.signal,
     );
   } catch (err) {

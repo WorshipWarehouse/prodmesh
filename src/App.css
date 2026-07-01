@@ -1191,6 +1191,119 @@ body {
   font-size: 0.85rem;
 }
 
+.ros__header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ── Timing report ─────────────────────────────────────────────────────── */
+.report {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.report__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+
+.report__title {
+  margin: 6px 0 0;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+.report__summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.report__stat {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.report__stat-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.report__stat-val {
+  font-size: 1.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.report__stat--over {
+  border-color: rgba(255, 107, 107, 0.5);
+  color: #ff8a8a;
+}
+
+.report__stat--under {
+  border-color: rgba(52, 199, 89, 0.5);
+  color: #4ad06a;
+}
+
+.report__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.report__table th {
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.report__table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.report__num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.report__table td.report__num:first-child,
+.report__num:first-child {
+  text-align: left;
+}
+
+.report__over { color: #ff8a8a; font-weight: 600; }
+.report__under { color: #4ad06a; font-weight: 600; }
+
+.report__row--live {
+  background: rgba(52, 199, 89, 0.08);
+}
+
+.report__live {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  color: #34c759;
+}
+
 /* ── Services overview (Quick Access) ──────────────────────────────────── */
 .overview {
   background: var(--bg-raised);

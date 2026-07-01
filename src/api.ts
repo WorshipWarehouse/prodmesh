@@ -222,6 +222,26 @@ export const getRoomPlan = (id: string, planId: string) =>
     `/api/rooms/${encodeURIComponent(id)}/plan/${encodeURIComponent(planId)}`,
   );
 
+export interface ReportItem {
+  itemName: string;
+  plannedLength: number | null;
+  actualSeconds: number;
+  delta: number | null;
+  ongoing: boolean;
+}
+
+export interface TimingReport {
+  items: ReportItem[];
+  totals: { planned: number; actual: number; delta: number };
+  startedAt?: number | null;
+}
+
+export const getReport = (id: string, planId: string, timeId?: string | null) =>
+  getJson<TimingReport>(
+    `/api/rooms/${encodeURIComponent(id)}/plan/${encodeURIComponent(planId)}/report` +
+      (timeId ? `?time=${encodeURIComponent(timeId)}` : ''),
+  );
+
 export const getServicesOverview = () => getJson<ServicesOverview>('/api/services');
 
 export const triggerUpdate = () =>
