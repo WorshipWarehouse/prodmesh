@@ -19,14 +19,20 @@ function baseUrl(pp) {
 // ── Mapping (pure, tested) ────────────────────────────────────────────────────
 
 // Extract the active presentation playlist item from a /v1/playlist/active body.
-// The item's fields live under `playlist_item.id` (verified against live API).
+// Fields live under `playlist_item.id`; the active arrangement (which the
+// presentation's own `current_arrangement` does NOT reliably report) lives under
+// `playlist_item.presentation_info`. Both verified against the live API.
 export function parseActive(state) {
   const p = state?.presentation ?? {};
-  const id = p.playlist_item?.id ?? null;
+  const pli = p.playlist_item ?? null;
+  const id = pli?.id ?? null;
+  const info = pli?.presentation_info ?? {};
   return {
     index: id?.index ?? null,
     name: id?.name ?? null,
     uuid: id?.uuid ?? null,
+    arrangementUuid: info.arrangement_uuid || null,
+    arrangementName: info.arrangement_name || null,
     playlistName: p.playlist?.name ?? null,
   };
 }
@@ -86,28 +92,32 @@ export async function readSlide(pp, signal) {
 }
 
 /**
- * Total slide count of the active presentation. Uses the current arrangement's
- * expanded sequence (songs repeat groups); falls back to the raw group sum when
- * no arrangement is selected.
+ * Total slide count of the active presentation for the given arrangement
+ * (songs repeat groups, so different arrangements have different totals).
+ * `arrangement` = { uuid, name } from the active playlist item. Falls back to
+ * the presentation's own current_arrangement, then the raw group sum.
  */
-export function slideTotal(pres) {
+export function slideTotal(pres, arrangement = null) {
   if (!pres) return null;
   const gcount = {};
   for (const g of pres.groups ?? []) gcount[g.uuid] = (g.slides ?? []).length;
-  const cur = pres.current_arrangement;
-  if (cur) {
-    const arr = (pres.arrangements ?? []).find((a) => a.id?.uuid === cur);
-    if (arr && Array.isArray(arr.groups)) {
-      const t = arr.groups.reduce((s, u) => s + (gcount[typeof u === 'string' ? u : u?.uuid] || 0), 0);
-      if (t > 0) return t;
-    }
+  const arrs = pres.arrangements ?? [];
+
+  let target = null;
+  if (arrangement?.uuid) target = arrs.find((a) => a.id?.uuid === arrangement.uuid);
+  if (!target && arrangement?.name) target = arrs.find((a) => a.id?.name === arrangement.name);
+  if (!target && pres.current_arrangement) target = arrs.find((a) => a.id?.uuid === pres.current_arrangement);
+
+  if (target && Array.isArray(target.groups)) {
+    const t = target.groups.reduce((s, u) => s + (gcount[typeof u === 'string' ? u : u?.uuid] || 0), 0);
+    if (t > 0) return t;
   }
   const raw = Object.values(gcount).reduce((a, b) => a + b, 0);
   return raw || null;
 }
 
-async function readSlideCount(pp, signal) {
-  return slideTotal((await ppGet(pp, '/v1/presentation/active', signal)).presentation);
+async function readSlideCount(pp, signal, arrangement) {
+  return slideTotal((await ppGet(pp, '/v1/presentation/active', signal)).presentation, arrangement);
 }
 
 function sleep(ms, signal) {
@@ -128,25 +138,28 @@ function sleep(ms, signal) {
 export async function pollRunState(pp, onState, signal, intervalMs = 800) {
   let lastKey;
   let fails = 0;
-  const countCache = { uuid: null, count: null };
+  const countCache = { key: null, count: null };
   while (!signal.aborted) {
     try {
       const [item, slide] = await Promise.all([readActive(pp, signal), readSlide(pp, signal)]);
       fails = 0;
-      // Refresh the (expensive) slide count only when the presentation changes.
-      if (slide.presUuid && slide.presUuid !== countCache.uuid) {
+      // Slide count depends on the presentation AND the active arrangement;
+      // refresh (expensive) only when either changes.
+      const arrangement = { uuid: item.arrangementUuid, name: item.arrangementName };
+      const cacheKey = slide.presUuid && `${slide.presUuid}|${arrangement.uuid || arrangement.name || ''}`;
+      if (cacheKey && cacheKey !== countCache.key) {
         try {
-          countCache.count = await readSlideCount(pp, signal);
+          countCache.count = await readSlideCount(pp, signal, arrangement);
         } catch {
           countCache.count = null;
         }
-        countCache.uuid = slide.presUuid;
+        countCache.key = cacheKey;
       }
       const state = {
         itemIndex: item.index,
         itemName: item.name,
         slideIndex: slide.slideIndex,
-        slideCount: slide.presUuid === countCache.uuid ? countCache.count : null,
+        slideCount: cacheKey && cacheKey === countCache.key ? countCache.count : null,
         presName: slide.presName,
       };
       const key = JSON.stringify([state.itemIndex, state.slideIndex, state.slideCount]);

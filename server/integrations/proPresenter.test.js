@@ -17,7 +17,7 @@ test('parseActive pulls the active playlist item (fields nested under .id)', () 
       playlist_item: {
         id: { uuid: 'i5', name: 'Break Out', index: 5 },
         type: 'presentation',
-        is_pco: true,
+        presentation_info: { arrangement_name: 'AOW', arrangement_uuid: 'arr-aow' },
       },
     },
   };
@@ -25,11 +25,13 @@ test('parseActive pulls the active playlist item (fields nested under .id)', () 
     index: 5,
     name: 'Break Out',
     uuid: 'i5',
+    arrangementUuid: 'arr-aow',
+    arrangementName: 'AOW',
     playlistName: 'Colossians …',
   });
   // Nothing triggered → playlist_item is null.
   assert.deepEqual(parseActive({ presentation: { playlist: null, playlist_item: null } }), {
-    index: null, name: null, uuid: null, playlistName: null,
+    index: null, name: null, uuid: null, arrangementUuid: null, arrangementName: null, playlistName: null,
   });
 });
 
@@ -81,6 +83,25 @@ test('slideTotal expands the selected arrangement (groups repeat)', () => {
     arrangements: [{ id: { uuid: 'a1' }, groups: ['v', 'c', 'v', 'c', 'c'] }], // 2+1+2+1+1 = 7
   };
   assert.equal(slideTotal(pres), 7);
+});
+
+test('slideTotal selects the arrangement from the playlist item (uuid, then name)', () => {
+  const pres = {
+    current_arrangement: '', // presentation does not report it — item does
+    groups: [
+      { uuid: 'v', slides: [1, 2] },
+      { uuid: 'c', slides: [1] },
+    ],
+    arrangements: [
+      { id: { uuid: 'now', name: 'NOW' }, groups: ['v', 'c'] }, // 3
+      { id: { uuid: 'aow', name: 'AOW' }, groups: ['v', 'c', 'v', 'c', 'c'] }, // 7
+    ],
+  };
+  assert.equal(slideTotal(pres, { uuid: 'aow' }), 7);
+  assert.equal(slideTotal(pres, { name: 'AOW' }), 7);
+  assert.equal(slideTotal(pres, { uuid: 'now' }), 3);
+  // Unknown arrangement → raw group sum fallback.
+  assert.equal(slideTotal(pres, { uuid: 'nope', name: 'nope' }), 3);
 });
 
 test('slideTotal handles null', () => {

@@ -119,7 +119,10 @@ Express server (server/)
   won't speak HTTP). The active item's fields nest under `playlist_item.id`. And
   `/v1/playlist/active?chunked=true` only sends the INITIAL state — it does NOT
   push item changes — so we **poll** `/v1/playlist/active` (~1s) and push to the
-  browser via SSE.
+  browser via SSE. For slide totals, the active arrangement comes from the
+  playlist item's `presentation_info.arrangement_name/uuid` — the presentation's
+  own `current_arrangement` is unreliable (often empty), and arrangements have
+  different slide counts (songs repeat groups).
 - **PC Calendar, not Services, is the authoritative event→room→time source.**
   Services doesn't reliably know the physical room. See ADR 0001.
 - **launchd/systemd don't inherit your PATH** — the service installer bakes in the
