@@ -114,6 +114,7 @@ async function beginShow(roomId, planId, timeId, startedAt) {
     abort: new AbortController(),
   };
   shows.set(roomId, show);
+  timeline.reopen(instanceId(show)); // restarting an ended show un-completes it
   persistShow(show);
   broadcast(roomId);
   startPoller(show);

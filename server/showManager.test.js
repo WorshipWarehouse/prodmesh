@@ -37,9 +37,16 @@ test('a show has a full lifecycle and records a timeline', async () => {
   st = sm.endShow(ROOM);
   assert.equal(st.active, false);
 
-  // the transition was recorded for the report
+  // the transition was recorded and the instance is stamped complete
   const report = timeline.getReport(`${plan.id}__t1`);
   assert.ok(report.items.some((i) => i.itemName === song.title));
+  assert.ok(report.completedAt != null);
+
+  // reopening clears the completed stamp; ending again restores it
+  await sm.startShow(ROOM, plan.id, 't1');
+  assert.equal(timeline.getReport(`${plan.id}__t1`).completedAt, null);
+  sm.endShow(ROOM);
+  assert.ok(timeline.getReport(`${plan.id}__t1`).completedAt != null);
 });
 
 test('getState is inactive with no show; ending twice errors', () => {

@@ -234,6 +234,7 @@ export interface TimingReport {
   items: ReportItem[];
   totals: { planned: number; actual: number; delta: number };
   startedAt?: number | null;
+  completedAt?: number | null;
 }
 
 export const getReport = (id: string, planId: string, timeId?: string | null) =>

@@ -69,6 +69,7 @@
 }
 
 .ros-track__status--follow { color: var(--ok); }
+.ros-track__status--done { color: var(--ok); }
 .ros-track__status--manual { color: var(--warn); }
 .ros-track__status--off { color: var(--text-dim); }
 .ros-track__status--idle { color: var(--text-faint); }

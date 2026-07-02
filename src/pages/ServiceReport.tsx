@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { getReport, type TimingReport } from '../api';
+import { getReport, getRoomPlan, type ServicePlan, type TimingReport } from '../api';
 
 function mmss(sec: number) {
   const s = Math.max(0, Math.round(sec));
@@ -17,6 +17,11 @@ export function ServiceReport() {
   const [params] = useSearchParams();
   const timeId = params.get('time');
   const [report, setReport] = useState<TimingReport | null>(null);
+  const [plan, setPlan] = useState<ServicePlan | null>(null);
+
+  useEffect(() => {
+    getRoomPlan(roomId, planId).then((r) => setPlan(r.plan)).catch(() => {});
+  }, [roomId, planId]);
 
   const load = useCallback(() => {
     getReport(roomId, planId, timeId).then(setReport).catch(() => {});
@@ -31,14 +36,31 @@ export function ServiceReport() {
 
   const backToRun = `/room/${roomId}/run/${planId}${timeId ? `?time=${timeId}` : ''}`;
 
+  // "Youth Service · Getting Over Yourself · July 6 · 9:30 AM" — which service
+  // instance this report is for.
+  const time = plan?.times.find((t) => t.id === timeId) ?? null;
+  const clock = time?.startsAt
+    ? new Date(time.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : time?.name ?? null;
+  const serviceLine = plan
+    ? [plan.serviceTypeName, plan.title, plan.dates, clock].filter(Boolean).join(' · ')
+    : null;
+
   return (
     <div className="report">
       <div className="pagehead">
         <div>
           <Link className="backlink" to={backToRun}>← Run of Show</Link>
           <h1 className="pagehead__title">Timing Report</h1>
+          {serviceLine && <p className="pagehead__sub">{serviceLine}</p>}
         </div>
         <div className="pagehead__right">
+          {report?.completedAt && (
+            <span className="svc__badge svc__badge--live">
+              ✓ Completed{' '}
+              {new Date(report.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </span>
+          )}
           <button className="btn btn--sm" onClick={load}>Refresh</button>
         </div>
       </div>

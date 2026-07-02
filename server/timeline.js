@@ -73,11 +73,10 @@ export function recordActive(instanceId, ctx, entry, nowMs = Date.now()) {
   persist(instanceId, tl);
 }
 
-/** Close out the last (open) item — called when a show ends. */
+/** Close out the last (open) item — called when a show ends. Creates the
+ *  timeline if nothing was tracked, so ending always stamps completion. */
 export function finalize(instanceId, nowMs = Date.now()) {
-  const f = fileFor(instanceId);
-  const tl = cache.get(instanceId) ?? (existsSync(f) ? load(instanceId) : null);
-  if (!tl) return;
+  const tl = load(instanceId);
   const last = tl.items[tl.items.length - 1];
   if (last && last.endedAt == null) {
     last.endedAt = nowMs;
@@ -87,11 +86,20 @@ export function finalize(instanceId, nowMs = Date.now()) {
   persist(instanceId, tl);
 }
 
+/** Re-opening a show clears the completed stamp so state stays truthful. */
+export function reopen(instanceId) {
+  const f = fileFor(instanceId);
+  const tl = cache.get(instanceId) ?? (existsSync(f) ? load(instanceId) : null);
+  if (!tl || tl.endedAt == null) return;
+  tl.endedAt = null;
+  persist(instanceId, tl);
+}
+
 /** Build the planned-vs-actual report for a service instance. */
 export function getReport(instanceId, nowMs = Date.now()) {
   const f = fileFor(instanceId);
   const tl = cache.get(instanceId) ?? (existsSync(f) ? load(instanceId) : null);
-  if (!tl || tl.items.length === 0) return null;
+  if (!tl) return null;
 
   const items = tl.items.map((it) => {
     const ongoing = it.endedAt == null;
@@ -111,6 +119,7 @@ export function getReport(instanceId, nowMs = Date.now()) {
     instanceId,
     serviceLabel: tl.serviceLabel ?? null,
     startedAt: tl.items[0]?.startedAt ?? null,
+    completedAt: tl.endedAt ?? null,
     items,
     totals: { planned, actual, delta: actual - planned },
   };

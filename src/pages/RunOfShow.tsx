@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
   getRoom,
   getRoomPlan,
+  getReport,
   startShow,
   endShow,
   setShowCurrent,
@@ -54,6 +55,7 @@ export function RunOfShow() {
   const [error, setError] = useState<string | null>(null);
   const [state, setState] = useState<ShowState>({ active: false });
   const [busy, setBusy] = useState(false);
+  const [completedAt, setCompletedAt] = useState<number | null>(null);
 
   useEffect(() => {
     getRoom(roomId).then(setRoom).catch(() => setError('Room not found'));
@@ -74,6 +76,19 @@ export function RunOfShow() {
     });
     return () => es.close();
   }, [roomId]);
+
+  // A previously ended show stays "Complete" even after reopening this page —
+  // the timeline's completion stamp is the source of truth. Refetched when the
+  // show state flips so ending a show marks it complete immediately.
+  useEffect(() => {
+    let on = true;
+    getReport(roomId, planId, timeId)
+      .then((r) => on && setCompletedAt(r?.completedAt ?? null))
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [roomId, planId, timeId, state.active]);
 
   if (error) {
     return (
@@ -146,10 +161,24 @@ export function RunOfShow() {
             </div>
           ) : !isThisShow ? (
             <div className="ros-track__start">
-              <span className="ros-track__status ros-track__status--idle">No show running</span>
-              <button className="btn btn--primary" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
-                ▶ Start Show
-              </button>
+              {completedAt ? (
+                <>
+                  <span className="ros-track__status ros-track__status--done">
+                    ✓ Complete ·{' '}
+                    {new Date(completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                  <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
+                    Reopen show
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="ros-track__status ros-track__status--idle">No show running</span>
+                  <button className="btn btn--primary" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
+                    ▶ Start Show
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -207,7 +236,9 @@ export function RunOfShow() {
         <p className="ros__hint">
           {isThisShow
             ? 'Following ProPresenter live. Tap an item to override.'
-            : 'Start the show to track it live and record timing.'}
+            : completedAt
+              ? 'This service is complete — see the timing report for how it ran.'
+              : 'Start the show to track it live and record timing.'}
         </p>
         <OrderOfService items={plan.items} currentId={currentId} onSelect={isThisShow ? pick : undefined} />
       </section>
