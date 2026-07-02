@@ -3,6 +3,9 @@
 
 /* ── Badges & chips ──────────────────────────────────────────────────────── */
 .svc__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.72rem;
   padding: 3px 9px;
   border-radius: 999px;
@@ -150,7 +153,9 @@
 .svc__item-icon {
   flex-shrink: 0;
   width: 20px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-faint);
 }
 
@@ -172,11 +177,6 @@
   gap: 4px;
   font-size: 0.8rem;
   color: var(--text-dim);
-}
-
-.svc__item-leader::before {
-  content: '👤';
-  font-size: 0.72rem;
 }
 
 /* Song key badge */

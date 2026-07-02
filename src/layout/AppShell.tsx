@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, matchPath, useLocation, useNavigate } from 'react-router-dom';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { getRooms, type RoomMeta } from '../api';
 import { church } from '../config/dashboard.config';
 import { Clock } from '../components/Clock';
@@ -63,7 +64,7 @@ export function AppShell() {
         <div className="topbar__spacer" />
         <Clock compact />
         <Link className="gear" to="/settings" title="Settings" aria-label="Settings">
-          ⚙️
+          <SettingsIcon size={20} />
         </Link>
       </header>
 

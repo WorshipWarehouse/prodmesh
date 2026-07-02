@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Lock, Wifi, WifiOff } from 'lucide-react';
 import {
   getRoom,
   getRoomState,
@@ -117,7 +118,7 @@ export function RoomStatus() {
 
       {showProtection && (
         <div className="protbar">
-          🔒 <strong>{protection!.label}</strong> — locked:{' '}
+          <Lock size={14} /> <strong>{protection!.label}</strong> — locked:{' '}
           {protection!.lockedModes
             .map((id) => room.modes.find((m) => m.id === id)?.label ?? id)
             .join(', ')}{' '}
@@ -131,7 +132,11 @@ export function RoomStatus() {
           title="Room Mode"
           meta={
             <span className={`mode-hero__conn mode-hero__conn--${state.online ? 'on' : 'off'}`}>
-              {state.online ? '● Companion live' : '○ Demo mode (Companion offline)'}
+              {state.online ? (
+                <><Wifi size={13} /> Companion live</>
+              ) : (
+                <><WifiOff size={13} /> Demo mode (Companion offline)</>
+              )}
             </span>
           }
         >
@@ -160,7 +165,7 @@ export function RoomStatus() {
                   onClick={() => openConfirm(mode)}
                 >
                   <span className="mode-btn__label">
-                    {locked && <span aria-label="locked">🔒 </span>}
+                    {locked && <Lock size={16} aria-label="locked" />}
                     {mode.label}
                   </span>
                   {isActive && <span className="mode-btn__active">Active now</span>}
@@ -184,7 +189,7 @@ export function RoomStatus() {
             {isLocked(pending.id) && (
               <div className="confirm__lock">
                 <label className="confirm__lock-label" htmlFor="override-pin">
-                  🔒 This change is locked ({protection!.label}). Enter override PIN:
+                  <Lock size={13} /> This change is locked ({protection!.label}). Enter override PIN:
                 </label>
                 <input
                   id="override-pin"

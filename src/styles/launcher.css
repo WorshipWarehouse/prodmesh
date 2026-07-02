@@ -99,9 +99,12 @@
 }
 
 .tile__icon {
+  display: inline-flex;
+  align-items: center;
   font-size: 1.5rem;
   line-height: 1;
   flex-shrink: 0;
+  color: var(--tile-accent);
 }
 
 .tile__icon-img {

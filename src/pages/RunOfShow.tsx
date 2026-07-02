@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import {
+  BarChart3,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  MonitorOff,
+  Pause,
+  Play,
+  Radio,
+  Square,
+  Timer as TimerIcon,
+} from 'lucide-react';
+import {
   getRoom,
   getRoomPlan,
   getReport,
@@ -54,7 +66,9 @@ function Countdown({ time, timer }: { time: PlanTime | null; timer: PpTimer | nu
       <div className="ros-count ros-count--pre">
         <span className="ros-count__label">Starts in</span>
         <span className="ros-count__time">{hhmmss(timer.remainingSeconds)}</span>
-        <span className="ros-count__at">⏱ {timer.name}{target}</span>
+        <span className="ros-count__at">
+          <TimerIcon size={13} /> {timer.name}{target}
+        </span>
       </div>
     );
   }
@@ -169,7 +183,7 @@ export function RunOfShow() {
             className="btn btn--sm"
             to={`/room/${roomId}/run/${planId}/report${timeId !== 'default' ? `?time=${timeId}` : ''}`}
           >
-            📊 Timing report
+            <BarChart3 size={14} /> Timing report
           </Link>
         </div>
       </div>
@@ -180,7 +194,7 @@ export function RunOfShow() {
         <div className="ros-track">
           {isOtherShow ? (
             <div className="ros-track__status ros-track__status--off">
-              <span>■ Another show is live in this room</span>
+              <span><Radio size={14} /> Another show is live in this room</span>
               <Link className="btn btn--sm" to={`/room/${roomId}/run/${state.planId}?time=${state.timeId}`}>
                 Go to it
               </Link>
@@ -190,7 +204,7 @@ export function RunOfShow() {
               {completedAt ? (
                 <>
                   <span className="ros-track__status ros-track__status--done">
-                    ✓ Complete ·{' '}
+                    <CheckCircle2 size={15} /> Complete ·{' '}
                     {new Date(completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                   </span>
                   <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
@@ -201,7 +215,7 @@ export function RunOfShow() {
                 <>
                   <span className="ros-track__status ros-track__status--idle">No show running</span>
                   <button className="btn btn--primary" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
-                    ▶ Start Show
+                    <Play size={15} /> Start Show
                   </button>
                 </>
               )}
@@ -214,13 +228,15 @@ export function RunOfShow() {
                 }`}
               >
                 <span>
-                  {ppConnected == null
-                    ? '· connecting to ProPresenter…'
-                    : !ppConnected
-                      ? '○ ProPresenter offline — manual mode'
-                      : follow
-                        ? '● Following ProPresenter'
-                        : '❙❙ Manual override'}
+                  {ppConnected == null ? (
+                    'connecting to ProPresenter…'
+                  ) : !ppConnected ? (
+                    <><MonitorOff size={14} /> ProPresenter offline — manual mode</>
+                  ) : follow ? (
+                    <><Radio size={14} /> Following ProPresenter</>
+                  ) : (
+                    <><Pause size={14} /> Manual override</>
+                  )}
                 </span>
                 {ppConnected && !follow && (
                   <button className="btn btn--sm" disabled={busy} onClick={() => act(() => setShowCurrent(roomId, { follow: true }))}>
@@ -244,12 +260,14 @@ export function RunOfShow() {
                 </div>
               )}
               <div className="ros-track__buttons">
-                <button className="btn" disabled={busy || idx <= 0} onClick={() => step(-1)}>◀ Prev</button>
+                <button className="btn" disabled={busy || idx <= 0} onClick={() => step(-1)}>
+                  <ChevronLeft size={16} /> Prev
+                </button>
                 <button className="btn btn--primary" disabled={busy || (idx >= 0 && idx >= trackable.length - 1)} onClick={() => step(1)}>
-                  Next ▶
+                  Next <ChevronRight size={16} />
                 </button>
                 <button className="btn btn--ghost" disabled={busy} onClick={() => act(() => endShow(roomId))}>
-                  ■ End Show
+                  <Square size={13} /> End Show
                 </button>
               </div>
             </>
