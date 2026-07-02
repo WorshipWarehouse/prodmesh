@@ -120,6 +120,64 @@ async function readSlideCount(pp, signal, arrangement) {
   return slideTotal((await ppGet(pp, '/v1/presentation/active', signal)).presentation, arrangement);
 }
 
+// ── Timers ────────────────────────────────────────────────────────────────────
+//
+//  The room's "Service Start Timer" pattern: one count-down-to-time timer, and
+//  Message objects ("9:30AM", "11:00AM"…) whose timer token re-targets + starts
+//  it when the operator clicks Show between services. We read the live value.
+
+// A timer definition's count_down_to_time.time_of_day is a 12-HOUR value paired
+// with an am/pm period (5:30 PM → 19800 + "pm"); normalize to absolute seconds
+// since midnight. Verified against the live API.
+export function targetSecondsOfDay(countDownToTime) {
+  if (!countDownToTime || typeof countDownToTime.time_of_day !== 'number') return null;
+  return (countDownToTime.time_of_day % 43200) + (countDownToTime.period === 'pm' ? 43200 : 0);
+}
+
+// "07:29:05" → seconds remaining.
+export function parseHms(s) {
+  const m = /^(\d+):(\d{2}):(\d{2})$/.exec(String(s ?? ''));
+  return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : null;
+}
+
+/** Merge /v1/timers (definitions) with /v1/timers/current (live values). */
+export function parseTimers(defs, currents) {
+  const byUuid = new Map((defs ?? []).map((d) => [d.id?.uuid, d]));
+  return (currents ?? []).map((c) => {
+    const def = byUuid.get(c.id?.uuid) ?? {};
+    return {
+      uuid: c.id?.uuid ?? null,
+      name: c.id?.name ?? '',
+      state: c.state ?? 'stopped',
+      remainingSeconds: parseHms(c.time),
+      targetSecondsOfDay: targetSecondsOfDay(def.count_down_to_time),
+      countsDownToTime: Boolean(def.count_down_to_time),
+    };
+  });
+}
+
+/**
+ * The room's service-start timer: the configured name if it matches, else the
+ * first count-down-to-time timer, else the first timer.
+ */
+export function pickTimer(timers, preferredName = null) {
+  if (!timers?.length) return null;
+  if (preferredName) {
+    const t = timers.find((x) => namesMatch(x.name, preferredName));
+    if (t) return t;
+  }
+  return timers.find((t) => t.countsDownToTime) ?? timers[0];
+}
+
+/** One-shot read of all timers with live values. */
+export async function readTimers(pp, signal) {
+  const [defs, currents] = await Promise.all([
+    ppGet(pp, '/v1/timers', signal),
+    ppGet(pp, '/v1/timers/current', signal),
+  ]);
+  return parseTimers(defs, currents);
+}
+
 function sleep(ms, signal) {
   return new Promise((resolve) => {
     const t = setTimeout(resolve, ms);

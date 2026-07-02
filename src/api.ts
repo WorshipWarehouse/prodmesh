@@ -253,6 +253,15 @@ export interface ShowCurrent {
   slideCount: number | null;
 }
 
+export interface PpTimer {
+  uuid: string | null;
+  name: string;
+  state: string; // 'running' | 'stopped' | …
+  remainingSeconds: number | null;
+  targetSecondsOfDay: number | null; // seconds since midnight, or null
+  countsDownToTime: boolean;
+}
+
 export interface ShowState {
   active: boolean;
   roomId?: string;
@@ -262,6 +271,7 @@ export interface ShowState {
   follow?: boolean;
   ppConnected?: boolean | null;
   current?: ShowCurrent;
+  timer?: PpTimer | null;
 }
 
 export const getShow = (roomId: string) =>

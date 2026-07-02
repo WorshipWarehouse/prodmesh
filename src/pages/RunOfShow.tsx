@@ -10,6 +10,7 @@ import {
   type RoomMeta,
   type ServicePlan,
   type PlanTime,
+  type PpTimer,
   type ShowState,
 } from '../api';
 import { OrderOfService } from '../components/OrderOfService';
@@ -22,24 +23,49 @@ function timeLabel(t: PlanTime | null) {
   return [t.name, clock].filter(Boolean).join(' · ');
 }
 
-function Countdown({ time }: { time: PlanTime | null }) {
+function hhmmss(totalSeconds: number) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${h ? `${h}:` : ''}${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function fmtSecondsOfDay(sec: number) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setSeconds(sec);
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+// The room's ProPresenter timer wins when it's running (the operator's Message
+// re-targets + starts it between services); otherwise fall back to clock math
+// against the Planning Center service time.
+function Countdown({ time, timer }: { time: PlanTime | null; timer: PpTimer | null }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
   }, []);
+
+  if (timer && timer.state === 'running' && timer.remainingSeconds != null) {
+    const target =
+      timer.targetSecondsOfDay != null ? ` → ${fmtSecondsOfDay(timer.targetSecondsOfDay)}` : '';
+    return (
+      <div className="ros-count ros-count--pre">
+        <span className="ros-count__label">Starts in</span>
+        <span className="ros-count__time">{hhmmss(timer.remainingSeconds)}</span>
+        <span className="ros-count__at">⏱ {timer.name}{target}</span>
+      </div>
+    );
+  }
+
   if (!time?.startsAt) return null;
   const diff = new Date(time.startsAt).getTime() - now;
   const past = diff < 0;
-  const abs = Math.abs(diff);
-  const h = Math.floor(abs / 3600000);
-  const m = Math.floor((abs % 3600000) / 60000);
-  const s = Math.floor((abs % 60000) / 1000);
-  const hhmmss = `${h ? `${h}:` : ''}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return (
     <div className={`ros-count ros-count--${past ? 'live' : 'pre'}`}>
       <span className="ros-count__label">{past ? 'Elapsed since start' : 'Starts in'}</span>
-      <span className="ros-count__time">{hhmmss}</span>
+      <span className="ros-count__time">{hhmmss(Math.abs(diff) / 1000)}</span>
       <span className="ros-count__at">{timeLabel(time)}</span>
     </div>
   );
@@ -149,7 +175,7 @@ export function RunOfShow() {
       </div>
 
       <section className="ros__widgets">
-        <Countdown time={selectedTime} />
+        <Countdown time={selectedTime} timer={state.timer ?? null} />
 
         <div className="ros-track">
           {isOtherShow ? (
