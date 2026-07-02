@@ -26,14 +26,17 @@ const SHOWS_DIR = join(process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data'),
 
 const shows = new Map(); // roomId -> runtime show (only while active)
 const subscribers = new Map(); // roomId -> Set<res> (persists across show start/end)
+const timers = new Map(); // roomId -> published PP timer state (or null)
+const timerWatchers = new Map(); // roomId -> AbortController (runs while subscribed)
 
 const instanceId = (show) => `${show.planId}__${show.timeId}`;
 const showFile = (roomId) => join(SHOWS_DIR, `${roomId.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`);
 
 // ── Public state + SSE fan-out ────────────────────────────────────────────────
 export function getState(roomId) {
+  const timer = timers.get(roomId) ?? null;
   const show = shows.get(roomId);
-  if (!show) return { active: false };
+  if (!show) return { active: false, timer };
   return {
     active: true,
     roomId,
@@ -43,6 +46,7 @@ export function getState(roomId) {
     follow: show.follow,
     ppConnected: show.ppConnected,
     current: show.current,
+    timer,
   };
 }
 
@@ -59,10 +63,61 @@ function broadcast(roomId) {
 export function subscribe(roomId, res) {
   subs(roomId).add(res);
   res.write(`event: state\ndata: ${JSON.stringify(getState(roomId))}\n\n`);
+  startTimerWatcher(roomId);
 }
 
 export function unsubscribe(roomId, res) {
   subs(roomId).delete(res);
+  if (subs(roomId).size === 0) stopTimerWatcher(roomId);
+}
+
+// ── PP timer watcher ─────────────────────────────────────────────────────────
+//  The room's "Service Start Timer" counts down BETWEEN services (a Message
+//  re-targets + starts it), so it can't be tied to an active show. It runs
+//  whenever the room has at least one subscribed view, and stops when the last
+//  view disconnects — no PP polling for rooms nobody is looking at.
+
+function startTimerWatcher(roomId) {
+  if (timerWatchers.has(roomId)) return;
+  const pp = rooms[roomId]?.proPresenter;
+  if (!ppro.isConfigured(pp)) return;
+  const ctl = new AbortController();
+  timerWatchers.set(roomId, ctl);
+  watchTimers(roomId, pp, ctl.signal).catch(() => {});
+}
+
+function stopTimerWatcher(roomId) {
+  timerWatchers.get(roomId)?.abort();
+  timerWatchers.delete(roomId);
+  timers.delete(roomId);
+}
+
+function timerSleep(ms, signal) {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+  });
+}
+
+async function watchTimers(roomId, pp, signal) {
+  let lastKey;
+  while (!signal.aborted) {
+    let next = null;
+    try {
+      const all = await ppro.readTimers(pp, signal);
+      next = ppro.pickTimer(all, pp.timer ?? null);
+    } catch {
+      next = null; // PP unreachable → no timer shown
+    }
+    if (signal.aborted) return;
+    const key = next ? `${next.uuid}|${next.state}|${next.remainingSeconds}` : 'none';
+    if (key !== lastKey) {
+      lastKey = key;
+      timers.set(roomId, next);
+      broadcast(roomId);
+    }
+    await timerSleep(next ? 1000 : 5000, signal); // back off while PP is offline
+  }
 }
 
 // ── Persistence ───────────────────────────────────────────────────────────────

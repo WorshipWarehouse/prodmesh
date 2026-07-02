@@ -44,6 +44,9 @@ Notes:
 - Run of Show: **server-coordinated show sessions** (one active per room, Start/End
   buttons, browsers are views — see ADR 0004) with live ProPresenter follow, slide
   progress, and a **timing report** (planned vs actual per item) for debriefs.
+  Ended shows stay marked **✓ Complete** (reopenable). The countdown widget follows
+  the room's **PP service-start timer** when it's running (Message-driven, works
+  between services); falls back to PC clock math otherwise.
 - Deploy/update scripts (launchd/systemd), tests, CI.
 
 ## Roadmap / open threads (roughly prioritized)

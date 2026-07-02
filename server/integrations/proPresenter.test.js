@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseActive, mapIndexToItemId, isConfigured, slideTotal } from './proPresenter.js';
+import {
+  parseActive,
+  mapIndexToItemId,
+  isConfigured,
+  slideTotal,
+  targetSecondsOfDay,
+  parseHms,
+  parseTimers,
+  pickTimer,
+} from './proPresenter.js';
 
 test('isConfigured needs a host', () => {
   assert.equal(isConfigured(null), false);
@@ -106,4 +115,53 @@ test('slideTotal selects the arrangement from the playlist item (uuid, then name
 
 test('slideTotal handles null', () => {
   assert.equal(slideTotal(null), null);
+});
+
+// ── Timers (fixtures are real /v1/timers + /v1/timers/current payloads) ──────
+
+test('targetSecondsOfDay normalizes the 12-hour time_of_day + period', () => {
+  assert.equal(targetSecondsOfDay({ time_of_day: 25200, period: 'am' }), 25200); // 7:00 AM
+  assert.equal(targetSecondsOfDay({ time_of_day: 19800, period: 'pm' }), 63000); // 5:30 PM
+  assert.equal(targetSecondsOfDay({ time_of_day: 1800, period: 'pm' }), 45000); // 12:30 PM
+  // Robust if PP ever reports absolute seconds with a redundant period.
+  assert.equal(targetSecondsOfDay({ time_of_day: 63000, period: 'pm' }), 63000);
+  assert.equal(targetSecondsOfDay(null), null);
+});
+
+test('parseHms parses remaining time', () => {
+  assert.equal(parseHms('07:29:00'), 26940);
+  assert.equal(parseHms('00:00:05'), 5);
+  assert.equal(parseHms('garbage'), null);
+  assert.equal(parseHms(null), null);
+});
+
+const TIMER_DEFS = [
+  {
+    id: { name: 'Service Start Timer', index: 0, uuid: '1DD1' },
+    allows_overrun: false,
+    count_down_to_time: { time_of_day: 19800, period: 'pm' },
+  },
+];
+const TIMER_CURRENT = [
+  { id: { uuid: '1DD1', name: 'Service Start Timer', index: 0 }, time: '07:29:00', state: 'running' },
+];
+
+test('parseTimers merges definitions with live values', () => {
+  const [t] = parseTimers(TIMER_DEFS, TIMER_CURRENT);
+  assert.equal(t.name, 'Service Start Timer');
+  assert.equal(t.state, 'running');
+  assert.equal(t.remainingSeconds, 26940);
+  assert.equal(t.targetSecondsOfDay, 63000);
+  assert.equal(t.countsDownToTime, true);
+});
+
+test('pickTimer prefers the configured name, then count-down-to-time', () => {
+  const timers = [
+    { name: 'Sermon Elapsed', countsDownToTime: false },
+    { name: 'Service Start Timer', countsDownToTime: true },
+  ];
+  assert.equal(pickTimer(timers, 'Sermon Elapsed').name, 'Sermon Elapsed');
+  assert.equal(pickTimer(timers).name, 'Service Start Timer'); // no config → countdown
+  assert.equal(pickTimer([{ name: 'Only', countsDownToTime: false }]).name, 'Only');
+  assert.equal(pickTimer([]), null);
 });

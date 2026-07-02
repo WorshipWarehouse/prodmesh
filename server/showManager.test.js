@@ -50,6 +50,6 @@ test('a show has a full lifecycle and records a timeline', async () => {
 });
 
 test('getState is inactive with no show; ending twice errors', () => {
-  assert.deepEqual(sm.getState('north-chapel'), { active: false });
+  assert.deepEqual(sm.getState('north-chapel'), { active: false, timer: null });
   assert.throws(() => sm.endShow('north-chapel'), /No active show/);
 });

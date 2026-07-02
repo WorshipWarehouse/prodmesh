@@ -47,6 +47,8 @@ export const rooms = {
     // host several (the soonest upcoming plan across them is shown).
     planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] }, // live demo
     // ProPresenter API (official 7.9+). Port is per-machine (PP picks it).
+    // Optional `timer: '<name>'` picks the service-start countdown timer;
+    // without it, the first count-down-to-time timer is used.
     proPresenter: { host: '127.0.0.1', port: 62202 },
     modes: standardModes(),
   },
