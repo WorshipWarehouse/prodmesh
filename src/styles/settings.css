@@ -1,0 +1,138 @@
+/* Settings — admin panels, schedule editor. */
+
+.settings {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings__muted {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  margin: 4px 0;
+}
+
+.settings__error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.settings__ok {
+  color: var(--ok);
+  font-size: 0.9rem;
+}
+
+.settings__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel__title {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.panel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.panel__label {
+  font-weight: 600;
+}
+
+.panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Schedule editor */
+.sched-room {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.sched-room__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sched-room__name {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.sched-win {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px;
+  margin: 8px 0;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.sched-days {
+  display: flex;
+  gap: 3px;
+}
+
+.daybtn {
+  width: 34px;
+  padding: 6px 0;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.daybtn--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+  font-weight: 700;
+}
+
+.sched-dash {
+  color: var(--text-dim);
+}
+
+.sched-locks {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lockchk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--text);
+}

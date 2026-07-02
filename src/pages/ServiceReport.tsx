@@ -33,13 +33,15 @@ export function ServiceReport() {
 
   return (
     <div className="report">
-      <header className="report__header">
+      <div className="pagehead">
         <div>
-          <Link className="status__back" to={backToRun}>← Run of Show</Link>
-          <h1 className="report__title">Timing Report</h1>
+          <Link className="backlink" to={backToRun}>← Run of Show</Link>
+          <h1 className="pagehead__title">Timing Report</h1>
         </div>
-        <button className="btn btn--sm" onClick={load}>Refresh</button>
-      </header>
+        <div className="pagehead__right">
+          <button className="btn btn--sm" onClick={load}>Refresh</button>
+        </div>
+      </div>
 
       {!report || report.items.length === 0 ? (
         <p className="settings__muted">

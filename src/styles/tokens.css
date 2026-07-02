@@ -1,0 +1,40 @@
+/* Design tokens — the single place colors, radii, and accents live.
+   Components reference these vars; don't hard-code hex values in feature CSS. */
+:root {
+  /* Surfaces */
+  --bg: #0d1117;
+  --bg-raised: #161b22;
+  --bg-tile: #1c2330;
+  --bg-tile-hover: #232c3d;
+  --border: #2a3240;
+
+  /* Text */
+  --text: #e8edf4;
+  --text-dim: #8b97a8;
+  --text-faint: #5a6675;
+  --text-on-accent: #0d1117;
+
+  /* Accents */
+  --accent: #5b8def;
+  --accent-text: #a9c7ff;
+  --accent-soft: rgba(91, 141, 239, 0.12);
+  --accent-border: rgba(91, 141, 239, 0.35);
+  --ok: #34c759;
+  --ok-soft: rgba(52, 199, 89, 0.12);
+  --ok-border: rgba(52, 199, 89, 0.35);
+  --warn: #ffb020;
+  --warn-text: #ffcf70;
+  --warn-soft: rgba(255, 176, 32, 0.12);
+  --warn-border: rgba(255, 176, 32, 0.4);
+  --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.5);
+  --purple-text: #c79bff;
+  --purple-soft: rgba(175, 123, 240, 0.14);
+  --purple-border: rgba(175, 123, 240, 0.45);
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}

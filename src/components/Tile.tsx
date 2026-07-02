@@ -30,7 +30,8 @@ export function Tile({ tile }: { tile: TileData }) {
     </>
   );
 
-  const style = { ['--accent' as string]: behavior.accent };
+  // --tile-accent, not --accent: the global token would leak into children.
+  const style = { ['--tile-accent' as string]: behavior.accent };
 
   // Non-clickable tiles (placeholders) render as a dimmed div.
   if (!href) {

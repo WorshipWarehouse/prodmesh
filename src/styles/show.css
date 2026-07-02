@@ -1,0 +1,142 @@
+/* Run of Show — countdown, tracker, slide progress. */
+
+.ros {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ros__widgets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.ros-count,
+.ros-track {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+}
+
+.ros-count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-top: 4px solid var(--text-faint);
+}
+
+.ros-count--pre { border-top-color: var(--accent); }
+.ros-count--live { border-top-color: var(--ok); }
+
+.ros-count__label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.ros-count__time {
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.ros-count__at {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.ros-track {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+}
+
+.ros-track__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ros-track__status--follow { color: var(--ok); }
+.ros-track__status--manual { color: var(--warn); }
+.ros-track__status--off { color: var(--text-dim); }
+.ros-track__status--idle { color: var(--text-faint); }
+
+.ros-track__label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-right: 10px;
+}
+
+.ros-track__title {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.ros-track__start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 100%;
+}
+
+.ros-track__buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.ros-track__buttons .btn {
+  flex: 1;
+}
+
+/* Slide progress bar */
+.ros-progress {
+  margin-top: 10px;
+}
+
+.ros-progress__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.ros-progress__fill {
+  height: 100%;
+  background: var(--ok);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.ros-progress__label {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.ros__order-title {
+  margin: 0 0 2px;
+}
+
+.ros__hint {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}

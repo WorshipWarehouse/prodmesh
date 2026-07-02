@@ -1,0 +1,155 @@
+/* App shell — sticky top bar (brand, room switcher, tabs, clock) + main area. */
+
+.shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 10px clamp(14px, 2.5vw, 28px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text);
+  min-width: 0;
+}
+
+.topbar__logo {
+  height: 30px;
+  width: auto;
+  /* Logo art is dark on transparent — tint it white for the dark bar. */
+  filter: brightness(0) invert(1);
+}
+
+.topbar__name {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Room switcher (native select, styled) */
+.roomswitch {
+  position: relative;
+}
+
+.roomswitch select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 8px 30px 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tile);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roomswitch::after {
+  content: '▾';
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
+
+/* Section tabs (contextual — shown inside a room) */
+.topbar__nav {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  padding: 7px 13px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: var(--bg-tile);
+}
+
+.tab--active {
+  color: var(--text);
+  background: var(--bg-tile);
+  border-color: var(--border);
+}
+
+.topbar__spacer {
+  flex: 1;
+}
+
+/* Clock */
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+
+.clock__time {
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock__date {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.clock--compact .clock__time {
+  font-size: 1.05rem;
+}
+
+.clock--compact .clock__date {
+  font-size: 0.72rem;
+}
+
+.gear {
+  font-size: 1.4rem;
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.gear:hover {
+  opacity: 1;
+  transform: rotate(30deg);
+}
+
+/* Main content area */
+.shell__main {
+  flex: 1;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}

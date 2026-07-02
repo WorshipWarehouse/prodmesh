@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRoomService, type RoomService } from '../api';
 import { OrderOfService } from './OrderOfService';
+import { Widget } from './Widget';
 
 const REFRESH_MS = 5 * 60 * 1000;
 
@@ -18,7 +19,13 @@ function fmtTime(iso: string | null, fallback: string | null, serviceDay?: strin
   return time;
 }
 
-export function ServicePanel({ roomId }: { roomId: string }) {
+export function ServicePanel({
+  roomId,
+  span,
+}: {
+  roomId: string;
+  span?: 'half' | 'third' | 'two-thirds';
+}) {
   const [service, setService] = useState<RoomService | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -47,14 +54,16 @@ export function ServicePanel({ roomId }: { roomId: string }) {
   })();
 
   return (
-    <section className="svc">
-      <div className="svc__head">
-        <h2 className="svc__title">Upcoming Service</h2>
+    <Widget
+      span={span}
+      className="svc"
+      title="Upcoming Service"
+      meta={
         <span className={`svc__badge svc__badge--${service.live ? 'live' : 'mock'}`}>
           {service.live ? '● Planning Center' : '○ Sample data'}
         </span>
-      </div>
-
+      }
+    >
       {!next && <p className="svc__muted">No upcoming plans.</p>}
 
       {next && (
@@ -116,6 +125,6 @@ export function ServicePanel({ roomId }: { roomId: string }) {
           {later.map((p) => p.dates).filter(Boolean).join(' · ')}
         </div>
       )}
-    </section>
+    </Widget>
   );
 }

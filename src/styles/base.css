@@ -1,0 +1,241 @@
+/* Reset, typography, and shared controls (buttons, fields, pills, dialogs). */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Page scaffolding (inside the shell) ─────────────────────────────────── */
+.pagehead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+
+.pagehead__title {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pagehead__sub {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.pagehead__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.pagemsg {
+  min-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.backlink {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.backlink:hover {
+  color: var(--text);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tile);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--bg-tile-hover);
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.btn--sm {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+.field {
+  padding: 10px 12px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.field--sm {
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  width: 160px;
+}
+
+.field--time {
+  width: 120px;
+}
+
+/* ── Pills ───────────────────────────────────────────────────────────────── */
+.pill {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.pill--on {
+  background: var(--ok-soft);
+  color: var(--ok);
+  border: 1px solid var(--ok-border);
+}
+
+.pill--off {
+  background: rgba(139, 151, 168, 0.15);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+/* ── Confirm dialog (generic modal) ──────────────────────────────────────── */
+.confirm {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(2px);
+  z-index: 100;
+}
+
+.confirm__card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  max-width: 440px;
+  width: 100%;
+}
+
+.confirm__text {
+  margin: 0 0 22px;
+  font-size: 1.25rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.confirm__buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.confirm__cancel,
+.confirm__ok {
+  flex: 1;
+  padding: 14px;
+  border-radius: var(--radius);
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+
+.confirm__cancel {
+  background: var(--bg-tile);
+  color: var(--text);
+}
+
+.confirm__ok {
+  --mode-color: var(--accent);
+  background: var(--mode-color);
+  border-color: var(--mode-color);
+  color: var(--text-on-accent);
+}
+
+.confirm__cancel:disabled,
+.confirm__ok:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Lock / override PIN inside the confirm dialog */
+.confirm__lock {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.confirm__lock-label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--warn);
+  margin-bottom: 8px;
+}
+
+.confirm__pin {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.3rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+
+.confirm__error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  margin: 0 0 14px;
+  text-align: center;
+}

@@ -1,0 +1,59 @@
+/* Widget grid — dashboard pages compose self-contained cards into a 12-col
+   grid. New features become new widgets, not new page layouts. */
+
+.widgets {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.widget {
+  grid-column: span 12;
+  min-width: 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 880px) {
+  .widget--half {
+    grid-column: span 6;
+  }
+
+  .widget--third {
+    grid-column: span 4;
+  }
+
+  .widget--two-thirds {
+    grid-column: span 8;
+  }
+}
+
+.widget__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.widget__title {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 650;
+}
+
+.widget__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.widget__hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}

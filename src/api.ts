@@ -263,6 +263,9 @@ export interface ShowState {
   current?: ShowCurrent;
 }
 
+export const getShow = (roomId: string) =>
+  getJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show`);
+
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',

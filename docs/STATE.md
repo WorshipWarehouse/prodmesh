@@ -2,7 +2,7 @@
 
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
-Last updated: 2026-07-01.
+Last updated: 2026-07-02.
 
 ## Sites & rooms
 
@@ -32,6 +32,10 @@ Notes:
 
 ## What's live right now
 
+- **App shell UI** (ADR 0005): persistent top bar (brand, room switcher,
+  Status | Run of Show tabs, clock, settings), widget-grid pages
+  (`Widget`/`WidgetGrid`), CSS split into design tokens + per-feature files.
+  Room Status is the first widget page; Run of Show/Settings kept internals.
 - Quick Access launcher (Companion / Screen Share / device web UIs), per room.
 - Room Status mode control with confirm + schedule-based **lockouts** (Override PIN).
 - Settings UI: Admin/Override PINs, schedule editor, system self-update.

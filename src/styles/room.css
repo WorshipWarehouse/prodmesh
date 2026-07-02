@@ -1,0 +1,122 @@
+/* Room Status page — mode hero, mode buttons, protection banner. */
+
+.status {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Big current-mode readout (lives inside the Mode widget) */
+.mode-hero {
+  --mode-color: #6b7280;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: clamp(20px, 3.5vw, 40px) 20px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  border-top: 4px solid var(--mode-color);
+}
+
+.mode-hero__label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.mode-hero__mode {
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--mode-color);
+}
+
+.mode-hero__conn {
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.mode-hero__conn--on {
+  color: var(--ok);
+}
+
+.mode-hero__conn--off {
+  color: var(--warn);
+}
+
+/* Mode buttons */
+.status__buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.mode-btn {
+  --mode-color: var(--accent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 104px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--mode-color);
+  background: color-mix(in srgb, var(--mode-color) 14%, var(--bg-raised));
+  color: var(--text);
+  font-size: 1.35rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.12s ease;
+}
+
+.mode-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--mode-color) 26%, var(--bg-raised));
+}
+
+.mode-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.mode-btn--standby {
+  grid-column: 1 / -1;
+  min-height: 72px;
+  font-size: 1.15rem;
+}
+
+.mode-btn--active {
+  cursor: default;
+  background: var(--mode-color);
+  color: var(--text-on-accent);
+}
+
+.mode-btn__active {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
+/* Protected banner */
+.protbar {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-text);
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.protbar__hint {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}

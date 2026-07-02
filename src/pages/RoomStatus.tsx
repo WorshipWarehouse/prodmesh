@@ -9,9 +9,8 @@ import {
   type RoomMode,
   type RoomState,
 } from '../api';
-import { Clock } from '../components/Clock';
+import { Widget, WidgetGrid } from '../components/Widget';
 import { ServicePanel } from '../components/ServicePanel';
-import logoUrl from '../assets/logo.png';
 
 const POLL_MS = 4000;
 
@@ -89,9 +88,9 @@ export function RoomStatus() {
 
   if (error) {
     return (
-      <div className="status status--error">
+      <div className="pagemsg">
         <p>{error}</p>
-        <Link className="status__back" to="/">
+        <Link className="backlink" to="/">
           ← Quick Access
         </Link>
       </div>
@@ -99,7 +98,7 @@ export function RoomStatus() {
   }
 
   if (!room || !state) {
-    return <div className="status status--loading">Loading…</div>;
+    return <div className="pagemsg">Loading…</div>;
   }
 
   const currentMode = room.modes.find((m) => m.id === state.mode) ?? null;
@@ -109,16 +108,12 @@ export function RoomStatus() {
 
   return (
     <div className="status">
-      <header className="status__header">
-        <div className="app__brand">
-          <img className="app__logo" src={logoUrl} alt="" />
-          <div>
-            <h1 className="status__room">{room.name}</h1>
-            <p className="app__subtitle">Room Status</p>
-          </div>
+      <div className="pagehead">
+        <div>
+          <h1 className="pagehead__title">{room.name}</h1>
+          <p className="pagehead__sub">Room Status</p>
         </div>
-        <Clock />
-      </header>
+      </div>
 
       {showProtection && (
         <div className="protbar">
@@ -130,52 +125,53 @@ export function RoomStatus() {
         </div>
       )}
 
-      <section
-        className="status__current"
-        style={{ ['--mode-color' as string]: currentMode?.color ?? '#6b7280' }}
-      >
-        <span className="status__label">Current mode</span>
-        <span className="status__mode">{currentMode?.label ?? 'Unknown'}</span>
-        <span className={`status__conn status__conn--${state.online ? 'on' : 'off'}`}>
-          {state.online ? '● Companion live' : '○ Demo mode (Companion offline)'}
-        </span>
-      </section>
+      <WidgetGrid>
+        <Widget
+          span="two-thirds"
+          title="Room Mode"
+          meta={
+            <span className={`mode-hero__conn mode-hero__conn--${state.online ? 'on' : 'off'}`}>
+              {state.online ? '● Companion live' : '○ Demo mode (Companion offline)'}
+            </span>
+          }
+        >
+          <div
+            className="mode-hero"
+            style={{ ['--mode-color' as string]: currentMode?.color ?? '#6b7280' }}
+          >
+            <span className="mode-hero__label">Current mode</span>
+            <span className="mode-hero__mode">{currentMode?.label ?? 'Unknown'}</span>
+          </div>
 
-      <section className="status__actions">
-        <h2 className="status__prompt">Set the room to…</h2>
-        <div className="status__buttons">
-          {buttons.map((mode) => {
-            const isActive = mode.id === state.mode;
-            const locked = isLocked(mode.id);
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                className={`mode-btn${isActive ? ' mode-btn--active' : ''}${
-                  mode.isStandby ? ' mode-btn--standby' : ''
-                }`}
-                style={{ ['--mode-color' as string]: mode.color }}
-                disabled={isActive}
-                onClick={() => openConfirm(mode)}
-              >
-                <span className="mode-btn__label">
-                  {locked && <span aria-label="locked">🔒 </span>}
-                  {mode.label}
-                </span>
-                {isActive && <span className="mode-btn__active">Active now</span>}
-              </button>
-            );
-          })}
-        </div>
-      </section>
+          <p className="widget__hint">Set the room to…</p>
+          <div className="status__buttons">
+            {buttons.map((mode) => {
+              const isActive = mode.id === state.mode;
+              const locked = isLocked(mode.id);
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  className={`mode-btn${isActive ? ' mode-btn--active' : ''}${
+                    mode.isStandby ? ' mode-btn--standby' : ''
+                  }`}
+                  style={{ ['--mode-color' as string]: mode.color }}
+                  disabled={isActive}
+                  onClick={() => openConfirm(mode)}
+                >
+                  <span className="mode-btn__label">
+                    {locked && <span aria-label="locked">🔒 </span>}
+                    {mode.label}
+                  </span>
+                  {isActive && <span className="mode-btn__active">Active now</span>}
+                </button>
+              );
+            })}
+          </div>
+        </Widget>
 
-      <ServicePanel roomId={roomId} />
-
-      <footer className="status__footer">
-        <Link className="status__back" to="/">
-          ← Quick Access
-        </Link>
-      </footer>
+        <ServicePanel roomId={roomId} span="third" />
+      </WidgetGrid>
 
       {pending && (
         <div className="confirm" role="dialog" aria-modal="true">

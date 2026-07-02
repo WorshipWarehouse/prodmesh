@@ -12,7 +12,6 @@ import {
   type ShowState,
 } from '../api';
 import { OrderOfService } from '../components/OrderOfService';
-import { Clock } from '../components/Clock';
 
 function timeLabel(t: PlanTime | null) {
   if (!t) return '';
@@ -78,13 +77,13 @@ export function RunOfShow() {
 
   if (error) {
     return (
-      <div className="ros ros--msg">
+      <div className="pagemsg">
         <p>{error}</p>
-        <Link className="status__back" to={`/room/${roomId}`}>← Back to room</Link>
+        <Link className="backlink" to={`/room/${roomId}`}>← Back to room</Link>
       </div>
     );
   }
-  if (!room || !plan) return <div className="ros ros--msg">Loading…</div>;
+  if (!room || !plan) return <div className="pagemsg">Loading…</div>;
 
   const isThisShow = state.active && state.planId === planId && state.timeId === timeId;
   const isOtherShow = state.active && !isThisShow;
@@ -117,16 +116,14 @@ export function RunOfShow() {
 
   return (
     <div className="ros">
-      <header className="ros__header">
+      <div className="pagehead">
         <div>
-          <Link className="status__back" to={`/room/${roomId}`}>← {room.name}</Link>
-          <h1 className="ros__title">{plan.title}</h1>
-          <p className="ros__sub">
+          <h1 className="pagehead__title">{plan.title}</h1>
+          <p className="pagehead__sub">
             {[plan.serviceTypeName, plan.seriesTitle, plan.dates].filter(Boolean).join(' · ')}
           </p>
         </div>
-        <div className="ros__header-right">
-          <Clock />
+        <div className="pagehead__right">
           <Link
             className="btn btn--sm"
             to={`/room/${roomId}/run/${planId}/report${timeId !== 'default' ? `?time=${timeId}` : ''}`}
@@ -134,7 +131,7 @@ export function RunOfShow() {
             📊 Timing report
           </Link>
         </div>
-      </header>
+      </div>
 
       <section className="ros__widgets">
         <Countdown time={selectedTime} />

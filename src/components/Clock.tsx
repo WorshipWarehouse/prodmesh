@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export function Clock() {
+export function Clock({ compact = false }: { compact?: boolean }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -12,12 +12,12 @@ export function Clock() {
     second: '2-digit',
   });
   const date = now.toLocaleDateString([], {
-    weekday: 'long',
-    month: 'long',
+    weekday: compact ? 'short' : 'long',
+    month: compact ? 'short' : 'long',
     day: 'numeric',
   });
   return (
-    <div className="clock">
+    <div className={`clock${compact ? ' clock--compact' : ''}`}>
       <span className="clock__time">{time}</span>
       <span className="clock__date">{date}</span>
     </div>

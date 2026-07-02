@@ -1,0 +1,258 @@
+/* Planning Center service display — badges, time chips, order-of-service list.
+   Shared by the Upcoming Service widget, launcher overview, and Run of Show. */
+
+/* ── Badges & chips ──────────────────────────────────────────────────────── */
+.svc__badge {
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.svc__badge--live {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border: 1px solid var(--ok-border);
+}
+
+.svc__badge--mock {
+  color: var(--text-dim);
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+}
+
+.svc__muted {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.svc__time {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  margin-right: 6px;
+}
+
+/* Rehearsal times stand out in purple; services keep the neutral chip. */
+.svc__time--rehearsal {
+  color: var(--purple-text);
+  background: var(--purple-soft);
+  border-color: var(--purple-border);
+}
+
+/* Clickable service-time chip (links into Run of Show) */
+.svc__time--link {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.svc__time--link:hover {
+  background: rgba(91, 141, 239, 0.2);
+  border-color: var(--accent);
+}
+
+.svc__legend {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+.svc__legend .svc__time {
+  margin-right: 0;
+  cursor: pointer;
+}
+
+/* Hovering a legend chip dims the OTHER time type, emphasizing the hovered one. */
+.svc__times .svc__time {
+  transition: opacity 0.15s ease;
+}
+
+.svc__next:has(.svc__legend .svc__time--service:hover) .svc__times .svc__time--rehearsal,
+.svc__next:has(.svc__legend .svc__time--rehearsal:hover) .svc__times .svc__time--service {
+  opacity: 0.18;
+}
+
+/* ── Plan summary ────────────────────────────────────────────────────────── */
+.svc__type-name {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  padding: 2px 10px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.svc__series {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.svc__plan {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.svc__date {
+  color: var(--text-dim);
+  margin: 2px 0 10px;
+}
+
+.svc__times {
+  margin-bottom: 12px;
+}
+
+.svc__toggle {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.svc__later {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+/* ── Order of service list ───────────────────────────────────────────────── */
+.svc__items {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.svc__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.svc__item-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+.svc__item-title {
+  flex: 1;
+  font-weight: 500;
+}
+
+.svc__item-len {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Leader name (from the "Leader" item note) */
+.svc__item-leader {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.svc__item-leader::before {
+  content: '👤';
+  font-size: 0.72rem;
+}
+
+/* Song key badge */
+.svc__item-key {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-text);
+  background: rgba(91, 141, 239, 0.15);
+  border: 1px solid rgba(91, 141, 239, 0.4);
+  border-radius: 6px;
+  padding: 1px 8px;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* Current-position + clickable items */
+.svc__item--clickable {
+  cursor: pointer;
+}
+
+.svc__item--clickable:hover {
+  border-color: var(--accent);
+}
+
+.svc__item--current {
+  border-color: var(--ok);
+  background: rgba(52, 199, 89, 0.14);
+  box-shadow: inset 3px 0 0 var(--ok);
+  animation: current-pulse 1.6s ease-in-out infinite;
+}
+
+.svc__item--current .svc__item-icon {
+  color: var(--ok);
+}
+
+@keyframes current-pulse {
+  0%, 100% { background: rgba(52, 199, 89, 0.1); }
+  50% { background: rgba(52, 199, 89, 0.22); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .svc__item--current { animation: none; }
+}
+
+/* Section headers — dividers between sections, not boxed rows */
+.svc__item--header {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  margin: 16px 0 6px;
+  padding: 4px 2px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+
+.svc__item--header:first-child {
+  margin-top: 0;
+}
+
+.svc__item--header .svc__item-title {
+  font-weight: 700;
+}
+
+/* Songs — colored title + left accent bar */
+.svc__item--song {
+  border-left: 3px solid var(--accent);
+}
+
+.svc__item--song .svc__item-icon {
+  color: inherit;
+}
+
+.svc__item--song .svc__item-title {
+  color: var(--accent-text);
+  font-weight: 600;
+}

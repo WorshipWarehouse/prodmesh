@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   getAuthStatus,
   loginAdmin,
@@ -13,8 +12,6 @@ import {
   type RoomMeta,
   type ScheduleWindow,
 } from '../api';
-import logoUrl from '../assets/logo.png';
-
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -32,16 +29,12 @@ export function Settings() {
 
   return (
     <div className="settings">
-      <header className="settings__header">
-        <div className="app__brand">
-          <img className="app__logo" src={logoUrl} alt="" />
-          <div>
-            <h1 className="app__title">Settings</h1>
-            <p className="app__subtitle">Admin</p>
-          </div>
+      <div className="pagehead">
+        <div>
+          <h1 className="pagehead__title">Settings</h1>
+          <p className="pagehead__sub">Admin</p>
         </div>
-        <Link className="status__back" to="/">← Quick Access</Link>
-      </header>
+      </div>
 
       {phase === 'loading' && <p className="settings__muted">Loading…</p>}
       {phase === 'setup' && <SetupForm onDone={refreshStatus} />}
