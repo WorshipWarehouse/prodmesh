@@ -132,6 +132,30 @@ export function getPlanItems(serviceType, planId) {
   });
 }
 
+/** Series artwork + plan notes for the Event Detail page.
+ *  Artwork lives on the plan's Series (verified live: `?include=series` →
+ *  attributes.artwork_for_plan etc.); notes are the plan-level category notes. */
+export function getPlanDetail(serviceType, planId) {
+  return cached(`detail:${planId}`, async () => {
+    if (!isConfigured()) return mockDetail();
+    const [planBody, notesBody] = await Promise.all([
+      pcGet(`/service_types/${serviceType.id}/plans/${planId}?include=series`),
+      pcGet(`/service_types/${serviceType.id}/plans/${planId}/notes`),
+    ]);
+    const series = (planBody.included ?? []).find((i) => i.type === 'Series');
+    const sa = series?.attributes ?? {};
+    return {
+      artwork: sa.has_artwork ? sa.artwork_for_plan || sa.artwork_for_dashboard || null : null,
+      notes: (notesBody.data ?? [])
+        .map((n) => ({
+          category: n.attributes?.category_name ?? null,
+          content: String(n.attributes?.content ?? '').trim(),
+        }))
+        .filter((n) => n.content),
+    };
+  });
+}
+
 // ── Mock data (used until a token is configured) ──────────────────────────────
 function nextSunday(offsetWeeks = 0) {
   const d = new Date();
@@ -195,4 +219,14 @@ function mockItems() {
     leader: r.leader ?? null,
     description: null,
   }));
+}
+
+function mockDetail() {
+  return {
+    artwork: null,
+    notes: [
+      { category: 'Production', content: 'Confetti drop during the final song — cue from FOH.' },
+      { category: 'Video', content: 'Baptism video rolls right after announcements.' },
+    ],
+  };
 }

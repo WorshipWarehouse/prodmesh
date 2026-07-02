@@ -70,7 +70,10 @@ export function ServicePanel({
         <div className="svc__next">
           <div className="svc__type-name">{next.serviceTypeName}</div>
           {next.seriesTitle && <div className="svc__series">{next.seriesTitle}</div>}
-          <div className="svc__plan">{next.title}</div>
+          {/* The event itself opens the Event Detail page (times/notes/checklist). */}
+          <Link className="svc__plan svc__plan--link" to={`/room/${roomId}/event/${next.id}`}>
+            {next.title}
+          </Link>
           {next.dates && <div className="svc__date">{next.dates}</div>}
           <div className="svc__times">
             {next.times.map((t) => {

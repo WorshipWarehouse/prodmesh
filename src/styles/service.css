@@ -108,6 +108,18 @@
   font-weight: 700;
 }
 
+.svc__plan--link {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.svc__plan--link:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .svc__date {
   color: var(--text-dim);
   margin: 2px 0 10px;

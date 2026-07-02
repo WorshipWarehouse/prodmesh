@@ -214,6 +214,7 @@ export function RunOfShow() {
     <div className="ros">
       <div className="pagehead">
         <div>
+          <Link className="backlink" to={`/room/${roomId}/event/${planId}`}>← Event details</Link>
           <h1 className="pagehead__title">{plan.title}</h1>
           <p className="pagehead__sub">
             {[plan.serviceTypeName, plan.seriesTitle, plan.dates].filter(Boolean).join(' · ')}
