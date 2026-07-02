@@ -19,7 +19,9 @@ import { writeJsonAtomic } from './atomicFile.js';
 import { rooms } from './rooms.config.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as pco from './integrations/planningCenter.js';
+import * as smaart from './integrations/smaart.js';
 import * as timeline from './timeline.js';
+import * as splStore from './splStore.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SHOWS_DIR = join(process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data'), 'shows');
@@ -28,6 +30,8 @@ const shows = new Map(); // roomId -> runtime show (only while active)
 const subscribers = new Map(); // roomId -> Set<res> (persists across show start/end)
 const timers = new Map(); // roomId -> published PP timer state (or null)
 const timerWatchers = new Map(); // roomId -> AbortController (runs while subscribed)
+const spls = new Map(); // roomId -> published SPL state (or null)
+const splWatchers = new Map(); // roomId -> AbortController (runs while subscribed)
 
 const instanceId = (show) => `${show.planId}__${show.timeId}`;
 const showFile = (roomId) => join(SHOWS_DIR, `${roomId.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`);
@@ -35,8 +39,9 @@ const showFile = (roomId) => join(SHOWS_DIR, `${roomId.replace(/[^a-zA-Z0-9_-]/g
 // ── Public state + SSE fan-out ────────────────────────────────────────────────
 export function getState(roomId) {
   const timer = timers.get(roomId) ?? null;
+  const spl = spls.get(roomId) ?? null;
   const show = shows.get(roomId);
-  if (!show) return { active: false, timer };
+  if (!show) return { active: false, timer, spl };
   return {
     active: true,
     roomId,
@@ -47,6 +52,7 @@ export function getState(roomId) {
     ppConnected: show.ppConnected,
     current: show.current,
     timer,
+    spl,
   };
 }
 
@@ -64,11 +70,15 @@ export function subscribe(roomId, res) {
   subs(roomId).add(res);
   res.write(`event: state\ndata: ${JSON.stringify(getState(roomId))}\n\n`);
   startTimerWatcher(roomId);
+  startSplWatcher(roomId);
 }
 
 export function unsubscribe(roomId, res) {
   subs(roomId).delete(res);
-  if (subs(roomId).size === 0) stopTimerWatcher(roomId);
+  if (subs(roomId).size === 0) {
+    stopTimerWatcher(roomId);
+    stopSplWatcher(roomId);
+  }
 }
 
 // ── PP timer watcher ─────────────────────────────────────────────────────────
@@ -97,6 +107,60 @@ function timerSleep(ms, signal) {
     const t = setTimeout(resolve, ms);
     signal.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
   });
+}
+
+// ── SPL watcher ──────────────────────────────────────────────────────────────
+//  Unlike the (display-only) timer watcher, SPL feeds the Show Report — so it
+//  runs while the room has subscribers OR an active show. Samples persist to
+//  SQLite only while a show is live; the live meter is broadcast either way.
+
+function splNeeded(roomId) {
+  return subs(roomId).size > 0 || shows.has(roomId);
+}
+
+function startSplWatcher(roomId) {
+  if (splWatchers.has(roomId)) return;
+  const cfg = rooms[roomId]?.smaart;
+  if (!smaart.isConfigured(cfg)) return;
+  const ctl = new AbortController();
+  splWatchers.set(roomId, ctl);
+  smaart.watchSpl(cfg, (s) => onSpl(roomId, s), ctl.signal).catch(() => {
+    if (!ctl.signal.aborted) {
+      spls.set(roomId, null);
+      broadcast(roomId);
+    }
+  });
+}
+
+function stopSplWatcher(roomId) {
+  if (splNeeded(roomId)) return; // still wanted by a show or a viewer
+  splWatchers.get(roomId)?.abort();
+  splWatchers.delete(roomId);
+  spls.delete(roomId);
+}
+
+function onSpl(roomId, sample) {
+  const cfg = rooms[roomId]?.smaart ?? {};
+  const show = shows.get(roomId);
+  let avg = null;
+  let peak = null;
+  if (show && show.splStats) {
+    splStore.record(roomId, instanceId(show), sample.ts, sample.spl);
+    const st = show.splStats;
+    st.n += 1;
+    st.sumEnergy += 10 ** (sample.spl / 10);
+    st.peak = st.peak == null ? sample.spl : Math.max(st.peak, sample.spl);
+    avg = splStore.round1(10 * Math.log10(st.sumEnergy / st.n));
+    peak = splStore.round1(st.peak);
+  }
+  spls.set(roomId, {
+    current: sample.spl,
+    avg,
+    peak,
+    target: cfg.target ?? null,
+    limit: cfg.limit ?? null,
+  });
+  broadcast(roomId);
 }
 
 async function watchTimers(roomId, pp, signal) {
@@ -173,9 +237,12 @@ async function beginShow(roomId, planId, timeId, startedAt) {
   };
   shows.set(roomId, show);
   timeline.reopen(instanceId(show)); // restarting an ended show un-completes it
+  // Seed running SPL stats from any samples already recorded (reopened show).
+  if (smaart.isConfigured(room.smaart)) show.splStats = splStore.runningStats(instanceId(show));
   persistShow(show);
   broadcast(roomId);
   startPoller(show);
+  startSplWatcher(roomId); // capture runs with the show, not the browsers
   return show;
 }
 
@@ -201,6 +268,7 @@ export function endShow(roomId) {
   timeline.finalize(instanceId(show));
   shows.delete(roomId);
   removeShowFile(roomId);
+  stopSplWatcher(roomId); // no-op if viewers still want the live meter
   broadcast(roomId);
   return getState(roomId);
 }

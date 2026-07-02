@@ -30,6 +30,7 @@ Notes:
 | Bitfocus Companion (per room) | Live for Auditorium; Youth/Chapel mock pending real setup |
 | Planning Center **Services** | **Live** — plan display + order of service, PAT in `server/data/secrets.json` |
 | Planning Center **Calendar** | **Not started** — awaiting read-only access. High value (see below) |
+| **Smaart SPL** | **Mock** — full pipeline live (capture → SQLite → live meter + report, ADR 0006); real WS transport needs the meter-read command verified on-site / from Rational's free SDK doc |
 
 ## What's live right now
 

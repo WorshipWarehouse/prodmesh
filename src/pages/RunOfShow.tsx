@@ -11,6 +11,7 @@ import {
   Radio,
   Square,
   Timer as TimerIcon,
+  Volume2,
 } from 'lucide-react';
 import {
   getRoom,
@@ -24,6 +25,7 @@ import {
   type PlanTime,
   type PpTimer,
   type ShowState,
+  type SplState,
 } from '../api';
 import { OrderOfService } from '../components/OrderOfService';
 
@@ -81,6 +83,45 @@ function Countdown({ time, timer }: { time: PlanTime | null; timer: PpTimer | nu
       <span className="ros-count__label">{past ? 'Elapsed since start' : 'Starts in'}</span>
       <span className="ros-count__time">{hhmmss(Math.abs(diff) / 1000)}</span>
       <span className="ros-count__at">{timeLabel(time)}</span>
+    </div>
+  );
+}
+
+// Live room loudness. Color tells the story at a glance: green under target,
+// amber between target and limit, red over the limit.
+function SplMeter({ spl }: { spl: SplState | null }) {
+  if (!spl) return null;
+  const zone =
+    spl.limit != null && spl.current >= spl.limit
+      ? 'over'
+      : spl.target != null && spl.current >= spl.target
+        ? 'warn'
+        : 'ok';
+  // Meter bar spans a fixed 70–100 dB window (where worship services live).
+  const pct = Math.min(100, Math.max(0, ((spl.current - 70) / 30) * 100));
+  return (
+    <div className={`ros-spl ros-spl--${zone}`}>
+      <span className="ros-count__label">
+        <Volume2 size={13} /> Loudness
+      </span>
+      <span className="ros-spl__db">
+        {spl.current.toFixed(1)} <small>dB</small>
+      </span>
+      <div className="ros-spl__bar">
+        <div className="ros-spl__fill" style={{ width: `${pct}%` }} />
+        {spl.target != null && (
+          <div className="ros-spl__mark ros-spl__mark--target" style={{ left: `${((spl.target - 70) / 30) * 100}%` }} />
+        )}
+        {spl.limit != null && (
+          <div className="ros-spl__mark ros-spl__mark--limit" style={{ left: `${((spl.limit - 70) / 30) * 100}%` }} />
+        )}
+      </div>
+      <span className="ros-spl__stats">
+        {spl.avg != null ? `avg ${spl.avg.toFixed(1)}` : 'avg —'}
+        {' · '}
+        {spl.peak != null ? `peak ${spl.peak.toFixed(1)}` : 'peak —'}
+        {spl.target != null && ` · target ${spl.target}`}
+      </span>
     </div>
   );
 }
@@ -190,6 +231,7 @@ export function RunOfShow() {
 
       <section className="ros__widgets">
         <Countdown time={selectedTime} timer={state.timer ?? null} />
+        <SplMeter spl={state.spl ?? null} />
 
         <div className="ros-track">
           {isOtherShow ? (

@@ -230,11 +230,22 @@ export interface ReportItem {
   ongoing: boolean;
 }
 
+export interface SplReport {
+  count: number;
+  leq: number | null; // energy-averaged dB over the captured window
+  peak: number | null;
+  from: number;
+  to: number;
+  target: number | null; // room's dB goal (e.g. 90)
+  limit: number | null; // do-not-exceed (e.g. 95)
+}
+
 export interface TimingReport {
   items: ReportItem[];
   totals: { planned: number; actual: number; delta: number };
   startedAt?: number | null;
   completedAt?: number | null;
+  spl?: SplReport | null;
 }
 
 export const getReport = (id: string, planId: string, timeId?: string | null) =>
@@ -262,6 +273,14 @@ export interface PpTimer {
   countsDownToTime: boolean;
 }
 
+export interface SplState {
+  current: number; // latest sample, dB
+  avg: number | null; // running Leq — only while a show is live
+  peak: number | null; // show peak — only while a show is live
+  target: number | null;
+  limit: number | null;
+}
+
 export interface ShowState {
   active: boolean;
   roomId?: string;
@@ -272,6 +291,7 @@ export interface ShowState {
   ppConnected?: boolean | null;
   current?: ShowCurrent;
   timer?: PpTimer | null;
+  spl?: SplState | null;
 }
 
 export const getShow = (roomId: string) =>
