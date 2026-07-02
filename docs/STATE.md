@@ -2,6 +2,7 @@
 
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
+The long-term destination lives in [VISION.md](./VISION.md).
 Last updated: 2026-07-02.
 
 ## Sites & rooms
