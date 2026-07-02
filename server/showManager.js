@@ -11,9 +11,10 @@
 //  Active shows are persisted (server/data/shows/) and restored on boot.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { writeJsonAtomic } from './atomicFile.js';
 
 import { rooms } from './rooms.config.js';
 import * as ppro from './integrations/proPresenter.js';
@@ -66,11 +67,13 @@ export function unsubscribe(roomId, res) {
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 function persistShow(show) {
-  if (!existsSync(SHOWS_DIR)) mkdirSync(SHOWS_DIR, { recursive: true });
-  writeFileSync(
-    showFile(show.roomId),
-    JSON.stringify({ roomId: show.roomId, planId: show.planId, timeId: show.timeId, startedAt: show.startedAt, status: 'active' }),
-  );
+  writeJsonAtomic(showFile(show.roomId), {
+    roomId: show.roomId,
+    planId: show.planId,
+    timeId: show.timeId,
+    startedAt: show.startedAt,
+    status: 'active',
+  });
 }
 
 function removeShowFile(roomId) {

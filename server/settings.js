@@ -10,10 +10,11 @@
 
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { validateSchedules } from './validate.js';
+import { writeJsonAtomic } from './atomicFile.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Overridable so tests (and alternate deployments) can point at their own dir.
@@ -57,8 +58,7 @@ function load() {
 }
 
 function persist() {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  writeFileSync(FILE, JSON.stringify(settings, null, 2));
+  writeJsonAtomic(FILE, settings);
 }
 
 // ── PIN hashing (scrypt, salted, constant-time compare) ───────────────────────

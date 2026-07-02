@@ -12,9 +12,10 @@
 //  with no double-recording (Node is single-threaded — no interleave mid-call).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { writeJsonAtomic } from './atomicFile.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = join(process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data'), 'timelines');
@@ -40,8 +41,7 @@ function load(instanceId, ctx = {}) {
 }
 
 function persist(instanceId, tl) {
-  if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
-  writeFileSync(fileFor(instanceId), JSON.stringify(tl, null, 2));
+  writeJsonAtomic(fileFor(instanceId), tl);
 }
 
 /**
