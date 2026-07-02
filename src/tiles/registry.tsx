@@ -8,12 +8,14 @@
 //
 // Adding a new module = add a type to src/types.ts and one entry here.
 
+import type { ReactNode } from 'react';
+import { ExternalLink, LayoutDashboard, Plus, ScreenShare } from 'lucide-react';
 import type { Tile } from '../types';
 import companionIcon from '../assets/companion.webp';
 
 export interface TileBehavior {
-  /** Emoji fallback icon (used when no `iconImage` and no per-tile `icon`). */
-  icon: string;
+  /** Default icon (a Lucide element; a per-tile `icon` emoji overrides it). */
+  icon: ReactNode;
   /** Optional image icon (imported asset) shown instead of the emoji. */
   iconImage?: string;
   accent: string;
@@ -25,7 +27,7 @@ export interface TileBehavior {
 
 export const tileRegistry: Record<Tile['type'], TileBehavior> = {
   companion: {
-    icon: '🎛️',
+    icon: <LayoutDashboard size={26} />,
     iconImage: companionIcon,
     accent: '#5b8def',
     target: '_blank',
@@ -43,7 +45,7 @@ export const tileRegistry: Record<Tile['type'], TileBehavior> = {
   },
 
   screenshare: {
-    icon: '🖥️',
+    icon: <ScreenShare size={26} />,
     accent: '#34c759',
     target: '_self',
     // vnc://host is handled by macOS and opens Screen Sharing.app directly.
@@ -56,14 +58,14 @@ export const tileRegistry: Record<Tile['type'], TileBehavior> = {
   },
 
   link: {
-    icon: '🔗',
+    icon: <ExternalLink size={26} />,
     accent: '#af7bf0',
     target: '_blank',
     href: (tile) => (tile.type === 'link' ? tile.url : null),
   },
 
   route: {
-    icon: '📊',
+    icon: <LayoutDashboard size={26} />,
     accent: '#ffce54',
     target: '_self',
     // Internal navigation — the Tile component renders a router <Link> for these.
@@ -71,7 +73,7 @@ export const tileRegistry: Record<Tile['type'], TileBehavior> = {
   },
 
   placeholder: {
-    icon: '➕',
+    icon: <Plus size={26} />,
     accent: '#6b7280',
     href: () => null,
   },

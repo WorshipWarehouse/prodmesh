@@ -131,14 +131,14 @@
 }
 
 .gear {
-  font-size: 1.4rem;
+  display: inline-flex;
+  color: var(--text-dim);
   text-decoration: none;
-  opacity: 0.7;
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  transition: color 0.12s ease, transform 0.12s ease;
 }
 
 .gear:hover {
-  opacity: 1;
+  color: var(--text);
   transform: rotate(30deg);
 }
 

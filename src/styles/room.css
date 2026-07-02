@@ -39,8 +39,10 @@
 }
 
 .mode-hero__conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 0.85rem;
-  margin-top: 4px;
 }
 
 .mode-hero__conn--on {
@@ -96,6 +98,12 @@
   cursor: default;
   background: var(--mode-color);
   color: var(--text-on-accent);
+}
+
+.mode-btn__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .mode-btn__active {

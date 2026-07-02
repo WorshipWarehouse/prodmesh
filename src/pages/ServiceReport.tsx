@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { getReport, getRoomPlan, type ServicePlan, type TimingReport } from '../api';
 
 function mmss(sec: number) {
@@ -57,11 +58,13 @@ export function ServiceReport() {
         <div className="pagehead__right">
           {report?.completedAt && (
             <span className="svc__badge svc__badge--live">
-              ✓ Completed{' '}
+              <CheckCircle2 size={12} /> Completed{' '}
               {new Date(report.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
             </span>
           )}
-          <button className="btn btn--sm" onClick={load}>Refresh</button>
+          <button className="btn btn--sm" onClick={load}>
+            <RefreshCw size={13} /> Refresh
+          </button>
         </div>
       </div>
 

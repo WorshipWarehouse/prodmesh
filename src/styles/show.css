@@ -48,6 +48,9 @@
 }
 
 .ros-count__at {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--text-dim);
   font-size: 0.9rem;
 }
@@ -66,6 +69,19 @@
   gap: 10px;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.ros-track__status > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* When the status is a bare span (idle / complete rows), don't space-between. */
+span.ros-track__status {
+  display: inline-flex;
+  justify-content: flex-start;
+  gap: 6px;
 }
 
 .ros-track__status--follow { color: var(--ok); }
