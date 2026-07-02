@@ -16,7 +16,8 @@
 }
 
 .ros-count,
-.ros-track {
+.ros-track,
+.ros-spl {
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -143,6 +144,73 @@ span.ros-track__status {
 .ros-progress__label {
   display: inline-block;
   margin-top: 5px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Live SPL meter widget */
+.ros-spl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 4px solid var(--ok);
+}
+
+.ros-spl--warn { border-top-color: var(--warn); }
+.ros-spl--over { border-top-color: var(--danger); }
+
+.ros-spl .ros-count__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ros-spl__db {
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.ros-spl__db small {
+  font-size: 0.45em;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.ros-spl--warn .ros-spl__db { color: var(--warn); }
+.ros-spl--over .ros-spl__db { color: var(--danger); }
+
+.ros-spl__bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.ros-spl__fill {
+  height: 100%;
+  background: var(--ok);
+  transition: width 0.4s ease;
+}
+
+.ros-spl--warn .ros-spl__fill { background: var(--warn); }
+.ros-spl--over .ros-spl__fill { background: var(--danger); }
+
+.ros-spl__mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.ros-spl__mark--target { background: var(--warn); }
+.ros-spl__mark--limit { background: var(--danger); }
+
+.ros-spl__stats {
   font-size: 0.8rem;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;

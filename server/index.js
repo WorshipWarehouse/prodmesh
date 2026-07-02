@@ -20,6 +20,7 @@ import * as settings from './settings.js';
 import * as pco from './integrations/planningCenter.js';
 import * as timeline from './timeline.js';
 import * as show from './showManager.js';
+import * as splStore from './splStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -171,11 +172,19 @@ app.get('/api/rooms/:id/plan/:planId', async (req, res) => {
   }
 });
 
-// Timing report for a service instance (planned vs actual per item).
+// Timing report for a service instance (planned vs actual per item), plus the
+// SPL block (avg Leq / peak vs the room's targets) when loudness was captured.
 app.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   const timeId = String(req.query.time || 'default');
-  const report = timeline.getReport(`${req.params.planId}__${timeId}`);
-  res.json(report ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } });
+  const instance = `${req.params.planId}__${timeId}`;
+  const report =
+    timeline.getReport(instance) ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } };
+  const smaartCfg = rooms[req.params.id]?.smaart;
+  const agg = splStore.aggregate(instance);
+  report.spl = agg
+    ? { ...agg, target: smaartCfg?.target ?? null, limit: smaartCfg?.limit ?? null }
+    : null;
+  res.json(report);
 });
 
 // ── Show session (server-coordinated Run of Show) ──────────────────────────────

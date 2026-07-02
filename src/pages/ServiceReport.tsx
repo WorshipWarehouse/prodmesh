@@ -13,6 +13,12 @@ function signed(sec: number) {
   return `${sign}${mmss(Math.abs(sec))}`;
 }
 
+const db = (v: number | null) => (v == null ? '—' : `${v.toFixed(1)} dB`);
+
+function splZone(value: number | null, spl: { limit: number | null }) {
+  return value != null && spl.limit != null && value > spl.limit ? 'over' : 'ok';
+}
+
 export function ServiceReport() {
   const { roomId = '', planId = '' } = useParams();
   const [params] = useSearchParams();
@@ -68,28 +74,50 @@ export function ServiceReport() {
         </div>
       </div>
 
-      {!report || report.items.length === 0 ? (
+      {!report || (report.items.length === 0 && !report.spl) ? (
         <p className="settings__muted">
-          No timing recorded yet. It builds automatically as the Run of Show follows
-          along during the service.
+          Nothing recorded yet. Timing and loudness build automatically while a
+          show is live.
         </p>
       ) : (
         <>
-          <div className="report__summary">
-            <div className="report__stat">
-              <span className="report__stat-label">Planned</span>
-              <span className="report__stat-val">{mmss(report.totals.planned)}</span>
+          {report.items.length > 0 && (
+            <div className="report__summary">
+              <div className="report__stat">
+                <span className="report__stat-label">Planned</span>
+                <span className="report__stat-val">{mmss(report.totals.planned)}</span>
+              </div>
+              <div className="report__stat">
+                <span className="report__stat-label">Actual</span>
+                <span className="report__stat-val">{mmss(report.totals.actual)}</span>
+              </div>
+              <div className={`report__stat report__stat--${report.totals.delta > 0 ? 'over' : 'under'}`}>
+                <span className="report__stat-label">{report.totals.delta > 0 ? 'Over' : 'Under'}</span>
+                <span className="report__stat-val">{signed(report.totals.delta)}</span>
+              </div>
             </div>
-            <div className="report__stat">
-              <span className="report__stat-label">Actual</span>
-              <span className="report__stat-val">{mmss(report.totals.actual)}</span>
-            </div>
-            <div className={`report__stat report__stat--${report.totals.delta > 0 ? 'over' : 'under'}`}>
-              <span className="report__stat-label">{report.totals.delta > 0 ? 'Over' : 'Under'}</span>
-              <span className="report__stat-val">{signed(report.totals.delta)}</span>
-            </div>
-          </div>
+          )}
 
+          {report.spl && (
+            <div className="report__summary">
+              <div className={`report__stat${splZone(report.spl.leq, report.spl) === 'over' ? ' report__stat--over' : ''}`}>
+                <span className="report__stat-label">Avg loudness (Leq)</span>
+                <span className="report__stat-val">{db(report.spl.leq)}</span>
+              </div>
+              <div className={`report__stat${splZone(report.spl.peak, report.spl) === 'over' ? ' report__stat--over' : ''}`}>
+                <span className="report__stat-label">Peak</span>
+                <span className="report__stat-val">{db(report.spl.peak)}</span>
+              </div>
+              <div className="report__stat">
+                <span className="report__stat-label">Target / limit</span>
+                <span className="report__stat-val">
+                  {report.spl.target ?? '—'} / {report.spl.limit ?? '—'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {report.items.length > 0 && (
           <table className="report__table">
             <thead>
               <tr>
@@ -117,6 +145,7 @@ export function ServiceReport() {
               ))}
             </tbody>
           </table>
+          )}
         </>
       )}
     </div>
