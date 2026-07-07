@@ -21,6 +21,8 @@ import * as pco from './integrations/planningCenter.js';
 import * as timeline from './timeline.js';
 import * as show from './showManager.js';
 import * as splStore from './splStore.js';
+import * as checklist from './checklistStore.js';
+import { templateFor } from './checklists.config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -99,16 +101,9 @@ app.post('/api/rooms/:id/mode', async (req, res) => {
     }
   }
 
-  // Update mock state regardless, so the UI reflects intent if Companion is down.
-  mockState[room.id] = mode.match ?? mode.id;
-
-  if (room.mock || !room.companion?.host) {
-    return res.json({ ok: true, mode: mode.id, online: false, source: 'mock' });
-  }
-
   try {
-    if (mode.press) await pressButton(room.companion, mode.press);
-    res.json({ ok: true, mode: mode.id, online: true, source: 'companion' });
+    const result = await applyMode(room, mode);
+    res.json({ ok: true, mode: mode.id, ...result });
   } catch (err) {
     res.status(502).json({
       ok: false,
@@ -118,6 +113,16 @@ app.post('/api/rooms/:id/mode', async (req, res) => {
     });
   }
 });
+
+// Set a room's mode: presses the mapped Companion button. Shared by the mode
+// endpoint and automated checklist items. Throws if Companion is unreachable.
+async function applyMode(room, mode) {
+  // Update mock state regardless, so the UI reflects intent if Companion is down.
+  mockState[room.id] = mode.match ?? mode.id;
+  if (room.mock || !room.companion?.host) return { online: false, source: 'mock' };
+  if (mode.press) await pressButton(room.companion, mode.press);
+  return { online: true, source: 'companion' };
+}
 
 // ── Planning Center Services (read-only plan display) ──────────────────────────
 
@@ -167,6 +172,66 @@ app.get('/api/rooms/:id/plan/:planId', async (req, res) => {
       pco.getPlanItems(st, plan.id),
     ]);
     res.json({ live: pco.isConfigured(), plan });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message ?? err) });
+  }
+});
+
+// ── Event Detail (the page above Run of Show: times, notes, checklist) ────────
+
+// Resolve one of the room's upcoming plans by id (shared lookup).
+async function planForRoom(room, planId) {
+  if (!room?.planningCenter?.serviceTypes?.length) return null;
+  return (await upcomingForRoom(room.planningCenter, 10)).find((p) => p.id === planId) ?? null;
+}
+
+app.get('/api/rooms/:id/event/:planId', async (req, res) => {
+  const room = rooms[req.params.id];
+  if (!room) return res.status(404).json({ error: 'Unknown room' });
+  try {
+    const plan = await planForRoom(room, req.params.planId);
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+    const st = stOf(plan);
+    const [times, detail] = await Promise.all([
+      pco.getPlanTimes(st, plan.id),
+      pco.getPlanDetail(st, plan.id),
+    ]);
+    plan.times = times;
+    res.json({
+      live: pco.isConfigured(),
+      plan,
+      detail,
+      checklist: checklist.getChecklist(room.id, plan.id, plan.serviceTypeId),
+    });
+  } catch (err) {
+    res.status(502).json({ error: String(err.message ?? err) });
+  }
+});
+
+// Check / uncheck a checklist item. Checking an item with an action executes
+// it first (e.g. set the room mode) — the item only marks done if that works.
+app.post('/api/rooms/:id/event/:planId/checklist/:itemId', async (req, res) => {
+  const room = rooms[req.params.id];
+  if (!room) return res.status(404).json({ error: 'Unknown room' });
+  try {
+    const plan = await planForRoom(room, req.params.planId);
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+    const item = templateFor(room.id, plan.serviceTypeId).find((i) => i.id === req.params.itemId);
+    if (!item) return res.status(400).json({ error: 'Unknown checklist item' });
+
+    const done = Boolean(req.body?.done);
+    if (done && item.action?.type === 'mode') {
+      const mode = room.modes.find((m) => m.id === item.action.mode);
+      if (!mode) return res.status(400).json({ error: `Unknown mode '${item.action.mode}'` });
+      // Lockouts apply here too — a checklist can't sidestep a protected window.
+      if (settings.isModeLocked(room.id, mode.id)) {
+        return res.status(403).json({ error: 'override_required', mode: mode.id });
+      }
+      await applyMode(room, mode); // throws → 502 below, item stays unchecked
+    }
+
+    checklist.setItem(room.id, plan.id, item.id, done);
+    res.json({ checklist: checklist.getChecklist(room.id, plan.id, plan.serviceTypeId) });
   } catch (err) {
     res.status(502).json({ error: String(err.message ?? err) });
   }

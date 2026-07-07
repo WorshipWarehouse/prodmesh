@@ -222,6 +222,39 @@ export const getRoomPlan = (id: string, planId: string) =>
     `/api/rooms/${encodeURIComponent(id)}/plan/${encodeURIComponent(planId)}`,
   );
 
+// ── Event Detail (times + notes + startup checklist for one event) ────────────
+
+export interface PlanNote {
+  category: string | null;
+  content: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  action: { type: 'mode'; mode: string } | null;
+  done: boolean;
+  doneAt: number | null;
+}
+
+export interface EventDetail {
+  live: boolean;
+  plan: ServicePlan;
+  detail: { artwork: string | null; notes: PlanNote[] };
+  checklist: ChecklistItem[];
+}
+
+export const getEventDetail = (id: string, planId: string) =>
+  getJson<EventDetail>(
+    `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}`,
+  );
+
+export const setChecklistItem = (id: string, planId: string, itemId: string, done: boolean) =>
+  postJson<{ checklist: ChecklistItem[] }>(
+    `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}/checklist/${encodeURIComponent(itemId)}`,
+    { done },
+  );
+
 export interface ReportItem {
   itemName: string;
   plannedLength: number | null;
