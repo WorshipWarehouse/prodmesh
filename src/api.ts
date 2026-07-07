@@ -154,6 +154,47 @@ export async function saveSchedules(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
+// ── Checklist templates (per event type, edited in Admin) ────────────────────
+
+export interface TemplateItem {
+  id?: string; // omitted for new items — the server assigns a stable slug
+  label: string;
+  action?: { type: 'mode'; mode: string } | null;
+}
+
+export interface ChecklistTemplatesInfo {
+  templates: Record<string, TemplateItem[]>; // keyed by service type id, '*' = default
+  serviceTypes: { id: string; name: string }[];
+  modes: { id: string; label: string }[];
+}
+
+export const getChecklistTemplates = () =>
+  getJson<ChecklistTemplatesInfo>('/api/checklist-templates');
+
+export async function saveChecklistTemplate(
+  serviceTypeId: string,
+  items: TemplateItem[],
+): Promise<Record<string, TemplateItem[]>> {
+  const res = await fetch(`/api/checklist-templates/${encodeURIComponent(serviceTypeId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
+  return ((await res.json()) as { templates: Record<string, TemplateItem[]> }).templates;
+}
+
+export async function deleteChecklistTemplate(
+  serviceTypeId: string,
+): Promise<Record<string, TemplateItem[]>> {
+  const res = await fetch(`/api/checklist-templates/${encodeURIComponent(serviceTypeId)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return ((await res.json()) as { templates: Record<string, TemplateItem[]> }).templates;
+}
+
 // ── System ────────────────────────────────────────────────────────────────────
 
 export interface Version {

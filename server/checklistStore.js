@@ -1,16 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  CHECKLIST STORE  —  merges a room/event-type template with per-event state.
+//  CHECKLIST STORE  —  merges an event-type template with per-event state.
 //
 //  State is keyed by (roomId, planId): one checklist run per EVENT, shared by
 //  every service time and every browser (server-authoritative, like shows).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getDb } from './db.js';
-import { templateFor } from './checklists.config.js';
+import { templateFor } from './checklistTemplates.js';
 
 /** Template + done-state → the checklist as the UI sees it. */
 export function getChecklist(roomId, planId, serviceTypeId) {
-  const tpl = templateFor(roomId, serviceTypeId);
+  const tpl = templateFor(serviceTypeId);
   if (tpl.length === 0) return [];
   const rows = getDb()
     .prepare('SELECT item_id, done_at FROM checklist_state WHERE room_id = ? AND plan_id = ?')

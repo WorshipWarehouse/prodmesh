@@ -60,3 +60,24 @@ export function validateSchedules(schedules) {
   }
   return schedules;
 }
+
+/** Validate one checklist template's items (saving from the Admin editor). */
+export function validateTemplateItems(items) {
+  if (!Array.isArray(items)) throw new Error('items must be an array');
+  if (items.length > 50) throw new Error('a checklist can have at most 50 items');
+  for (const it of items) {
+    if (typeof it?.label !== 'string' || !it.label.trim()) {
+      throw new Error('every item needs a label');
+    }
+    if (it.label.length > 200) throw new Error('item labels must be ≤ 200 characters');
+    if (it.id != null && !/^[a-z0-9_-]{1,60}$/i.test(it.id)) {
+      throw new Error('item ids may only contain letters, digits, - and _');
+    }
+    if (it.action != null) {
+      if (it.action.type !== 'mode' || typeof it.action.mode !== 'string' || !it.action.mode) {
+        throw new Error('item action must be { type: "mode", mode: "<mode id>" }');
+      }
+    }
+  }
+  return items;
+}

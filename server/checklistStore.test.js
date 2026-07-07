@@ -6,15 +6,14 @@ import { join } from 'node:path';
 
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-chk-'));
 const chk = await import('./checklistStore.js');
-const { templateFor } = await import('./checklists.config.js');
+const { templateFor } = await import('./checklistTemplates.js');
 
-test('templateFor resolves event type, falls back to *, then []', () => {
-  const sunday = templateFor('north-main', '500001');
+test('templateFor resolves event type, falls back to *', () => {
+  const sunday = templateFor('500001');
   assert.ok(sunday.some((i) => i.action?.type === 'mode' && i.action.mode === 'sunday'));
-  const other = templateFor('north-main', '500002'); // Second Service → '*'
+  const other = templateFor('500002'); // Second Service → '*'
   assert.ok(other.length > 0);
   assert.ok(!other.some((i) => i.action)); // fallback has no automated items
-  assert.deepEqual(templateFor('north-youth', '500005'), []); // no templates yet
 });
 
 test('checklist state round-trips per event', () => {
@@ -34,8 +33,4 @@ test('checklist state round-trips per event', () => {
   // Uncheck clears.
   chk.setItem('local-test', 'planA', 'cameras', false);
   assert.equal(chk.getChecklist('local-test', 'planA', '500001').find((i) => i.id === 'cameras').done, false);
-});
-
-test('unknown room/event type yields an empty checklist', () => {
-  assert.deepEqual(chk.getChecklist('nope', 'p', 'x'), []);
 });

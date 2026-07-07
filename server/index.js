@@ -22,7 +22,7 @@ import * as timeline from './timeline.js';
 import * as show from './showManager.js';
 import * as splStore from './splStore.js';
 import * as checklist from './checklistStore.js';
-import { templateFor } from './checklists.config.js';
+import * as chkTemplates from './checklistTemplates.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -275,6 +275,38 @@ app.get('/api/rooms/:id/event/:planId', async (req, res) => {
   }
 });
 
+// ── Checklist templates (per event type, edited in Admin → Checklists) ───────
+
+// Templates plus what the editor needs to offer: the event types known from
+// room mappings, and the union of mode ids for the automated-item picker.
+app.get('/api/checklist-templates', (_req, res) => {
+  const serviceTypes = new Map();
+  const modes = new Map();
+  for (const room of Object.values(rooms)) {
+    for (const st of room.planningCenter?.serviceTypes ?? []) serviceTypes.set(st.id, st.name);
+    for (const m of room.modes) if (!modes.has(m.id)) modes.set(m.id, m.label);
+  }
+  res.json({
+    templates: chkTemplates.getTemplates(),
+    serviceTypes: [...serviceTypes].map(([id, name]) => ({ id, name })),
+    modes: [...modes].map(([id, label]) => ({ id, label })),
+  });
+});
+
+app.put('/api/checklist-templates/:serviceTypeId', requireAdmin, (req, res) => {
+  try {
+    chkTemplates.setTemplate(req.params.serviceTypeId, req.body?.items);
+  } catch (err) {
+    return res.status(400).json({ error: String(err.message ?? err) });
+  }
+  res.json({ ok: true, templates: chkTemplates.getTemplates() });
+});
+
+app.delete('/api/checklist-templates/:serviceTypeId', requireAdmin, (req, res) => {
+  chkTemplates.removeTemplate(req.params.serviceTypeId);
+  res.json({ ok: true, templates: chkTemplates.getTemplates() });
+});
+
 // Check / uncheck a checklist item. Checking an item with an action executes
 // it first (e.g. set the room mode) — the item only marks done if that works.
 app.post('/api/rooms/:id/event/:planId/checklist/:itemId', async (req, res) => {
@@ -283,7 +315,7 @@ app.post('/api/rooms/:id/event/:planId/checklist/:itemId', async (req, res) => {
   try {
     const plan = await planForRoom(room, req.params.planId);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
-    const item = templateFor(room.id, plan.serviceTypeId).find((i) => i.id === req.params.itemId);
+    const item = chkTemplates.templateFor(plan.serviceTypeId).find((i) => i.id === req.params.itemId);
     if (!item) return res.status(400).json({ error: 'Unknown checklist item' });
 
     const done = Boolean(req.body?.done);
