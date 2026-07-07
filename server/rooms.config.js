@@ -50,7 +50,7 @@ export const rooms = {
     // Optional `timer: '<name>'` picks the service-start countdown timer;
     // without it, the first count-down-to-time timer is used.
     proPresenter: { host: '127.0.0.1', port: 62202 },
-    // Smaart SPL (mock until the live meter-read command is verified on-site).
+    // Smaart SPL — mock meter for dev (no Smaart on this machine).
     // target/limit in dB: our Sundays target 90, not to exceed 95.
     smaart: { mock: true, target: 90, limit: 95 },
     modes: standardModes(),
@@ -75,7 +75,11 @@ export const rooms = {
       ],
     },
     proPresenter: { host: '192.0.2.74', port: 62202 }, // ProPresenter (confirm port on-site)
-    // smaart: { host: '<FOH Mac>', port: 26000, target: 90, limit: 95 }, // after live transport is verified
+    // Smaart SPL — live transport is implemented (SDK v4, integrations/smaart.js);
+    // fill in the FOH Mac once Smaart's API is enabled there (Options → API,
+    // default port 26000). Optional: password, device/channel (default: first
+    // logging input), metric (default 'SPL A Slow').
+    // smaart: { host: '<FOH Mac>', port: 26000, target: 90, limit: 95 },
     // Auditorium-specific modes. Button locations [page, row, column].
     modes: [
       mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),
