@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-07-02.
+Last updated: 2026-07-06.
 
 ## Sites & rooms
 
@@ -48,6 +48,13 @@ Notes:
   Ended shows stay marked **✓ Complete** (reopenable). The countdown widget follows
   the room's **PP service-start timer** when it's running (Message-driven, works
   between services); falls back to PC clock math otherwise.
+- **Event Detail page + startup checklists** (live-tested 2026-07-06): clicking the
+  event title opens `/room/:id/event/:planId` — service/rehearsal times, PC series
+  artwork, plan notes, and a **startup checklist**. Templates are per room × PC
+  service type in `server/checklists.config.js` (`'*'` fallback); run state is
+  per-event in SQLite (shared across browsers). Automated items (e.g. "Set room to
+  Sunday mode") press the real Companion button via the shared mode path, so
+  schedule lockouts still apply.
 - Deploy/update scripts (launchd/systemd), tests, CI.
 
 ## Roadmap / open threads (roughly prioritized)
@@ -70,7 +77,9 @@ Notes:
 4. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
 5. **Confirm production deployment** on the Producer Mac via `deploy/install-service.sh`
    (dev has happened on jbeale's Mac; verify the box is running the service).
-6. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
+6. **Checklist template editor in Settings** — templates currently live in
+   `server/checklists.config.js`, the one config the tech team can't edit in-app.
+7. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
 
 ## Deferred tech debt (known, low-risk)
 
