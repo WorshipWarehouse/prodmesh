@@ -1,109 +1,211 @@
-/* App shell — sticky top bar (brand, room switcher, tabs, clock) + main area. */
+/* App shell — left sidebar (brand + campus, nav, user) + main area.
+   The sidebar collapses to an icon rail: `.shell--rail` (user toggle) and the
+   narrow-screen media query apply the same treatment via `.rail-hide`. */
 
 .shell {
   min-height: 100%;
   display: flex;
-  flex-direction: column;
 }
 
-.topbar {
+.sidebar {
   position: sticky;
   top: 0;
-  z-index: 40;
+  align-self: flex-start;
+  height: 100vh;
+  height: 100dvh;
+  width: var(--sidebar-w);
+  flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 10px clamp(14px, 2.5vw, 28px);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  background: var(--bg-raised);
+  border-right: 1px solid var(--border);
+  padding: 14px 10px;
+  transition: width 0.15s ease;
 }
 
-.topbar__brand {
+.shell--rail .sidebar {
+  width: var(--sidebar-rail);
+}
+
+.shell--rail .rail-hide {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .sidebar {
+    width: var(--sidebar-rail);
+  }
+
+  .rail-hide {
+    display: none;
+  }
+}
+
+/* ── Brand + campus ──────────────────────────────────────────────────────── */
+.sidebar__brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  text-decoration: none;
-  color: var(--text);
+  padding: 2px 6px 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
   min-width: 0;
 }
 
-.topbar__logo {
-  height: 30px;
-  width: auto;
-  /* Logo art is dark on transparent — tint it white for the dark bar. */
+.sidebar__logo {
+  height: 32px;
+  width: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+  /* Logo art is dark on transparent — tint it white for the dark surface. */
   filter: brightness(0) invert(1);
 }
 
-.topbar__name {
+.sidebar__brandtext {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sidebar__church {
   font-weight: 700;
+  font-size: 0.92rem;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__campus {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  max-width: 100%;
+}
+
+.sidebar__campus:hover {
+  color: var(--text);
+}
+
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-/* Room switcher (native select, styled) */
-.roomswitch {
-  position: relative;
+.sidebar__item:hover {
+  color: var(--text);
+  background: var(--bg-tile);
 }
 
-.roomswitch select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 8px 30px 8px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-tile);
+.sidebar__item--active {
   color: var(--text);
-  font-size: 0.9rem;
+  background: var(--bg-tile);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.sidebar__icon {
+  flex-shrink: 0;
+}
+
+/* ── Footer: clock + user + collapse ─────────────────────────────────────── */
+.sidebar__foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.sidebar__clock {
+  padding: 0 10px 4px;
+}
+
+.sidebar__clock .clock {
+  align-items: flex-start;
+}
+
+.sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 6px 10px;
+  color: var(--text-dim);
+  min-width: 0;
+}
+
+.sidebar__user .sidebar__label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.sidebar__username {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sidebar__version {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__toggle {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
 }
 
-.roomswitch::after {
-  content: '▾';
-  position: absolute;
-  right: 11px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--text-dim);
-  font-size: 0.7rem;
-}
-
-/* Section tabs (contextual — shown inside a room) */
-.topbar__nav {
-  display: flex;
-  gap: 4px;
-}
-
-.tab {
-  padding: 7px 13px;
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  border: 1px solid transparent;
-}
-
-.tab:hover {
+.sidebar__toggle:hover {
   color: var(--text);
   background: var(--bg-tile);
 }
 
-.tab--active {
-  color: var(--text);
-  background: var(--bg-tile);
-  border-color: var(--border);
+/* Hide the manual toggle when the media query forces the rail anyway. */
+@media (max-width: 860px) {
+  .sidebar__toggle {
+    display: none;
+  }
 }
 
-.topbar__spacer {
-  flex: 1;
-}
-
-/* Clock */
+/* ── Clock (also used inside pages) ──────────────────────────────────────── */
 .clock {
   display: flex;
   flex-direction: column;
@@ -130,22 +232,10 @@
   font-size: 0.72rem;
 }
 
-.gear {
-  display: inline-flex;
-  color: var(--text-dim);
-  text-decoration: none;
-  transition: color 0.12s ease, transform 0.12s ease;
-}
-
-.gear:hover {
-  color: var(--text);
-  transform: rotate(30deg);
-}
-
-/* Main content area */
+/* ── Main content area ───────────────────────────────────────────────────── */
 .shell__main {
   flex: 1;
-  width: 100%;
+  min-width: 0;
   max-width: 1600px;
   margin: 0 auto;
   padding: clamp(16px, 3vw, 32px);

@@ -41,4 +41,8 @@
   /* Type */
   --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI',
     system-ui, sans-serif;
+
+  /* Layout */
+  --sidebar-w: 236px;
+  --sidebar-rail: 62px;
 }

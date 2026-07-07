@@ -12,7 +12,7 @@
 //  with no double-recording (Node is single-threaded — no interleave mid-call).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeJsonAtomic } from './atomicFile.js';
@@ -71,6 +71,40 @@ export function recordActive(instanceId, ctx, entry, nowMs = Date.now()) {
     actualSeconds: null,
   });
   persist(instanceId, tl);
+}
+
+/**
+ * Stamp display context (plan title, service type, time label…) onto a
+ * timeline without touching its items — called at show start so the history
+ * page can label past shows without re-querying Planning Center for old plans.
+ * Only fills gaps; never overwrites values already recorded.
+ */
+export function ensure(instanceId, ctx) {
+  const tl = load(instanceId, ctx);
+  let changed = false;
+  for (const [k, v] of Object.entries(ctx)) {
+    if (v != null && tl[k] == null) {
+      tl[k] = v;
+      changed = true;
+    }
+  }
+  if (changed) persist(instanceId, tl);
+}
+
+/** Every recorded timeline, for the history/analytics view. Reads from disk
+ *  (cached live timelines are persisted on every change, so files are current). */
+export function listAll() {
+  if (!existsSync(DIR)) return [];
+  const out = [];
+  for (const f of readdirSync(DIR)) {
+    if (!f.endsWith('.json')) continue;
+    try {
+      out.push(JSON.parse(readFileSync(join(DIR, f), 'utf8')));
+    } catch {
+      /* skip corrupt file */
+    }
+  }
+  return out;
 }
 
 /** Close out the last (open) item — called when a show ends. Creates the

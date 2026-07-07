@@ -10,7 +10,7 @@ import express from 'express';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { rooms } from './rooms.config.js';
 import { readCustomVariable, pressButton } from './companion.js';
@@ -46,6 +46,45 @@ const app = express();
 app.use(express.json());
 
 // ── API ──────────────────────────────────────────────────────────────────────
+
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+app.get('/api/about', (_req, res) => res.json({ name: 'prodmesh', version: pkg.version }));
+
+// Every recorded show, newest first — powers the Analytics history view.
+// Labels (planTitle etc.) are stamped at show start; older timelines without
+// them fall back to ids on the client.
+app.get('/api/history', (_req, res) => {
+  const shows = timeline
+    .listAll()
+    .map((tl) => {
+      const room = rooms[tl.roomId] ?? null;
+      const planned = tl.items.reduce((s, i) => s + (i.plannedLength || 0), 0);
+      const actual = tl.items.reduce((s, i) => s + (i.actualSeconds || 0), 0);
+      const agg = splStore.aggregate(tl.instanceId);
+      return {
+        instanceId: tl.instanceId,
+        roomId: tl.roomId ?? null,
+        roomName: room?.name ?? tl.roomId ?? null,
+        site: room?.site ?? null,
+        planId: tl.planId ?? null,
+        timeId: tl.timeId ?? null,
+        planTitle: tl.planTitle ?? null,
+        serviceTypeName: tl.serviceTypeName ?? null,
+        dates: tl.dates ?? null,
+        timeName: tl.timeName ?? null,
+        timeStartsAt: tl.timeStartsAt ?? null,
+        startedAt: tl.items[0]?.startedAt ?? null,
+        completedAt: tl.endedAt ?? null,
+        itemCount: tl.items.length,
+        totals: { planned, actual, delta: actual - planned },
+        spl: agg
+          ? { ...agg, target: room?.smaart?.target ?? null, limit: room?.smaart?.limit ?? null }
+          : null,
+      };
+    })
+    .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+  res.json({ shows });
+});
 
 app.get('/api/rooms', (_req, res) => {
   res.json(Object.values(rooms).map(publicRoom));

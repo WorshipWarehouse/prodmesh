@@ -6,6 +6,7 @@ export function publicRoom(room) {
   return {
     id: room.id,
     name: room.name,
+    site: room.site ?? null,
     hasCompanion: Boolean(room.companion?.host) && !room.mock,
     modes: room.modes.map((m) => ({
       id: m.id,

@@ -1,0 +1,126 @@
+/* Home — campus overview: room status cards + the Quick Access launcher. */
+
+.home__rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.roomcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.roomcard:hover {
+  background: var(--bg-tile);
+  border-color: var(--accent);
+}
+
+.roomcard__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.roomcard__name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.roomcard__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid var(--danger-soft);
+  border-radius: 999px;
+  padding: 2px 9px;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roomcard__live { animation: none; }
+}
+
+.roomcard__mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.roomcard__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.roomcard__lock {
+  display: inline-flex;
+  color: var(--warn-text);
+}
+
+.roomcard__offline {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.roomcard__next {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.roomcard__next-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.roomcard__next-when {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.roomcard__next--none {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
+
+.home__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.home__tools-title {
+  margin: 8px 0 -8px;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+}

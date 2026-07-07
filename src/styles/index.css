@@ -4,6 +4,9 @@
 @import './base.css';
 @import './shell.css';
 @import './widgets.css';
+@import './home.css';
+@import './services.css';
+@import './analytics.css';
 @import './launcher.css';
 @import './room.css';
 @import './service.css';

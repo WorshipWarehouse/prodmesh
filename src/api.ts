@@ -10,6 +10,7 @@ export interface RoomMode {
 export interface RoomMeta {
   id: string;
   name: string;
+  site: string | null;
   hasCompanion: boolean;
   modes: RoomMode[];
 }
@@ -350,6 +351,31 @@ export const setShowCurrent = (roomId: string, body: { itemId?: string; follow?:
   postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/current`, body);
 
 export const getServicesOverview = () => getJson<ServicesOverview>('/api/services');
+
+// ── History (Analytics) ──────────────────────────────────────────────────────
+
+export interface HistoryShow {
+  instanceId: string;
+  roomId: string | null;
+  roomName: string | null;
+  site: string | null;
+  planId: string | null;
+  timeId: string | null;
+  planTitle: string | null;
+  serviceTypeName: string | null;
+  dates: string | null;
+  timeName: string | null;
+  timeStartsAt: string | null;
+  startedAt: number | null;
+  completedAt: number | null;
+  itemCount: number;
+  totals: { planned: number; actual: number; delta: number };
+  spl: SplReport | null;
+}
+
+export const getHistory = () => getJson<{ shows: HistoryShow[] }>('/api/history');
+
+export const getAbout = () => getJson<{ name: string; version: string }>('/api/about');
 
 export const triggerUpdate = () =>
   fetch('/api/system/update', { method: 'POST', headers: authHeaders() }).then((r) => {
