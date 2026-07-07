@@ -27,7 +27,9 @@
   width: var(--sidebar-rail);
 }
 
-.shell--rail .rail-hide {
+/* Extra .sidebar in the selector so this outranks any later display rule on
+   the same element (e.g. the user label's flex layout). */
+.shell--rail .sidebar .rail-hide {
   display: none;
 }
 
@@ -36,7 +38,7 @@
     width: var(--sidebar-rail);
   }
 
-  .rail-hide {
+  .shell .sidebar .rail-hide {
     display: none;
   }
 }

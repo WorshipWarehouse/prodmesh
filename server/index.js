@@ -50,10 +50,38 @@ app.use(express.json());
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
 app.get('/api/about', (_req, res) => res.json({ name: 'prodmesh', version: pkg.version }));
 
+// Shows recorded before label-stamping existed (or while PC was unreachable)
+// have no planTitle. Resolve those plans directly by id — Planning Center
+// serves past plans fine, they just fall out of the "upcoming" list — and
+// stamp the result into the timeline so it's a one-time repair per show.
+const backfillDone = new Set(); // instanceIds tried this boot (hit or miss)
+async function backfillLabels(tl) {
+  if (tl.planTitle != null || !tl.roomId || !tl.planId) return;
+  if (backfillDone.has(tl.instanceId)) return;
+  backfillDone.add(tl.instanceId);
+  for (const st of rooms[tl.roomId]?.planningCenter?.serviceTypes ?? []) {
+    const plan = await pco.getPlan(st, tl.planId);
+    if (!plan) continue; // not this service type (or PC not live)
+    const time = await pco
+      .getPlanTimes(st, tl.planId)
+      .then((ts) => ts.find((t) => t.id === tl.timeId) ?? null)
+      .catch(() => null);
+    timeline.ensure(tl.instanceId, {
+      planTitle: plan.title,
+      serviceTypeName: plan.serviceTypeName,
+      dates: plan.dates,
+      timeName: time?.name ?? null,
+      timeStartsAt: time?.startsAt ?? null,
+    });
+    return;
+  }
+}
+
 // Every recorded show, newest first — powers the Analytics history view.
-// Labels (planTitle etc.) are stamped at show start; older timelines without
-// them fall back to ids on the client.
-app.get('/api/history', (_req, res) => {
+// Labels (planTitle etc.) are stamped at show start; unlabeled rows get a
+// backfill attempt above before the response is built.
+app.get('/api/history', async (_req, res) => {
+  await Promise.all(timeline.listAll().map(backfillLabels));
   const shows = timeline
     .listAll()
     .map((tl) => {
