@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, Zap } from 'lucide-react';
 import {
   getAuthStatus,
   loginAdmin,
@@ -9,8 +10,13 @@ import {
   getRooms,
   getVersion,
   triggerUpdate,
+  getChecklistTemplates,
+  saveChecklistTemplate,
+  deleteChecklistTemplate,
   type RoomMeta,
   type ScheduleWindow,
+  type ChecklistTemplatesInfo,
+  type TemplateItem,
 } from '../api';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -107,7 +113,182 @@ function AdminPanels({ onLogout }: { onLogout: () => void }) {
       <SecurityPanel />
       <SystemPanel />
       <SchedulesPanel />
+      <ChecklistsPanel />
     </>
+  );
+}
+
+// ── Checklist templates (per event type) ──────────────────────────────────────
+const DEFAULT_KEY = '*';
+
+function ChecklistsPanel() {
+  const [info, setInfo] = useState<ChecklistTemplatesInfo | null>(null);
+  const [selected, setSelected] = useState(DEFAULT_KEY);
+  const [draft, setDraft] = useState<TemplateItem[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    getChecklistTemplates()
+      .then((i) => {
+        setInfo(i);
+        setDraft(i.templates[DEFAULT_KEY] ?? null);
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!info) return null;
+
+  const typeName = (id: string) =>
+    id === DEFAULT_KEY
+      ? 'Default (any other event)'
+      : info.serviceTypes.find((s) => s.id === id)?.name ?? `Type ${id}`;
+
+  // Event types worth listing: the default, everything mapped on a room, plus
+  // any template saved for a type we no longer map (so it stays editable).
+  const typeIds = [
+    DEFAULT_KEY,
+    ...info.serviceTypes.map((s) => s.id),
+    ...Object.keys(info.templates).filter(
+      (id) => id !== DEFAULT_KEY && !info.serviceTypes.some((s) => s.id === id),
+    ),
+  ];
+
+  const pick = (id: string) => {
+    setSelected(id);
+    setDraft(info.templates[id] ?? null);
+    setMsg(null);
+  };
+
+  const edit = (i: number, patch: Partial<TemplateItem>) =>
+    setDraft((d) => d!.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  const move = (i: number, delta: number) =>
+    setDraft((d) => {
+      const next = [...d!];
+      const j = i + delta;
+      if (j < 0 || j >= next.length) return d!;
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+
+  const save = async () => {
+    setMsg(null);
+    try {
+      const templates = await saveChecklistTemplate(selected, draft ?? []);
+      setInfo((x) => x && { ...x, templates });
+      setDraft(templates[selected] ?? []);
+      setMsg('Template saved.');
+    } catch (err) {
+      setMsg(`Couldn’t save: ${err instanceof Error ? err.message : err}`);
+    }
+  };
+
+  const removeTemplate = async () => {
+    const templates = await deleteChecklistTemplate(selected);
+    setInfo((x) => x && { ...x, templates });
+    setDraft(templates[selected] ?? null);
+    setMsg(selected === DEFAULT_KEY ? 'Default template removed.' : 'Now using the Default template.');
+  };
+
+  const hasOwn = Boolean(info.templates[selected]);
+
+  return (
+    <section className="panel">
+      <h2 className="panel__title">Checklists</h2>
+      <p className="settings__muted">
+        Startup checklist per event type — it runs on that event’s detail page in whichever room
+        hosts it. Automated items (<Zap size={11} />) set the room’s mode when checked; lockouts
+        still apply.
+      </p>
+
+      <div className="tpl-types">
+        {typeIds.map((id) => (
+          <button
+            key={id}
+            className={`typebtn${selected === id ? ' typebtn--on' : ''}`}
+            onClick={() => pick(id)}
+          >
+            {typeName(id)}
+            {id !== DEFAULT_KEY && !info.templates[id] && (
+              <span className="typebtn__uses">default</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {draft === null ? (
+        <div className="tpl-fallback">
+          <p className="settings__muted">
+            <strong>{typeName(selected)}</strong> uses the Default template
+            {(info.templates[DEFAULT_KEY] ?? []).length
+              ? ` (${info.templates[DEFAULT_KEY]!.length} items)`
+              : ' (currently empty)'}
+            .
+          </p>
+          <button
+            className="btn btn--sm"
+            onClick={() => setDraft(structuredClone(info.templates[DEFAULT_KEY] ?? []))}
+          >
+            Customize for this event type
+          </button>
+        </div>
+      ) : (
+        <>
+          {draft.length === 0 && <p className="settings__muted">No items yet.</p>}
+          {draft.map((it, i) => (
+            <div key={it.id ?? `new-${i}`} className="tpl-item">
+              <div className="tpl-item__order">
+                <button className="orderbtn" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">
+                  <ArrowUp size={13} />
+                </button>
+                <button className="orderbtn" disabled={i === draft.length - 1} onClick={() => move(i, 1)} aria-label="Move down">
+                  <ArrowDown size={13} />
+                </button>
+              </div>
+              <input
+                className="field tpl-item__label"
+                value={it.label}
+                placeholder="What needs to happen?"
+                onChange={(e) => edit(i, { label: e.target.value })}
+              />
+              <select
+                className="field field--sm tpl-item__action"
+                value={it.action?.mode ?? ''}
+                onChange={(e) =>
+                  edit(i, { action: e.target.value ? { type: 'mode', mode: e.target.value } : null })
+                }
+              >
+                <option value="">Manual check</option>
+                {info.modes.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    ⚡ Set room to {m.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setDraft((d) => d!.filter((_, j) => j !== i))}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <div className="settings__toolbar">
+            <button className="btn btn--sm" onClick={() => setDraft((d) => [...(d ?? []), { label: '' }])}>
+              + Item
+            </button>
+            <button className="btn btn--primary" onClick={save}>
+              Save template
+            </button>
+            {hasOwn && selected !== DEFAULT_KEY && (
+              <button className="btn btn--ghost" onClick={removeTemplate}>
+                Remove (use Default)
+              </button>
+            )}
+            {msg && <span className="settings__ok">{msg}</span>}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

@@ -38,7 +38,7 @@ function migrate(d) {
     CREATE INDEX IF NOT EXISTS spl_by_instance ON spl_samples (instance_id, ts);
 
     -- Startup checklist run state, per event (planId — per service, not per
-    -- service time). Templates live in checklists.config.js; a row here means
+    -- service time). Templates live in data/checklists.json; a row here means
     -- the item is done.
     CREATE TABLE IF NOT EXISTS checklist_state (
       room_id TEXT NOT NULL,

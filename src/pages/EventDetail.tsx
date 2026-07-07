@@ -124,7 +124,7 @@ export function EventDetail() {
         >
           {checklist.length === 0 ? (
             <p className="svc__muted">
-              No checklist template for this event type yet (see <code>server/checklists.config.js</code>).
+              No checklist template for this event type yet — add one in Admin → Checklists.
             </p>
           ) : (
             <>
