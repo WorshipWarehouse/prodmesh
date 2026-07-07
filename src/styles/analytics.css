@@ -1,0 +1,151 @@
+/* Analytics — show-report history table. */
+
+.hist__table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hist__row {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(120px, 1fr) minmax(150px, 1fr) minmax(160px, 1fr) 24px;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+
+a.hist__row:hover {
+  background: var(--bg-tile);
+  border-color: var(--accent);
+}
+
+.hist__row--head {
+  background: transparent;
+  border: none;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  font-weight: 700;
+}
+
+.hist__svc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hist__title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 650;
+}
+
+.hist__done {
+  color: var(--ok);
+  flex-shrink: 0;
+}
+
+.hist__when {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.hist__room {
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+.hist__runtime {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+  flex-wrap: wrap;
+}
+
+.hist__delta {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.hist__delta--ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border: 1px solid var(--ok-border);
+}
+
+.hist__delta--over {
+  color: var(--warn-text);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-border);
+}
+
+.hist__delta--under {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+}
+
+.hist__spl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+}
+
+.hist__spl small {
+  color: var(--text-faint);
+}
+
+.hist__go {
+  color: var(--text-faint);
+  text-align: right;
+}
+
+.hist__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 20px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.hist__empty p {
+  margin: 0;
+  max-width: 46ch;
+}
+
+@media (max-width: 800px) {
+  .hist__row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .hist__row--head,
+  .hist__room,
+  .hist__go {
+    display: none;
+  }
+
+  .hist__spl {
+    grid-column: 1 / -1;
+  }
+}

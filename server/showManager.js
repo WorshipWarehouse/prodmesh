@@ -218,7 +218,26 @@ async function beginShow(roomId, planId, timeId, startedAt) {
   let items = [];
   try {
     const plan = await findPlan(room, planId);
-    if (plan) items = await pco.getPlanItems({ id: plan.serviceTypeId, name: plan.serviceTypeName }, plan.id);
+    if (plan) {
+      const st = { id: plan.serviceTypeId, name: plan.serviceTypeName };
+      items = await pco.getPlanItems(st, plan.id);
+      // Label the timeline now, while the plan is easy to resolve — the
+      // history page reads these long after the plan has left "upcoming".
+      const time = await pco.getPlanTimes(st, plan.id).then(
+        (ts) => ts.find((t) => t.id === timeId) ?? null,
+        () => null,
+      );
+      timeline.ensure(`${planId}__${timeId}`, {
+        roomId,
+        planId,
+        timeId,
+        planTitle: plan.title,
+        serviceTypeName: plan.serviceTypeName,
+        dates: plan.dates,
+        timeName: time?.name ?? null,
+        timeStartsAt: time?.startsAt ?? null,
+      });
+    }
   } catch {
     /* items stay [] */
   }

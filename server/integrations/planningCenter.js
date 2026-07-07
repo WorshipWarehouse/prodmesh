@@ -106,6 +106,21 @@ export function getUpcomingPlans(serviceType, limit = 3) {
 // sound-checks tagged "other") are noise for this display.
 const SHOWN_TIME_TYPES = new Set(['service', 'rehearsal']);
 
+/** One plan fetched directly by id — works for PAST plans too, which the
+ *  upcoming list can't see. Returns null when not live or the plan isn't in
+ *  this service type (404). Used to backfill labels on old show timelines. */
+export function getPlan(serviceType, planId) {
+  return cached(`plan:${serviceType.id}:${planId}`, async () => {
+    if (!isConfigured()) return null; // never fabricate labels for real history
+    try {
+      const body = await pcGet(`/service_types/${serviceType.id}/plans/${planId}`);
+      return body?.data ? normalizePlan(serviceType, body.data) : null;
+    } catch {
+      return null;
+    }
+  });
+}
+
 /** A plan's service + rehearsal times, chronological. (Auditions/meetings out.) */
 export function getPlanTimes(serviceType, planId) {
   return cached(`times:${planId}`, async () => {

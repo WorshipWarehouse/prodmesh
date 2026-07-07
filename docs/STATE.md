@@ -34,11 +34,18 @@ Notes:
 
 ## What's live right now
 
-- **App shell UI** (ADR 0005): persistent top bar (brand, room switcher,
-  Status | Run of Show tabs, clock, settings), widget-grid pages
-  (`Widget`/`WidgetGrid`), CSS split into design tokens + per-feature files.
-  Room Status is the first widget page; Run of Show/Settings kept internals.
-- Quick Access launcher (Companion / Screen Share / device web UIs), per room.
+- **Campus-first sidebar shell** (ADR 0007, supersedes 0005's top bar):
+  collapsible left sidebar with campus picker (All Campuses / per site),
+  nav = Home · Services · Analytics · Admin, User slot pinned at bottom
+  (placeholder until auth). Widget-grid pages (`Widget`/`WidgetGrid`), CSS
+  tokens + per-feature files.
+  - **Home**: campus rooms as live status cards (mode, LIVE, next event)
+    + the Quick Access launcher (Companion / Screen Share / device UIs).
+  - **Services**: campus-wide upcoming events → Event Detail pages.
+  - **Analytics**: show history (timelines + SPL from SQLite) → full reports.
+    Timelines are labeled at show start so history outlives PC's "upcoming".
+  - Room pages keep their `/room/:id…` URLs (room-Mac homepages unaffected);
+    `/settings` → `/admin`.
 - Room Status mode control with confirm + schedule-based **lockouts** (Override PIN).
 - Settings UI: Admin/Override PINs, schedule editor, system self-update.
 - PC Services plan display on Quick Access + Room Status (real data).

@@ -1,10 +1,4 @@
-/* Quick Access launcher — sites, auditorium cards, launch tiles, overview. */
-
-.launcher {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
+/* Quick Access launcher — sites, auditorium cards, launch tiles. */
 
 /* ── Sites ────────────────────────────────────────────────────────────────── */
 .site__header {
@@ -145,75 +139,3 @@
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
-.launcher__footer {
-  margin-top: auto;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-  font-size: 0.82rem;
-  color: var(--text-faint);
-}
-
-.launcher__footer code {
-  color: var(--text-dim);
-  background: var(--bg-raised);
-  padding: 2px 6px;
-  border-radius: 5px;
-  font-size: 0.78rem;
-}
-
-/* ── Services overview ───────────────────────────────────────────────────── */
-.overview {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 18px 20px;
-}
-
-.overview__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.overview__title {
-  margin: 0;
-  font-size: 1.3rem;
-}
-
-.overview__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.ovcard {
-  display: block;
-  padding: 14px 16px;
-  border-radius: var(--radius);
-  background: var(--bg-tile);
-  border: 1px solid var(--border);
-  text-decoration: none;
-  color: var(--text);
-  transition: background 0.12s ease, border-color 0.12s ease;
-}
-
-.ovcard:hover {
-  background: var(--bg-tile-hover);
-  border-color: var(--accent);
-}
-
-.ovcard__room {
-  font-weight: 650;
-}
-
-.ovcard__type {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  margin-bottom: 8px;
-}
-
-.ovcard__date {
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-}

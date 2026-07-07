@@ -40,6 +40,7 @@ export const rooms = {
   'local-test': {
     id: 'local-test',
     name: 'Local Test (this Mac)',
+    site: 'north',
     mock: false, // live — talks to the Companion on 127.0.0.1:8000
     companion: { host: '127.0.0.1', port: 8000 },
     state: { variable: 'roomState' },
@@ -61,6 +62,7 @@ export const rooms = {
   'north-main': {
     id: 'north-main',
     name: 'North · Main Auditorium',
+    site: 'north',
     mock: false, // LIVE — Companion runs on this same (Producer) Mac in production
     companion: { host: '192.0.2.31', port: 8000 }, // Producer machine
     state: { variable: 'roomState' },
@@ -94,6 +96,7 @@ export const rooms = {
   'north-youth': {
     id: 'north-youth',
     name: 'North · Youth',
+    site: 'north',
     mock: true,
     companion: { host: '192.0.2.150', port: 8000 }, // Lighting machine
     state: { variable: 'roomState' },
@@ -104,6 +107,7 @@ export const rooms = {
   'north-chapel': {
     id: 'north-chapel',
     name: 'North · Chapel',
+    site: 'north',
     mock: true,
     companion: { host: '192.0.2.101', port: 8000 }, // Chapel-Mac machine
     state: { variable: 'roomState' },
