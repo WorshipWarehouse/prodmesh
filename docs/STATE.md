@@ -55,6 +55,16 @@ Notes:
   Ended shows stay marked **✓ Complete** (reopenable). The countdown widget follows
   the room's **PP service-start timer** when it's running (Message-driven, works
   between services); falls back to PC clock math otherwise.
+- **Show automation** (per event, Event Detail → Show Automation widget): pick the
+  PC item that **autostarts** the show when ProPresenter lands on it (edge-triggered,
+  so "Pre-Service Slides" can loop between services harmlessly) and the item whose
+  **last slide auto-completes** it. Autostart picks the right service time by clock,
+  skipping already-completed ones; a per-room watcher polls PP only inside the arm
+  window (2h before first service → 1h after last), zero browsers required. Manual
+  **PC→PP mapping overrides** per event handle drifted orders (stored in SQLite
+  `show_config`; live shows pick up edits). PP quirk (verified): `playlist_item`
+  reads null right after an item trigger until the next slide action — baseline
+  keeps last mapped item.
 - **Event Detail page + startup checklists** (live-tested 2026-07-06): clicking the
   event title opens `/room/:id/event/:planId` — service/rehearsal times, PC series
   artwork, plan notes, and a **startup checklist**. Templates are per PC **event

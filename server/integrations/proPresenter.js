@@ -63,6 +63,33 @@ export function mapIndexToItemId(items, active) {
   return at ? at.id : null; // trust index even if names differ
 }
 
+/**
+ * Mapping with per-event manual overrides layered on top (Event Detail →
+ * Show Config): overrides = { '<pc item id>': { ppIndex, ppName } }. An
+ * override wins by playlist index, with a tolerant-name rescue for when the
+ * playlist was re-pushed and indices shifted but names survived.
+ */
+export function mapActiveToItemId(items, active, overrides = null) {
+  if (!active || active.index == null) return null;
+  if (overrides) {
+    for (const [pcId, pp] of Object.entries(overrides)) {
+      if (pp == null) continue;
+      if (pp.ppIndex === active.index || (pp.ppName && namesMatch(pp.ppName, active.name))) {
+        return pcId;
+      }
+    }
+    // A PP item claimed by an override must not ALSO auto-map elsewhere…
+    const auto = mapIndexToItemId(items, active);
+    // …and a PC item claimed by an override must not be reachable by auto-map
+    // from a different PP item (the override redirected it on purpose).
+    if (auto && Object.prototype.hasOwnProperty.call(overrides, auto) && overrides[auto] != null) {
+      return null;
+    }
+    return auto;
+  }
+  return mapIndexToItemId(items, active);
+}
+
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 function withTimeout(signal, ms = 3000) {
@@ -79,6 +106,27 @@ async function ppGet(pp, path, signal) {
 /** One-shot read of the current active playlist item. */
 export async function readActive(pp, signal) {
   return parseActive(await ppGet(pp, '/v1/playlist/active', signal));
+}
+
+/**
+ * The items of the currently open playlist (for the mapping-override UI).
+ * Uses the active playlist — the one the operator has loaded for the service.
+ * Returns null when PP has no active playlist. Shape verified live:
+ * /v1/playlist/{uuid} → { id, items: [{ id: {index,name,uuid}, type, … }] }.
+ */
+export async function readPlaylistItems(pp, signal) {
+  const active = await ppGet(pp, '/v1/playlist/active', signal);
+  const pl = active?.presentation?.playlist ?? null;
+  if (!pl?.uuid) return null;
+  const body = await ppGet(pp, `/v1/playlist/${pl.uuid}`, signal);
+  return {
+    playlistName: pl.name ?? null,
+    items: (body.items ?? []).map((it) => ({
+      index: it.id?.index ?? null,
+      name: it.id?.name ?? '',
+      type: it.type ?? 'presentation',
+    })),
+  };
 }
 
 /** Current slide position within the active presentation. */
@@ -180,8 +228,12 @@ export async function readTimers(pp, signal) {
 
 function sleep(ms, signal) {
   return new Promise((resolve) => {
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+    if (signal?.aborted) return resolve();
+    // Detach on normal completion — a 90-minute show polls thousands of times
+    // on one signal and would otherwise leak a listener per poll.
+    const onAbort = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 

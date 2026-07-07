@@ -9,6 +9,7 @@ import {
   type PlanTime,
 } from '../api';
 import { Widget, WidgetGrid } from '../components/Widget';
+import { ShowConfigWidget } from '../components/ShowConfigWidget';
 
 function fmtTime(t: PlanTime) {
   if (!t.startsAt) return t.name ?? '';
@@ -162,6 +163,13 @@ export function EventDetail() {
             </>
           )}
         </Widget>
+
+        <ShowConfigWidget
+          roomId={roomId}
+          planId={planId}
+          items={plan.items}
+          saved={data.showConfig}
+        />
 
         {detail.notes.length > 0 && (
           <Widget title="Plan Notes">

@@ -22,6 +22,8 @@ import * as pco from './integrations/planningCenter.js';
 import * as smaart from './integrations/smaart.js';
 import * as timeline from './timeline.js';
 import * as splStore from './splStore.js';
+import * as showConfig from './showConfig.js';
+import { armWindow, pickAutostartTime, shouldAutostart, shouldAutoComplete } from './autoShow.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SHOWS_DIR = join(process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data'), 'shows');
@@ -104,8 +106,13 @@ function stopTimerWatcher(roomId) {
 
 function timerSleep(ms, signal) {
   return new Promise((resolve) => {
-    const t = setTimeout(resolve, ms);
-    signal.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+    if (signal.aborted) return resolve();
+    // Detach the abort listener when the timer fires normally — long-lived
+    // signals (the autostart watcher's never-aborting one) would otherwise
+    // accumulate one listener per sleep, forever.
+    const onAbort = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(() => { signal.removeEventListener('abort', onAbort); resolve(); }, ms);
+    signal.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -252,6 +259,7 @@ async function beginShow(roomId, planId, timeId, startedAt) {
     current: { itemId: null, itemIndex: null, itemName: null, slideIndex: null, slideCount: null },
     follow: true,
     ppConnected: null,
+    config: showConfig.getConfig(roomId, planId), // per-event automation settings
     abort: new AbortController(),
   };
   shows.set(roomId, show);
@@ -333,8 +341,19 @@ function onPoll(show, s) {
   show.current.slideIndex = s.slideIndex;
   show.current.slideCount = s.slideCount;
   if (show.follow) {
-    const itemId = ppro.mapIndexToItemId(show.items, { index: s.itemIndex, name: s.itemName });
+    const itemId = ppro.mapActiveToItemId(
+      show.items,
+      { index: s.itemIndex, name: s.itemName },
+      show.config?.map,
+    );
     if (itemId) applyCurrent(show, itemId, s.itemName, s.itemIndex);
+    // Auto-complete: last slide of the configured end item. Follow mode only —
+    // in manual override, current.itemId no longer describes what PP is
+    // showing, so slide position would be meaningless here.
+    if (shouldAutoComplete(show.config, show.current)) {
+      endShow(show.roomId);
+      return;
+    }
   }
   broadcast(show.roomId);
 }
@@ -351,6 +370,108 @@ function applyCurrent(show, itemId, fallbackName, index) {
     { roomId: show.roomId, planId: show.planId, timeId: show.timeId },
     { itemId, itemName: name, itemIndex: index, plannedLength: pc?.length ?? null },
   );
+}
+
+/** A live show picks up config edits made on the Event Detail page. */
+export function refreshConfig(roomId, planId) {
+  const show = shows.get(roomId);
+  if (show && show.planId === planId) {
+    show.config = showConfig.getConfig(roomId, planId);
+    broadcast(roomId);
+  }
+}
+
+// ── Autostart watcher ────────────────────────────────────────────────────────
+//  Per room, for the server's lifetime, with zero browsers required. Cheap
+//  when idle: once a minute it checks whether the room's next event has a
+//  startItemId configured AND the clock is inside the arm window (2h before
+//  the first service time → 1h after the last). Only then does it poll
+//  ProPresenter, and only a TRANSITION onto the start item begins the show —
+//  "Pre-Service Slides" can loop all it wants between services.
+
+const ARM_CHECK_MS = 60 * 1000;
+const PP_POLL_MS = 3000;
+
+export async function nextArmedEvent(room, now) {
+  const plans = [];
+  for (const st of room.planningCenter?.serviceTypes ?? []) {
+    plans.push(...(await pco.getUpcomingPlans(st, 3).catch(() => [])));
+  }
+  plans.sort((a, b) => String(a.sortDate ?? '').localeCompare(String(b.sortDate ?? '')));
+  for (const plan of plans) {
+    const config = showConfig.getConfig(room.id, plan.id);
+    if (!config?.startItemId) continue;
+    const st = { id: plan.serviceTypeId, name: plan.serviceTypeName };
+    const times = await pco.getPlanTimes(st, plan.id).catch(() => []);
+    const window = armWindow(times);
+    if (!window || now < window.from || now > window.to) continue;
+    const items = await pco.getPlanItems(st, plan.id).catch(() => []);
+    if (items.length === 0) continue;
+    return { plan, config, times, items };
+  }
+  return null;
+}
+
+async function autostartLoop(roomId, signal) {
+  const room = rooms[roomId];
+  const pp = room.proPresenter;
+  let prevItemId = null; // last mapped PC item; null = no baseline (never trigger)
+  while (!signal.aborted) {
+    let armed = null;
+    if (!shows.has(roomId)) {
+      try {
+        armed = await nextArmedEvent(room, Date.now());
+      } catch {
+        armed = null;
+      }
+    }
+    if (!armed) {
+      prevItemId = null;
+      await timerSleep(ARM_CHECK_MS, signal);
+      continue;
+    }
+    // Armed: watch PP until the arm window closes, a show starts, or ~1 min
+    // passes (then re-evaluate which event is armed).
+    for (let i = 0; i < ARM_CHECK_MS / PP_POLL_MS && !signal.aborted && !shows.has(roomId); i++) {
+      let itemId = null;
+      try {
+        const active = await ppro.readActive(pp, signal);
+        itemId = ppro.mapActiveToItemId(armed.items, active, armed.config.map);
+      } catch {
+        prevItemId = null; // PP unreachable → drop the baseline
+        await timerSleep(PP_POLL_MS, signal);
+        continue;
+      }
+      if (shouldAutostart(armed.config, prevItemId, itemId)) {
+        const isCompleted = (timeId) =>
+          Boolean(timeline.getReport(`${armed.plan.id}__${timeId}`)?.completedAt);
+        const timeId = pickAutostartTime(armed.times, Date.now(), isCompleted);
+        if (timeId) {
+          try {
+            await startShow(roomId, armed.plan.id, timeId);
+            console.log(`[autostart] ${roomId}: show started for ${armed.plan.id}__${timeId}`);
+          } catch {
+            /* conflict — someone started it manually first */
+          }
+        }
+      }
+      // PP quirk (verified live): playlist_item reads null for a beat right
+      // after an item trigger, until the next slide action. Only a MAPPED item
+      // updates the baseline — otherwise pre-service → (null) → worship would
+      // swallow the transition and autostart would never fire.
+      if (itemId != null) prevItemId = itemId;
+      await timerSleep(PP_POLL_MS, signal);
+    }
+  }
+}
+
+/** Start the per-room autostart watchers (called once at boot). */
+export function initAutomation() {
+  for (const room of Object.values(rooms)) {
+    if (!ppro.isConfigured(room.proPresenter)) continue;
+    if (!(room.planningCenter?.serviceTypes ?? []).length) continue;
+    autostartLoop(room.id, new AbortController().signal).catch(() => {});
+  }
 }
 
 // ── Boot restore ────────────────────────────────────────────────────────────

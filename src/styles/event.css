@@ -169,3 +169,90 @@
   font-size: 0.95rem;
   white-space: pre-wrap;
 }
+
+/* ── Show Automation widget ──────────────────────────────────────────────── */
+.showcfg__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.showcfg__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  min-width: 190px;
+}
+
+.showcfg__select {
+  flex: 1;
+  min-width: 160px;
+  max-width: 100%;
+}
+
+.showcfg__maptoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.showcfg__mapcount {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--warn-text);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.showcfg__map {
+  margin-bottom: 10px;
+}
+
+.showcfg__maprow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.showcfg__pcitem {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.showcfg__maprow .showcfg__select {
+  flex: 0 1 220px;
+}
+
+.showcfg__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.showcfg__msg {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--ok);
+}

@@ -23,6 +23,8 @@ import * as show from './showManager.js';
 import * as splStore from './splStore.js';
 import * as checklist from './checklistStore.js';
 import * as chkTemplates from './checklistTemplates.js';
+import * as showCfg from './showConfig.js';
+import * as ppro from './integrations/proPresenter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -269,9 +271,42 @@ app.get('/api/rooms/:id/event/:planId', async (req, res) => {
       plan,
       detail,
       checklist: checklist.getChecklist(room.id, plan.id, plan.serviceTypeId),
+      showConfig: showCfg.getConfig(room.id, plan.id),
     });
   } catch (err) {
     res.status(502).json({ error: String(err.message ?? err) });
+  }
+});
+
+// ── Show automation config (Event Detail → Show Config widget) ───────────────
+
+app.put('/api/rooms/:id/event/:planId/show-config', (req, res) => {
+  if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
+  try {
+    const config = showCfg.setConfig(req.params.id, req.params.planId, req.body ?? {});
+    show.refreshConfig(req.params.id, req.params.planId); // live show picks it up
+    res.json({ ok: true, showConfig: config });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.delete('/api/rooms/:id/event/:planId/show-config', (req, res) => {
+  if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
+  showCfg.clearConfig(req.params.id, req.params.planId);
+  show.refreshConfig(req.params.id, req.params.planId);
+  res.json({ ok: true, showConfig: null });
+});
+
+// The room's currently open ProPresenter playlist (for the mapping UI).
+app.get('/api/rooms/:id/pp-playlist', async (req, res) => {
+  const room = rooms[req.params.id];
+  if (!room) return res.status(404).json({ error: 'Unknown room' });
+  if (!ppro.isConfigured(room.proPresenter)) return res.json({ playlist: null });
+  try {
+    res.json({ playlist: await ppro.readPlaylistItems(room.proPresenter) });
+  } catch {
+    res.json({ playlist: null }); // PP offline — the UI explains itself
   }
 });
 
@@ -503,6 +538,7 @@ if (existsSync(distDir)) {
 // Only start listening when run directly (not when imported by tests).
 if (process.argv[1] === __filename) {
   show.restoreShows().catch(() => {}); // resume any show that was active before restart
+  show.initAutomation(); // per-room autostart watchers (PP-driven, browserless)
   app.listen(PORT, () => {
     console.log(`Production dashboard server on http://localhost:${PORT}`);
   });

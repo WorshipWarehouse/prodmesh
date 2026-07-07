@@ -40,8 +40,10 @@ const STALE_STREAM_MS = 15000; // no frames for this long → reconnect
 function sleep(ms, signal) {
   return new Promise((resolve) => {
     if (signal?.aborted) return resolve();
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+    // Detach on normal completion so long-lived signals don't leak listeners.
+    const onAbort = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 
