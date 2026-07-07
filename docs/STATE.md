@@ -30,7 +30,7 @@ Notes:
 | Bitfocus Companion (per room) | Live for Auditorium; Youth/Chapel mock pending real setup |
 | Planning Center **Services** | **Live** — plan display + order of service, PAT in `server/data/secrets.json` |
 | Planning Center **Calendar** | **Not started** — awaiting read-only access. High value (see below) |
-| **Smaart SPL** | **Mock** — full pipeline live (capture → SQLite → live meter + report, ADR 0006); real WS transport needs the meter-read command. SDK access requested from Rational 2026-07-02 |
+| **Smaart SPL** | **Transport implemented** (SDK v4 doc received 2026-07-06) — full pipeline (capture → SQLite → live meter + report, ADR 0006) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream, tested against a protocol-faithful fake). Remaining: enable API in Smaart on the FOH Mac, set `smaart.host` in rooms.config, verify on-site. Rooms stay `mock: true` until then |
 
 ## What's live right now
 
