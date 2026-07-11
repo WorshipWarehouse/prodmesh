@@ -392,6 +392,11 @@ export function refreshConfig(roomId, planId) {
 const ARM_CHECK_MS = 60 * 1000;
 const PP_POLL_MS = 3000;
 
+// Dev-only: PRODMESH_AUTOSTART_TEST=1 arms configured events regardless of
+// the clock, so autostart can be exercised outside the Sunday window. Never
+// set this in production — it would let a Tuesday rehearsal start a show.
+const IGNORE_WINDOW = process.env.PRODMESH_AUTOSTART_TEST === '1';
+
 export async function nextArmedEvent(room, now) {
   const plans = [];
   for (const st of room.planningCenter?.serviceTypes ?? []) {
@@ -404,7 +409,7 @@ export async function nextArmedEvent(room, now) {
     const st = { id: plan.serviceTypeId, name: plan.serviceTypeName };
     const times = await pco.getPlanTimes(st, plan.id).catch(() => []);
     const window = armWindow(times);
-    if (!window || now < window.from || now > window.to) continue;
+    if (!IGNORE_WINDOW && (!window || now < window.from || now > window.to)) continue;
     const items = await pco.getPlanItems(st, plan.id).catch(() => []);
     if (items.length === 0) continue;
     return { plan, config, times, items };
@@ -416,6 +421,7 @@ async function autostartLoop(roomId, signal) {
   const room = rooms[roomId];
   const pp = room.proPresenter;
   let prevItemId = null; // last mapped PC item; null = no baseline (never trigger)
+  let armedPlanId = null; // for state-change logging only
   while (!signal.aborted) {
     let armed = null;
     if (!shows.has(roomId)) {
@@ -424,6 +430,10 @@ async function autostartLoop(roomId, signal) {
       } catch {
         armed = null;
       }
+    }
+    if ((armed?.plan.id ?? null) !== armedPlanId) {
+      armedPlanId = armed?.plan.id ?? null;
+      console.log(`[autostart] ${roomId}: ${armedPlanId ? `armed for plan ${armedPlanId}` : 'disarmed'}`);
     }
     if (!armed) {
       prevItemId = null;
@@ -441,6 +451,9 @@ async function autostartLoop(roomId, signal) {
         prevItemId = null; // PP unreachable → drop the baseline
         await timerSleep(PP_POLL_MS, signal);
         continue;
+      }
+      if (itemId !== prevItemId && itemId != null) {
+        console.log(`[autostart] ${roomId}: PP moved ${prevItemId ?? '(none)'} → ${itemId}`);
       }
       if (shouldAutostart(armed.config, prevItemId, itemId)) {
         const isCompleted = (timeId) =>
@@ -467,10 +480,16 @@ async function autostartLoop(roomId, signal) {
 
 /** Start the per-room autostart watchers (called once at boot). */
 export function initAutomation() {
+  if (IGNORE_WINDOW) {
+    console.warn('[autostart] PRODMESH_AUTOSTART_TEST=1 — arm window IGNORED (dev/testing only)');
+  }
   for (const room of Object.values(rooms)) {
     if (!ppro.isConfigured(room.proPresenter)) continue;
     if (!(room.planningCenter?.serviceTypes ?? []).length) continue;
-    autostartLoop(room.id, new AbortController().signal).catch(() => {});
+    // A watcher must never die silently — it's the thing nobody is looking at.
+    autostartLoop(room.id, new AbortController().signal).catch((err) => {
+      console.error(`[autostart] ${room.id}: watcher crashed — ${err?.stack ?? err}`);
+    });
   }
 }
 
