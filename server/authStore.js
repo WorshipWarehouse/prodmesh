@@ -18,6 +18,7 @@ const SESSION_TTL = 8 * 60 * 60 * 1000;
 
 const id = () => crypto.randomUUID();
 const digest = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
+const normalizePcPersonId = (value) => String(value ?? '').trim().replace(/^P(?=\d+$)/i, '');
 
 function hashPin(pin) {
   const salt = crypto.randomBytes(16);
@@ -130,15 +131,22 @@ export function hasPermission(session, permission) {
 export function createUser({ username, displayName, pin, planningCenterPersonId = null, groupIds = [] }) {
   const uname = String(username ?? '').trim();
   const display = String(displayName ?? '').trim();
+  const pcPersonId = normalizePcPersonId(planningCenterPersonId);
   if (!/^[a-z0-9._-]{2,40}$/i.test(uname)) throw new Error('Username must be 2–40 letters, numbers, dots, dashes, or underscores');
   if (display.length < 2 || display.length > 80) throw new Error('Display name must be 2–80 characters');
   if (String(pin ?? '').length < 4) throw new Error('PIN must be at least 4 characters');
+  if (pcPersonId && !/^\d+$/.test(pcPersonId)) throw new Error('Planning Center person ID must be numeric');
   const userId = id();
   const db = getDb();
+  const duplicatePcUser = pcPersonId
+    ? db.prepare('SELECT username, planning_center_person_id AS personId FROM users WHERE planning_center_person_id IS NOT NULL').all()
+      .find((row) => normalizePcPersonId(row.personId) === pcPersonId)
+    : null;
+  if (duplicatePcUser) throw new Error(`Planning Center person is already assigned to @${duplicatePcUser.username}`);
   db.transaction(() => {
     db.prepare(
       'INSERT INTO users (id, username, display_name, pin_hash, planning_center_person_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    ).run(userId, uname, display, hashPin(pin), planningCenterPersonId || null, Date.now());
+    ).run(userId, uname, display, hashPin(pin), pcPersonId || null, Date.now());
     const add = db.prepare('INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)');
     for (const groupId of groupIds) add.run(userId, groupId);
   })();

@@ -44,3 +44,22 @@ test('Administrators system group grants wildcard authority', () => {
   const session = auth.authenticate('admin-user', '9876');
   assert.equal(auth.hasPermission(session, 'anything.future'), true);
 });
+
+test('Planning Center person IDs are normalized and cannot be assigned twice', () => {
+  const first = auth.createUser({
+    username: 'photo-one',
+    displayName: 'Photo One',
+    pin: '1234',
+    planningCenterPersonId: 'P987654',
+  });
+  assert.equal(first.planningCenterPersonId, '987654');
+  assert.throws(
+    () => auth.createUser({
+      username: 'photo-two',
+      displayName: 'Photo Two',
+      pin: '1234',
+      planningCenterPersonId: '987654',
+    }),
+    /already assigned to @photo-one/,
+  );
+});
