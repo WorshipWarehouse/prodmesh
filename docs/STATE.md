@@ -94,6 +94,10 @@ Notes:
   Checklists subpages. The account menu requires confirmation before returning a
   station to read-only mode. When a user has a Planning Center Services Person ID,
   their Services profile thumbnail is shown as their avatar.
+- **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
+  Server-managed configuration and operational facts live in SQLite; only
+  deployment bootstrap and restricted secrets remain outside it. Portability is
+  provided by versioned JSON import/export and consistent full-database backups.
 
 ## Roadmap / open threads (roughly prioritized)
 
