@@ -135,6 +135,30 @@
   font-size: 0.84rem;
 }
 
+.users__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.users__avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.users__avatar img {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .users__groups {
   display: flex;
   flex-wrap: wrap;

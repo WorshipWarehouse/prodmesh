@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, CircleUser, Zap } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { SelectField } from '../components/SelectField';
 import {
@@ -130,7 +130,7 @@ function AdminPanels({ section }: { section: AdminSection }) {
 }
 
 // ── Users, permission groups, and ACLs ───────────────────────────────────────
-function UserManagementPanel() {
+export function UserManagementPanel() {
   const [directory, setDirectory] = useState<UserDirectory | null>(null);
   const [user, setUser] = useState({ displayName: '', username: '', pin: '', planningCenterPersonId: '' });
   const [userGroups, setUserGroupsDraft] = useState<string[]>([]);
@@ -212,7 +212,14 @@ function UserManagementPanel() {
         {directory.users.length === 0 && <p className="settings__muted">No named users yet. The existing Admin PIN remains available for bootstrap access.</p>}
         {directory.users.map((entry) => (
           <div className="users__row" key={entry.id}>
-            <span><strong>{entry.displayName}</strong><small>@{entry.username}{entry.planningCenterPersonId ? ` · PCO ${entry.planningCenterPersonId}` : ''}</small></span>
+            <div className="users__identity">
+              <span className="users__avatar" role="img" aria-label={`${entry.displayName} avatar`}>
+                {entry.avatarUrl
+                  ? <img src={entry.avatarUrl} alt="" />
+                  : <CircleUser size={28} />}
+              </span>
+              <span><strong>{entry.displayName}</strong><small>@{entry.username}{entry.planningCenterPersonId ? ` · PCO ${entry.planningCenterPersonId}` : ''}</small></span>
+            </div>
             <div className="users__groups">
               {directory.groups.map((group) => {
                 const checked = entry.groups.some((g) => g.id === group.id);

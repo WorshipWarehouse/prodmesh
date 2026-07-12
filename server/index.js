@@ -580,8 +580,15 @@ app.get('/api/auth/status', async (req, res) => {
   });
 });
 
-app.get('/api/users', requirePermission('users.manage'), (_req, res) => {
-  res.json(auth.listDirectory());
+app.get('/api/users', requirePermission('users.manage'), async (_req, res) => {
+  const directory = auth.listDirectory();
+  directory.users = await Promise.all(directory.users.map(async (user) => {
+    const profile = user.planningCenterPersonId
+      ? await pco.getPersonProfile(user.planningCenterPersonId).catch(() => null)
+      : null;
+    return { ...user, avatarUrl: profile?.avatarUrl ?? null };
+  }));
+  res.json(directory);
 });
 
 app.post('/api/users', requirePermission('users.manage'), (req, res) => {

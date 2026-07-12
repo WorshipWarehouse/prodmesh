@@ -58,6 +58,15 @@ test('settings endpoint requires an admin token', async () => {
   assert.equal(ok.status, 200);
 });
 
+test('user directory includes the avatar contract', async () => {
+  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const res = await fetch(base + '/api/users', { headers: { Authorization: `Bearer ${token}` } });
+  assert.equal(res.status, 200);
+  const directory = await res.json();
+  assert.ok(directory.users.length > 0);
+  assert.ok(directory.users.every((user) => Object.hasOwn(user, 'avatarUrl')));
+});
+
 test('locked mode is blocked without override, allowed with it', async () => {
   const blocked = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby' }, operatorToken, station.token);
   assert.equal(blocked.status, 403);
