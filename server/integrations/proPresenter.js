@@ -63,6 +63,33 @@ export function mapIndexToItemId(items, active) {
   return at ? at.id : null; // trust index even if names differ
 }
 
+/**
+ * Mapping with per-event manual overrides layered on top (Event Detail →
+ * Show Config): overrides = { '<pc item id>': { ppIndex, ppName } }. An
+ * override wins by playlist index, with a tolerant-name rescue for when the
+ * playlist was re-pushed and indices shifted but names survived.
+ */
+export function mapActiveToItemId(items, active, overrides = null) {
+  if (!active || active.index == null) return null;
+  if (overrides) {
+    for (const [pcId, pp] of Object.entries(overrides)) {
+      if (pp == null) continue;
+      if (pp.ppIndex === active.index || (pp.ppName && namesMatch(pp.ppName, active.name))) {
+        return pcId;
+      }
+    }
+    // A PP item claimed by an override must not ALSO auto-map elsewhere…
+    const auto = mapIndexToItemId(items, active);
+    // …and a PC item claimed by an override must not be reachable by auto-map
+    // from a different PP item (the override redirected it on purpose).
+    if (auto && Object.prototype.hasOwnProperty.call(overrides, auto) && overrides[auto] != null) {
+      return null;
+    }
+    return auto;
+  }
+  return mapIndexToItemId(items, active);
+}
+
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
 function withTimeout(signal, ms = 3000) {
@@ -79,6 +106,74 @@ async function ppGet(pp, path, signal) {
 /** One-shot read of the current active playlist item. */
 export async function readActive(pp, signal) {
   return parseActive(await ppGet(pp, '/v1/playlist/active', signal));
+}
+
+/**
+ * Pick the PP playlist that belongs to a PC plan. The PC push names playlists
+ * "<series> - <plan title> - <dates>" (e.g. "… - July 12, 2026"), so the plan's
+ * date string is the strong signal; the title breaks ties. Pure — tested.
+ * `playlists` = flattened [{uuid, name}]. Returns the best match or null.
+ */
+export function pickPlaylistForPlan(playlists, plan) {
+  let best = null;
+  let bestScore = 0;
+  for (const pl of playlists) {
+    const name = norm(pl.name);
+    let score = 0;
+    if (plan?.dates && name.includes(norm(plan.dates))) score += 2;
+    if (plan?.title && name.includes(norm(plan.title))) score += 1;
+    if (score > bestScore) {
+      bestScore = score;
+      best = pl;
+    }
+  }
+  return best;
+}
+
+// /v1/playlists nests folders via `children` — flatten to playlist leaves.
+function flattenPlaylists(nodes, out = []) {
+  for (const n of nodes ?? []) {
+    if (n.field_type === 'playlist' && n.id?.uuid) out.push({ uuid: n.id.uuid, name: n.id.name ?? '' });
+    flattenPlaylists(n.children, out);
+  }
+  return out;
+}
+
+/**
+ * The items of the playlist to map a plan against (for the mapping-override
+ * UI). Prefers the playlist that MATCHES the plan (by pushed name), so the
+ * config screen shows the right service even while PP still has last week's
+ * playlist open; falls back to the active playlist (matched: false → the UI
+ * warns). Returns null when PP has neither. Shapes verified live:
+ * /v1/playlist/{uuid} → { id, items: [{ id: {index,name,uuid}, type, … }] }.
+ */
+export async function readPlaylistItems(pp, signal, plan = null) {
+  let target = null;
+  let matched = false;
+  if (plan) {
+    const all = flattenPlaylists(await ppGet(pp, '/v1/playlists', signal).catch(() => []));
+    const hit = pickPlaylistForPlan(all, plan);
+    if (hit) {
+      target = hit;
+      matched = true;
+    }
+  }
+  if (!target) {
+    const active = await ppGet(pp, '/v1/playlist/active', signal);
+    const pl = active?.presentation?.playlist ?? null;
+    if (!pl?.uuid) return null;
+    target = pl;
+  }
+  const body = await ppGet(pp, `/v1/playlist/${target.uuid}`, signal);
+  return {
+    playlistName: target.name ?? null,
+    matched,
+    items: (body.items ?? []).map((it) => ({
+      index: it.id?.index ?? null,
+      name: it.id?.name ?? '',
+      type: it.type ?? 'presentation',
+    })),
+  };
 }
 
 /** Current slide position within the active presentation. */
@@ -180,8 +275,12 @@ export async function readTimers(pp, signal) {
 
 function sleep(ms, signal) {
   return new Promise((resolve) => {
-    const t = setTimeout(resolve, ms);
-    signal?.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
+    if (signal?.aborted) return resolve();
+    // Detach on normal completion — a 90-minute show polls thousands of times
+    // on one signal and would otherwise leak a listener per poll.
+    const onAbort = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 

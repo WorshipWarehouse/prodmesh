@@ -47,5 +47,17 @@ function migrate(d) {
       done_at INTEGER NOT NULL,
       PRIMARY KEY (room_id, plan_id, item_id)
     );
+
+    -- Per-event show automation config (set on the Event Detail page):
+    -- which PC item autostarts the show, which one auto-completes it (at its
+    -- last slide), and manual PC→PP mapping overrides. JSON blob; per event
+    -- like checklist_state, and disposable with it.
+    CREATE TABLE IF NOT EXISTS show_config (
+      room_id    TEXT    NOT NULL,
+      plan_id    TEXT    NOT NULL,
+      config     TEXT    NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (room_id, plan_id)
+    );
   `);
 }

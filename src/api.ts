@@ -279,16 +279,55 @@ export interface ChecklistItem {
   doneAt: number | null;
 }
 
+export interface ShowConfig {
+  startItemId: string | null; // PP lands on this PC item → show autostarts
+  endItemId: string | null; // last slide of this PC item → show auto-completes
+  map: Record<string, { ppIndex: number; ppName: string | null } | null>;
+}
+
+export interface PpPlaylist {
+  playlistName: string | null;
+  matched: boolean; // true = this is the plan's own playlist, not just PP's active one
+  items: { index: number; name: string; type: string }[];
+}
+
 export interface EventDetail {
   live: boolean;
   plan: ServicePlan;
   detail: { artwork: string | null; notes: PlanNote[] };
   checklist: ChecklistItem[];
+  showConfig: ShowConfig | null;
 }
 
 export const getEventDetail = (id: string, planId: string) =>
   getJson<EventDetail>(
     `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}`,
+  );
+
+export async function saveShowConfig(
+  id: string,
+  planId: string,
+  config: ShowConfig,
+): Promise<ShowConfig> {
+  const res = await fetch(
+    `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}/show-config`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) },
+  );
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
+  return ((await res.json()) as { showConfig: ShowConfig }).showConfig;
+}
+
+export async function clearShowConfig(id: string, planId: string): Promise<void> {
+  const res = await fetch(
+    `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}/show-config`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+export const getPpPlaylist = (id: string, planId: string) =>
+  getJson<{ playlist: PpPlaylist | null }>(
+    `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}/pp-playlist`,
   );
 
 export const setChecklistItem = (id: string, planId: string, itemId: string, done: boolean) =>
