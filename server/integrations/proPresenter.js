@@ -109,18 +109,65 @@ export async function readActive(pp, signal) {
 }
 
 /**
- * The items of the currently open playlist (for the mapping-override UI).
- * Uses the active playlist — the one the operator has loaded for the service.
- * Returns null when PP has no active playlist. Shape verified live:
+ * Pick the PP playlist that belongs to a PC plan. The PC push names playlists
+ * "<series> - <plan title> - <dates>" (e.g. "… - July 12, 2026"), so the plan's
+ * date string is the strong signal; the title breaks ties. Pure — tested.
+ * `playlists` = flattened [{uuid, name}]. Returns the best match or null.
+ */
+export function pickPlaylistForPlan(playlists, plan) {
+  let best = null;
+  let bestScore = 0;
+  for (const pl of playlists) {
+    const name = norm(pl.name);
+    let score = 0;
+    if (plan?.dates && name.includes(norm(plan.dates))) score += 2;
+    if (plan?.title && name.includes(norm(plan.title))) score += 1;
+    if (score > bestScore) {
+      bestScore = score;
+      best = pl;
+    }
+  }
+  return best;
+}
+
+// /v1/playlists nests folders via `children` — flatten to playlist leaves.
+function flattenPlaylists(nodes, out = []) {
+  for (const n of nodes ?? []) {
+    if (n.field_type === 'playlist' && n.id?.uuid) out.push({ uuid: n.id.uuid, name: n.id.name ?? '' });
+    flattenPlaylists(n.children, out);
+  }
+  return out;
+}
+
+/**
+ * The items of the playlist to map a plan against (for the mapping-override
+ * UI). Prefers the playlist that MATCHES the plan (by pushed name), so the
+ * config screen shows the right service even while PP still has last week's
+ * playlist open; falls back to the active playlist (matched: false → the UI
+ * warns). Returns null when PP has neither. Shapes verified live:
  * /v1/playlist/{uuid} → { id, items: [{ id: {index,name,uuid}, type, … }] }.
  */
-export async function readPlaylistItems(pp, signal) {
-  const active = await ppGet(pp, '/v1/playlist/active', signal);
-  const pl = active?.presentation?.playlist ?? null;
-  if (!pl?.uuid) return null;
-  const body = await ppGet(pp, `/v1/playlist/${pl.uuid}`, signal);
+export async function readPlaylistItems(pp, signal, plan = null) {
+  let target = null;
+  let matched = false;
+  if (plan) {
+    const all = flattenPlaylists(await ppGet(pp, '/v1/playlists', signal).catch(() => []));
+    const hit = pickPlaylistForPlan(all, plan);
+    if (hit) {
+      target = hit;
+      matched = true;
+    }
+  }
+  if (!target) {
+    const active = await ppGet(pp, '/v1/playlist/active', signal);
+    const pl = active?.presentation?.playlist ?? null;
+    if (!pl?.uuid) return null;
+    target = pl;
+  }
+  const body = await ppGet(pp, `/v1/playlist/${target.uuid}`, signal);
   return {
-    playlistName: pl.name ?? null,
+    playlistName: target.name ?? null,
+    matched,
     items: (body.items ?? []).map((it) => ({
       index: it.id?.index ?? null,
       name: it.id?.name ?? '',

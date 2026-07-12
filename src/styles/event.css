@@ -256,3 +256,13 @@
   font-size: 0.85rem;
   color: var(--ok);
 }
+
+.showcfg__mismatch {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--warn-text);
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-border);
+}

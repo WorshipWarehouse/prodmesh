@@ -34,10 +34,10 @@ export function ShowConfigWidget({
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    getPpPlaylist(roomId)
+    getPpPlaylist(roomId, planId)
       .then((r) => setPp(r.playlist))
       .catch(() => setPp(null));
-  }, [roomId]);
+  }, [roomId, planId]);
 
   const trackable = items.filter((i) => (i.type ?? 'item') !== 'header');
   const ppItems = (pp?.items ?? []).filter((i) => i.type !== 'header');
@@ -127,10 +127,18 @@ export function ShowConfigWidget({
           </p>
         ) : (
           <div className="showcfg__map">
-            <p className="widget__hint">
-              Items map automatically by playlist order (“{pp.playlistName}”). Override only the
-              ones that drifted.
-            </p>
+            {pp.matched ? (
+              <p className="widget__hint">
+                Mapping against this event’s playlist (“{pp.playlistName}”). Items map
+                automatically by order — override only the ones that drifted.
+              </p>
+            ) : (
+              <p className="showcfg__mismatch">
+                Couldn’t find this event’s playlist in ProPresenter — showing the open one
+                (“{pp.playlistName}”), which looks like a <em>different</em> service. Push this
+                plan from Planning Center first, or map with care.
+              </p>
+            )}
             {trackable.map((it) => (
               <div key={it.id} className="showcfg__maprow">
                 <span className="showcfg__pcitem">{it.title}</span>

@@ -67,3 +67,16 @@ test('mapActiveToItemId honors manual overrides over index mapping', () => {
   // Unrelated items still auto-map.
   assert.equal(mapActiveToItemId(items, { index: 0, name: 'Pre Service' }, map), 'a');
 });
+
+test('pickPlaylistForPlan matches by plan date, title as tiebreak', async () => {
+  const { pickPlaylistForPlan } = await import('./integrations/proPresenter.js');
+  const playlists = [
+    { uuid: 'a', name: 'RECORDING NOW' },
+    { uuid: 'b', name: 'Colossians - Riley - Commissioning - July 5, 2026' },
+    { uuid: 'c', name: 'Summer in the Psalms - Michael - acoustic - Psalm 1 - July 12, 2026' },
+  ];
+  const plan = { title: 'Michael - acoustic - Psalm 1', dates: 'July 12, 2026' };
+  assert.equal(pickPlaylistForPlan(playlists, plan).uuid, 'c');
+  // No date/title match anywhere → null (the caller falls back to active).
+  assert.equal(pickPlaylistForPlan(playlists, { title: 'Xmas Eve', dates: 'December 24, 2026' }), null);
+});

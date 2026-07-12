@@ -298,13 +298,17 @@ app.delete('/api/rooms/:id/event/:planId/show-config', (req, res) => {
   res.json({ ok: true, showConfig: null });
 });
 
-// The room's currently open ProPresenter playlist (for the mapping UI).
-app.get('/api/rooms/:id/pp-playlist', async (req, res) => {
+// The ProPresenter playlist to map THIS event against (for the mapping UI):
+// prefers the playlist whose pushed name matches the plan; falls back to
+// whatever's active in PP (matched: false → the UI warns it's a different
+// service's playlist).
+app.get('/api/rooms/:id/event/:planId/pp-playlist', async (req, res) => {
   const room = rooms[req.params.id];
   if (!room) return res.status(404).json({ error: 'Unknown room' });
   if (!ppro.isConfigured(room.proPresenter)) return res.json({ playlist: null });
   try {
-    res.json({ playlist: await ppro.readPlaylistItems(room.proPresenter) });
+    const plan = await planForRoom(room, req.params.planId).catch(() => null);
+    res.json({ playlist: await ppro.readPlaylistItems(room.proPresenter, undefined, plan) });
   } catch {
     res.json({ playlist: null }); // PP offline — the UI explains itself
   }

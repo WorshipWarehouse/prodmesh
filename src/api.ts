@@ -287,6 +287,7 @@ export interface ShowConfig {
 
 export interface PpPlaylist {
   playlistName: string | null;
+  matched: boolean; // true = this is the plan's own playlist, not just PP's active one
   items: { index: number; name: string; type: string }[];
 }
 
@@ -324,8 +325,10 @@ export async function clearShowConfig(id: string, planId: string): Promise<void>
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
-export const getPpPlaylist = (id: string) =>
-  getJson<{ playlist: PpPlaylist | null }>(`/api/rooms/${encodeURIComponent(id)}/pp-playlist`);
+export const getPpPlaylist = (id: string, planId: string) =>
+  getJson<{ playlist: PpPlaylist | null }>(
+    `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}/pp-playlist`,
+  );
 
 export const setChecklistItem = (id: string, planId: string, itemId: string, done: boolean) =>
   postJson<{ checklist: ChecklistItem[] }>(
