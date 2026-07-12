@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart3,
@@ -51,6 +51,7 @@ export function AppShell() {
   const [identityOpen, setIdentityOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getAbout().then((a) => setVersion(a.version)).catch(() => {});
@@ -59,6 +60,22 @@ export function AppShell() {
       if (!s.station) setIdentityOpen(true);
     }).catch(() => setIdentityOpen(true));
   }, []);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAccountOpen(false);
+    };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [accountOpen]);
 
   useEffect(() => {
     const open = () => setIdentityOpen(true);
@@ -162,30 +179,32 @@ export function AppShell() {
             <div className="sidebar__clock rail-hide">
               <Clock compact />
             </div>
-            <button
-              className="sidebar__user"
-              title={identity?.authenticated ? `Account: ${operatorName}` : 'Log in'}
-              onClick={identity?.authenticated ? () => setAccountOpen((open) => !open) : () => setIdentityOpen(true)}
-            >
-              {identity?.user?.avatarUrl ? (
-                <img className="sidebar__avatar" src={identity.user.avatarUrl} alt="" />
-              ) : (
-                <CircleUser size={19} className="sidebar__icon" />
-              )}
-              <div className="sidebar__label rail-hide">
-                <span className="sidebar__username">{operatorName}</span>
-                <span className="sidebar__version">{stationName}{version ? ` · v${version}` : ''}</span>
-              </div>
-            </button>
-            {accountOpen && identity?.authenticated && (
-              <div className="accountmenu">
-                <div className="accountmenu__identity">
-                  {identity.user?.avatarUrl ? <img src={identity.user.avatarUrl} alt="" /> : <CircleUser size={28} />}
-                  <span><strong>{operatorName}</strong><small>@{identity.user?.username} · {stationName}</small></span>
+            <div className="sidebar__account" ref={accountRef}>
+              <button
+                className="sidebar__user"
+                title={identity?.authenticated ? `Account: ${operatorName}` : 'Log in'}
+                onClick={identity?.authenticated ? () => setAccountOpen((open) => !open) : () => setIdentityOpen(true)}
+              >
+                {identity?.user?.avatarUrl ? (
+                  <img className="sidebar__avatar" src={identity.user.avatarUrl} alt="" />
+                ) : (
+                  <CircleUser size={19} className="sidebar__icon" />
+                )}
+                <div className="sidebar__label rail-hide">
+                  <span className="sidebar__username">{operatorName}</span>
+                  <span className="sidebar__version">{stationName}{version ? ` · v${version}` : ''}</span>
                 </div>
-                <button onClick={() => setConfirmLock(true)}><LockKeyhole size={14} /> Lock station</button>
-              </div>
-            )}
+              </button>
+              {accountOpen && identity?.authenticated && (
+                <div className="accountmenu">
+                  <div className="accountmenu__identity">
+                    {identity.user?.avatarUrl ? <img src={identity.user.avatarUrl} alt="" /> : <CircleUser size={28} />}
+                    <span><strong>{operatorName}</strong><small>@{identity.user?.username} · {stationName}</small></span>
+                  </div>
+                  <button onClick={() => setConfirmLock(true)}><LockKeyhole size={14} /> Lock station</button>
+                </div>
+              )}
+            </div>
             <button
               className="sidebar__toggle"
               onClick={toggle}

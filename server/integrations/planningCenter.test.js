@@ -14,6 +14,11 @@ test('isConfigured is false without credentials', () => {
   assert.equal(pco.isConfigured(), false);
 });
 
+test('Planning Center person IDs accept the UI-style P prefix', () => {
+  assert.equal(pco.normalizePersonId('P900001'), '900001');
+  assert.equal(pco.normalizePersonId('900001'), '900001');
+});
+
 test('getUpcomingPlans (mock) returns summaries; times hydrated separately', async () => {
   const plans = await pco.getUpcomingPlans(ST, 2);
   assert.equal(plans.length, 2);

@@ -192,6 +192,10 @@
   align-items: flex-start;
 }
 
+.sidebar__account {
+  min-width: 0;
+}
+
 .sidebar__user {
   display: flex;
   align-items: center;

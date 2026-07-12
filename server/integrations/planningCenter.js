@@ -123,11 +123,16 @@ export function getPlan(serviceType, planId) {
 
 /** A Services person profile for the signed-in prodmesh user. Services exposes
  * photo_thumbnail_url directly, so this does not require People-app access. */
+export function normalizePersonId(personId) {
+  return String(personId ?? '').trim().replace(/^P(?=\d+$)/i, '');
+}
+
 export function getPersonProfile(personId) {
-  return cached(`person:${personId}`, async () => {
-    if (!isConfigured() || !personId) return null;
+  const normalizedId = normalizePersonId(personId);
+  return cached(`person:${normalizedId}`, async () => {
+    if (!isConfigured() || !normalizedId) return null;
     try {
-      const body = await pcGet(`/people/${encodeURIComponent(personId)}`);
+      const body = await pcGet(`/people/${encodeURIComponent(normalizedId)}`);
       const data = body?.data;
       const a = data?.attributes ?? {};
       return data ? {
