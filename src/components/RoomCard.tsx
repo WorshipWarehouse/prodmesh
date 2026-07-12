@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Lock, Radio } from 'lucide-react';
+import { ChevronRight, Lock, Radio } from 'lucide-react';
 import {
   getRoomService,
   getRoomState,
@@ -54,7 +54,10 @@ export function RoomCard({ room }: { room: RoomMeta }) {
   return (
     <Link to={`/room/${room.id}`} className="roomcard">
       <div className="roomcard__head">
-        <span className="roomcard__name">{room.name}</span>
+        <span>
+          <span className="roomcard__id mono">{room.id}</span>
+          <span className="roomcard__name">{room.name}</span>
+        </span>
         {show?.active && (
           <span className="roomcard__live">
             <Radio size={12} /> LIVE
@@ -62,29 +65,48 @@ export function RoomCard({ room }: { room: RoomMeta }) {
         )}
       </div>
 
-      <div className="roomcard__mode">
-        <span
-          className="roomcard__dot"
-          style={{ background: mode?.color ?? 'var(--text-faint)' }}
-        />
-        <span>{mode ? mode.label : state ? 'Unknown mode' : 'Connecting…'}</span>
-        {state?.protection.active && (
-          <span className="roomcard__lock" title={state.protection.label ?? 'Schedule protection'}>
-            <Lock size={12} />
-          </span>
-        )}
-        {state && !state.online && <span className="roomcard__offline">offline</span>}
+      <div className="roomcard__status">
+        <span className="roomcard__metric-label">ROOM MODE</span>
+        <div className="roomcard__mode">
+          <span
+            className="roomcard__dot"
+            style={{ background: mode?.color ?? 'var(--text-faint)' }}
+          />
+          <span>{mode ? mode.label : state ? 'Unknown mode' : 'Connecting…'}</span>
+          {state?.protection.active && (
+            <span className="roomcard__lock" title={state.protection.label ?? 'Schedule protection'}>
+              <Lock size={12} />
+            </span>
+          )}
+        </div>
+        <span className={`roomcard__health${state?.online ? ' roomcard__health--on' : ''}`}>
+          {state?.online ? 'COMPANION ONLINE' : state ? 'COMPANION OFFLINE' : 'CONNECTING'}
+        </span>
       </div>
 
       {next ? (
         <div className="roomcard__next">
-          <span className="roomcard__next-title">{next.title}</span>
-          <span className="roomcard__next-when">
-            {[next.dates, nextTime].filter(Boolean).join(' · ')}
+          <span className="roomcard__metric-label">NEXT EVENT</span>
+          <span className="roomcard__next-copy">
+            <span className="roomcard__next-title">{next.title}</span>
+            <span className="roomcard__next-when mono">
+              {[next.dates, nextTime].filter(Boolean).join(' · ')}
+            </span>
           </span>
+          <ChevronRight className="roomcard__arrow" size={17} />
         </div>
       ) : (
-        service?.configured && <div className="roomcard__next roomcard__next--none">No upcoming plans</div>
+        <div className="roomcard__next roomcard__next--none">
+          <span className="roomcard__metric-label">NEXT EVENT</span>
+          <span>
+            {service
+              ? service.configured
+                ? 'No upcoming plans'
+                : 'Planning Center not configured'
+              : 'Loading schedule…'}
+          </span>
+          <ChevronRight className="roomcard__arrow" size={17} />
+        </div>
       )}
     </Link>
   );

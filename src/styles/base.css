@@ -19,6 +19,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+::selection {
+  background: var(--accent-border);
+}
+
 /* Native controls don't inherit the body font. */
 button,
 input,
@@ -39,21 +43,38 @@ svg.lucide {
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 16px;
 }
 
 .pagehead__title {
   margin: 0;
-  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .pagehead__sub {
   margin: 3px 0 0;
   color: var(--text-dim);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
+}
+
+.eyebrow,
+.section-label {
+  margin: 0;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .pagehead__right {
@@ -96,7 +117,7 @@ svg.lucide {
   background: var(--bg-tile);
   color: var(--text);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -108,6 +129,23 @@ svg.lucide {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--text-on-accent);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: #78bbff;
+  border-color: #78bbff;
+  color: var(--text-on-accent);
+}
+
+.btn:focus-visible,
+.field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .btn--ghost {
@@ -140,13 +178,125 @@ svg.lucide {
   width: 120px;
 }
 
+/* ── Selects ─────────────────────────────────────────────────────────────── */
+.selectfield {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  color: var(--text);
+}
+
+.selectfield__control {
+  width: 100%;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 8px 32px 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tile);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.selectfield__control:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-tile-hover);
+}
+
+.selectfield__control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.selectfield__control:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.selectfield__icon {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.selectfield:focus-within .selectfield__icon {
+  color: var(--accent);
+}
+
+/* ── Checkboxes ──────────────────────────────────────────────────────────── */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox__box {
+  position: relative;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.checkbox__input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg-raised);
+  cursor: pointer;
+}
+
+.checkbox__input:hover {
+  border-color: var(--accent);
+}
+
+.checkbox__input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.checkbox__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.checkbox__check {
+  position: absolute;
+  inset: 2px;
+  color: var(--text-on-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checkbox__input:checked + .checkbox__check {
+  opacity: 1;
+}
+
+.checkbox__label {
+  line-height: 1.25;
+}
+
 /* ── Pills ───────────────────────────────────────────────────────────────── */
 .pill {
-  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 3px;
   margin-left: 8px;
   vertical-align: middle;
 }

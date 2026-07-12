@@ -1,27 +1,72 @@
-/* Home — campus overview: room status cards + the Quick Access launcher. */
+/* Home — a compact operational overview, with infrastructure kept secondary. */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.home__overview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home__section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.home__section-head h2 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.home__room-count {
+  color: var(--text-faint);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+}
 
 .home__rooms {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+@media (max-width: 980px) {
+  .home__rooms {
+    grid-template-columns: 1fr;
+  }
 }
 
 .roomcard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  border-radius: var(--radius-lg);
+  gap: 16px;
+  min-height: 202px;
+  padding: 16px;
+  border-radius: 0;
   background: var(--bg-raised);
-  border: 1px solid var(--border);
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   text-decoration: none;
   color: var(--text);
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 0.12s ease;
 }
 
 .roomcard:hover {
   background: var(--bg-tile);
-  border-color: var(--accent);
+}
+
+.roomcard:hover .roomcard__arrow {
+  color: var(--accent);
+  transform: translateX(2px);
 }
 
 .roomcard__head {
@@ -32,8 +77,18 @@
 }
 
 .roomcard__name {
-  font-weight: 700;
-  font-size: 1.05rem;
+  display: block;
+  margin-top: 3px;
+  font-weight: 600;
+  font-size: 1.08rem;
+}
+
+.roomcard__id {
+  display: block;
+  color: var(--text-faint);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .roomcard__live {
@@ -46,8 +101,8 @@
   color: var(--danger);
   background: rgba(255, 107, 107, 0.12);
   border: 1px solid var(--danger-soft);
-  border-radius: 999px;
-  padding: 2px 9px;
+  border-radius: 3px;
+  padding: 3px 7px;
   animation: live-pulse 1.6s ease-in-out infinite;
 }
 
@@ -60,17 +115,35 @@
   .roomcard__live { animation: none; }
 }
 
+.roomcard__status {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 5px 12px;
+}
+
+.roomcard__metric-label {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.61rem;
+  letter-spacing: 0.08em;
+}
+
+.roomcard__status > .roomcard__metric-label {
+  grid-column: 1 / -1;
+}
+
 .roomcard__mode {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.96rem;
+  font-weight: 500;
 }
 
 .roomcard__dot {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -80,30 +153,56 @@
   color: var(--warn-text);
 }
 
-.roomcard__offline {
-  font-size: 0.72rem;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.roomcard__health {
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+}
+
+.roomcard__health--on {
+  color: var(--ok);
 }
 
 .roomcard__next {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.roomcard__next > .roomcard__metric-label {
+  grid-column: 1 / -1;
+}
+
+.roomcard__next-copy {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
 }
 
 .roomcard__next-title {
   font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--accent-text);
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .roomcard__next-when {
-  font-size: 0.8rem;
+  font-size: 0.69rem;
   color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
+.roomcard__arrow {
+  color: var(--text-faint);
+  transition: color 0.12s ease, transform 0.12s ease;
 }
 
 .roomcard__next--none {
@@ -112,15 +211,55 @@
 }
 
 .home__tools {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
 }
 
-.home__tools-title {
-  margin: 8px 0 -8px;
-  font-size: 1.05rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+.home__tools-summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.home__tools-summary::-webkit-details-marker { display: none; }
+
+.home__tools-summary:hover { background: var(--bg-tile); }
+
+.home__tools-summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.home__tools-icon { color: var(--text-faint); }
+
+.home__tools-summary strong {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.home__tools-summary small {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.72rem;
   color: var(--text-dim);
+}
+
+.home__tools-chevron {
+  color: var(--text-faint);
+  transition: transform 0.15s ease;
+}
+
+.home__tools[open] .home__tools-chevron { transform: rotate(180deg); }
+
+.home__tools-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 18px;
+  border-top: 1px solid var(--border-subtle);
 }

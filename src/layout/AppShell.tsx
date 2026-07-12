@@ -13,6 +13,7 @@ import { getAbout } from '../api';
 import { church } from '../config/dashboard.config';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { Clock } from '../components/Clock';
+import { SelectField } from '../components/SelectField';
 import logoUrl from '../assets/logo.png';
 
 const NAV = [
@@ -70,7 +71,7 @@ export function AppShell() {
             <img className="sidebar__logo" src={logoUrl} alt="" title={church.name} />
             <div className="sidebar__brandtext rail-hide">
               <span className="sidebar__church">{church.name}</span>
-              <select
+              <SelectField
                 className="sidebar__campus"
                 value={campusId}
                 onChange={(e) => campus.setCampusId(e.target.value)}
@@ -83,7 +84,7 @@ export function AppShell() {
                     {s.status !== 'active' ? ' (soon)' : ''}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           </div>
 

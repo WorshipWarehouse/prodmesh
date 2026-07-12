@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Zap } from 'lucide-react';
+import { Checkbox } from '../components/Checkbox';
+import { SelectField } from '../components/SelectField';
 import {
   getAuthStatus,
   loginAdmin,
@@ -250,8 +252,8 @@ function ChecklistsPanel() {
                 placeholder="What needs to happen?"
                 onChange={(e) => edit(i, { label: e.target.value })}
               />
-              <select
-                className="field field--sm tpl-item__action"
+              <SelectField
+                className="tpl-item__action"
                 value={it.action?.mode ?? ''}
                 onChange={(e) =>
                   edit(i, { action: e.target.value ? { type: 'mode', mode: e.target.value } : null })
@@ -263,7 +265,7 @@ function ChecklistsPanel() {
                     ⚡ Set room to {m.label}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               <button
                 className="btn btn--ghost btn--sm"
                 onClick={() => setDraft((d) => d!.filter((_, j) => j !== i))}
@@ -467,13 +469,11 @@ function SchedulesPanel() {
               <div className="sched-locks">
                 <span className="settings__muted">Lock:</span>
                 {room.modes.map((m) => (
-                  <label key={m.id} className="lockchk">
-                    <input type="checkbox" checked={w.lock.includes(m.id)}
+                  <Checkbox key={m.id} className="lockchk" label={m.label}
+                    checked={w.lock.includes(m.id)}
                       onChange={() => editWindow(room.id, i, {
                         lock: w.lock.includes(m.id) ? w.lock.filter((x) => x !== m.id) : [...w.lock, m.id],
                       })} />
-                    {m.label}
-                  </label>
                 ))}
               </div>
               <button className="btn btn--ghost btn--sm" onClick={() => removeWindow(room.id, i)}>Remove</button>
