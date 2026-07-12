@@ -173,6 +173,88 @@
   .users__groups { justify-content: flex-start; }
 }
 
+/* Registered stations */
+.stations__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stations__row {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.65fr) minmax(360px, 1.35fr) auto;
+  align-items: end;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-tile);
+}
+
+.stations__identity {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stations__identity strong,
+.stations__identity small {
+  display: block;
+}
+
+.stations__identity small {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+}
+
+.stations__icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+}
+
+.stations__fields {
+  display: grid;
+  grid-template-columns: 1.25fr 0.8fr 1fr;
+  gap: 8px;
+}
+
+.stations__fields label > span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-faint);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stations__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.stations__revoke {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+@media (max-width: 980px) {
+  .stations__row { grid-template-columns: 1fr; align-items: stretch; }
+  .stations__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 650px) {
+  .stations__fields { grid-template-columns: 1fr; }
+}
+
 /* Schedule editor */
 .sched-room {
   border-top: 1px solid var(--border);

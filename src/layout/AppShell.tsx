@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CircleUser,
   ClipboardList,
+  MonitorCog,
   LockKeyhole,
   Settings2,
   Users,
@@ -31,6 +32,7 @@ const NAV = [
 const ADMIN_NAV = [
   { to: '/admin/general', label: 'General', icon: Settings2 },
   { to: '/admin/users', label: 'Users & access', icon: Users },
+  { to: '/admin/stations', label: 'Stations', icon: MonitorCog },
   { to: '/admin/checklists', label: 'Checklists', icon: ClipboardList },
 ];
 
@@ -79,7 +81,10 @@ export function AppShell() {
 
   useEffect(() => {
     const open = () => setIdentityOpen(true);
-    const refresh = () => getAuthStatus().then(setIdentity).catch(() => {});
+    const refresh = () => getAuthStatus().then((status) => {
+      setIdentity(status);
+      if (!status.station) setIdentityOpen(true);
+    }).catch(() => {});
     window.addEventListener('prodmesh:auth-required', open);
     window.addEventListener('prodmesh:auth-changed', refresh);
     return () => {

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowDown, ArrowUp, CircleUser, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2, Zap } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { SelectField } from '../components/SelectField';
+import { church } from '../config/dashboard.config';
 import {
   getAuthStatus,
   loginAdmin,
@@ -18,16 +19,20 @@ import {
   createUser,
   createGroup,
   setUserGroups,
+  getStations,
+  updateStation,
+  revokeStation,
   type RoomMeta,
   type ScheduleWindow,
   type ChecklistTemplatesInfo,
   type TemplateItem,
   type UserDirectory,
+  type ManagedStation,
 } from '../api';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type AdminSection = 'general' | 'users' | 'checklists';
+type AdminSection = 'general' | 'users' | 'stations' | 'checklists';
 
 export function Settings({ section = 'general' }: { section?: AdminSection }) {
   const [phase, setPhase] = useState<Phase>('loading');
@@ -46,6 +51,7 @@ export function Settings({ section = 'general' }: { section?: AdminSection }) {
   const titles = {
     general: ['General', 'Security, schedules, and system maintenance'],
     users: ['Users & access', 'Operators, permission groups, and Planning Center identities'],
+    stations: ['Stations', 'Registered browsers, assignments, and recent activity'],
     checklists: ['Checklists', 'Startup checklist templates by event type'],
   } as const;
 
@@ -124,6 +130,7 @@ function AdminPanels({ section }: { section: AdminSection }) {
     <>
       {section === 'general' && <><SecurityPanel /><SystemPanel /><SchedulesPanel /></>}
       {section === 'users' && <UserManagementPanel />}
+      {section === 'stations' && <StationsPanel />}
       {section === 'checklists' && <ChecklistsPanel />}
     </>
   );
@@ -235,6 +242,173 @@ export function UserManagementPanel() {
       </div>
       {msg && <p className={msg.includes('created') ? 'settings__ok' : 'settings__muted'}>{msg}</p>}
     </section>
+  );
+}
+
+// ── Registered browser stations ─────────────────────────────────────────────
+function relativeTime(timestamp: number) {
+  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export function StationsPanel() {
+  const [stations, setStations] = useState<ManagedStation[]>([]);
+  const [rooms, setRooms] = useState<RoomMeta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [revokeTarget, setRevokeTarget] = useState<ManagedStation | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [stationResult, roomResult] = await Promise.all([getStations(), getRooms()]);
+      setStations(stationResult.stations);
+      setRooms(roomResult);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const remove = async () => {
+    if (!revokeTarget) return;
+    setMessage('');
+    try {
+      const result = await revokeStation(revokeTarget.id);
+      setRevokeTarget(null);
+      if (!result.current) {
+        setMessage('Station revoked. Its browser will be asked to register again.');
+        refresh();
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  if (loading) return <p className="settings__muted">Loading stations…</p>;
+
+  return (
+    <section className="panel stations">
+      <div>
+        <p className="section-label">Browser identity</p>
+        <h2 className="panel__title">Registered stations</h2>
+      </div>
+      <p className="settings__muted">
+        Stations identify where actions originate. Revoking one removes its registration and signs out sessions created there.
+      </p>
+
+      <div className="stations__list">
+        {stations.length === 0 && <p className="settings__muted">No registered stations.</p>}
+        {stations.map((station) => (
+          <StationEditor
+            key={station.id}
+            station={station}
+            rooms={rooms}
+            onSaved={(updated) => {
+              setStations((all) => all.map((entry) => entry.id === updated.id ? { ...updated, current: station.current } : entry));
+              setMessage('Station updated.');
+            }}
+            onRevoke={() => setRevokeTarget(station)}
+          />
+        ))}
+      </div>
+      {message && <p className="settings__muted">{message}</p>}
+
+      {revokeTarget && (
+        <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="revoke-station-title">
+          <div className="confirm__card">
+            <p className="eyebrow">Revoke station</p>
+            <p className="confirm__text" id="revoke-station-title">
+              Unregister <strong>{revokeTarget.name}</strong>? Its browser will return to station registration.
+            </p>
+            <div className="confirm__buttons">
+              <button className="confirm__cancel" onClick={() => setRevokeTarget(null)}>Cancel</button>
+              <button className="confirm__ok" onClick={remove}>Revoke station</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StationEditor({
+  station,
+  rooms,
+  onSaved,
+  onRevoke,
+}: {
+  station: ManagedStation;
+  rooms: RoomMeta[];
+  onSaved: (station: ManagedStation) => void;
+  onRevoke: () => void;
+}) {
+  const [name, setName] = useState(station.name);
+  const [campusId, setCampusId] = useState(station.campusId ?? '');
+  const [roomId, setRoomId] = useState(station.roomId ?? '');
+  const [busy, setBusy] = useState(false);
+
+  const campusRooms = rooms.filter((room) => !campusId || room.site === campusId);
+  const dirty = name !== station.name || campusId !== (station.campusId ?? '') || roomId !== (station.roomId ?? '');
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      onSaved(await updateStation(station.id, {
+        name,
+        campusId: campusId || null,
+        roomId: roomId || null,
+      }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="stations__row">
+      <div className="stations__identity">
+        <span className="stations__icon"><MonitorCog size={19} /></span>
+        <span>
+          <strong>{station.name}</strong>
+          <small>{station.current ? 'CURRENT STATION · ' : ''}Last seen {relativeTime(station.lastSeen)}</small>
+        </span>
+      </div>
+      <div className="stations__fields">
+        <label><span>Name</span><input className="field" value={name} onChange={(event) => setName(event.target.value)} /></label>
+        <label>
+          <span>Campus</span>
+          <SelectField value={campusId} onChange={(event) => {
+            setCampusId(event.target.value);
+            if (roomId && rooms.find((room) => room.id === roomId)?.site !== event.target.value) setRoomId('');
+          }}>
+            <option value="">Unassigned</option>
+            {church.sites.filter((site) => site.status === 'active').map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+          </SelectField>
+        </label>
+        <label>
+          <span>Room</span>
+          <SelectField value={roomId} onChange={(event) => {
+            const nextRoom = rooms.find((room) => room.id === event.target.value);
+            setRoomId(event.target.value);
+            if (nextRoom) setCampusId(nextRoom.site ?? '');
+          }}>
+            <option value="">No room</option>
+            {campusRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+          </SelectField>
+        </label>
+      </div>
+      <div className="stations__actions">
+        <button className="btn btn--primary btn--sm" disabled={!dirty || busy || name.trim().length < 2} onClick={save}>Save</button>
+        <button className="btn btn--ghost btn--sm stations__revoke" onClick={onRevoke}><Trash2 size={13} /> Revoke</button>
+      </div>
+    </div>
   );
 }
 
