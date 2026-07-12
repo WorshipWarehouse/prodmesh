@@ -25,6 +25,7 @@ import * as checklist from './checklistStore.js';
 import * as chkTemplates from './checklistTemplates.js';
 import * as showCfg from './showConfig.js';
 import * as ppro from './integrations/proPresenter.js';
+import * as auth from './authStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,10 +35,43 @@ const PORT = process.env.PORT ?? (process.env.NODE_ENV === 'production' ? 8080 :
 validateRooms(rooms);
 
 // Require a valid admin bearer token. Attach to any admin-only route.
-function requireAdmin(req, res, next) {
-  const token = (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  if (!settings.checkSession(token)) return res.status(401).json({ error: 'Admin auth required' });
+function bearer(req) {
+  return (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
+}
+
+function resolveIdentity(req, _res, next) {
+  req.station = auth.resolveStation(req.get('x-prodmesh-station'));
+  const token = bearer(req);
+  req.auth = auth.resolveSession(token);
+  req.legacyAdmin = settings.checkSession(token);
   next();
+}
+
+function requirePermission(permission) {
+  return (req, res, next) => {
+    if (req.legacyAdmin || auth.hasPermission(req.auth, permission)) return next();
+    auth.audit({
+      userId: req.auth?.user?.id,
+      stationId: req.station?.id,
+      action: permission,
+      result: 'denied',
+      roomId: req.params.id ?? null,
+      planId: req.params.planId ?? null,
+    });
+    return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission });
+  };
+}
+
+function auditSuccess(req, action, context = {}) {
+  auth.audit({
+    userId: req.auth?.user?.id,
+    stationId: req.station?.id,
+    action,
+    result: 'allowed',
+    roomId: req.params.id ?? null,
+    planId: req.params.planId ?? null,
+    ...context,
+  });
 }
 
 // In-memory state used when a room is in mock mode or Companion is unreachable.
@@ -46,6 +80,7 @@ for (const id of Object.keys(rooms)) mockState[id] = 'standby';
 
 const app = express();
 app.use(express.json());
+app.use(resolveIdentity);
 
 // ── API ──────────────────────────────────────────────────────────────────────
 
@@ -156,7 +191,7 @@ app.get('/api/rooms/:id/state', async (req, res) => {
 });
 
 // Switch the room to a mode (presses the mapped Companion button).
-app.post('/api/rooms/:id/mode', async (req, res) => {
+app.post('/api/rooms/:id/mode', requirePermission('rooms.mode.change'), async (req, res) => {
   const room = rooms[req.params.id];
   if (!room) return res.status(404).json({ error: 'Unknown room' });
 
@@ -165,13 +200,15 @@ app.post('/api/rooms/:id/mode', async (req, res) => {
 
   // Enforce lockout: a locked mode in a protected window needs the Override PIN.
   if (settings.isModeLocked(room.id, mode.id)) {
-    if (!settings.verifyOverride(req.body?.overridePin)) {
+    const permitted = req.legacyAdmin || auth.hasPermission(req.auth, 'rooms.mode.override_lock');
+    if (!permitted && !settings.verifyOverride(req.body?.overridePin)) {
       return res.status(403).json({ error: 'override_required', mode: mode.id });
     }
   }
 
   try {
     const result = await applyMode(room, mode);
+    auditSuccess(req, 'rooms.mode.change', { resourceType: 'room-mode', resourceId: mode.id });
     res.json({ ok: true, mode: mode.id, ...result });
   } catch (err) {
     res.status(502).json({
@@ -283,7 +320,7 @@ app.get('/api/rooms/:id/event/:planId', async (req, res) => {
 
 // ── Show automation config (Event Detail → Show Config widget) ───────────────
 
-app.put('/api/rooms/:id/event/:planId/show-config', (req, res) => {
+app.put('/api/rooms/:id/event/:planId/show-config', requirePermission('shows.configure'), (req, res) => {
   if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
   try {
     const config = showCfg.setConfig(req.params.id, req.params.planId, req.body ?? {});
@@ -294,7 +331,7 @@ app.put('/api/rooms/:id/event/:planId/show-config', (req, res) => {
   }
 });
 
-app.delete('/api/rooms/:id/event/:planId/show-config', (req, res) => {
+app.delete('/api/rooms/:id/event/:planId/show-config', requirePermission('shows.configure'), (req, res) => {
   if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
   showCfg.clearConfig(req.params.id, req.params.planId);
   show.refreshConfig(req.params.id, req.params.planId);
@@ -335,7 +372,7 @@ app.get('/api/checklist-templates', (_req, res) => {
   });
 });
 
-app.put('/api/checklist-templates/:serviceTypeId', requireAdmin, (req, res) => {
+app.put('/api/checklist-templates/:serviceTypeId', requirePermission('checklists.templates.edit'), (req, res) => {
   try {
     chkTemplates.setTemplate(req.params.serviceTypeId, req.body?.items);
   } catch (err) {
@@ -344,14 +381,14 @@ app.put('/api/checklist-templates/:serviceTypeId', requireAdmin, (req, res) => {
   res.json({ ok: true, templates: chkTemplates.getTemplates() });
 });
 
-app.delete('/api/checklist-templates/:serviceTypeId', requireAdmin, (req, res) => {
+app.delete('/api/checklist-templates/:serviceTypeId', requirePermission('checklists.templates.edit'), (req, res) => {
   chkTemplates.removeTemplate(req.params.serviceTypeId);
   res.json({ ok: true, templates: chkTemplates.getTemplates() });
 });
 
 // Check / uncheck a checklist item. Checking an item with an action executes
 // it first (e.g. set the room mode) — the item only marks done if that works.
-app.post('/api/rooms/:id/event/:planId/checklist/:itemId', async (req, res) => {
+app.post('/api/rooms/:id/event/:planId/checklist/:itemId', requirePermission('checklists.complete'), async (req, res) => {
   const room = rooms[req.params.id];
   if (!room) return res.status(404).json({ error: 'Unknown room' });
   try {
@@ -362,16 +399,27 @@ app.post('/api/rooms/:id/event/:planId/checklist/:itemId', async (req, res) => {
 
     const done = Boolean(req.body?.done);
     if (done && item.action?.type === 'mode') {
+      if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'rooms.mode.change')) {
+        return res.status(403).json({ error: 'permission_required', permission: 'rooms.mode.change' });
+      }
       const mode = room.modes.find((m) => m.id === item.action.mode);
       if (!mode) return res.status(400).json({ error: `Unknown mode '${item.action.mode}'` });
       // Lockouts apply here too — a checklist can't sidestep a protected window.
       if (settings.isModeLocked(room.id, mode.id)) {
-        return res.status(403).json({ error: 'override_required', mode: mode.id });
+        const permitted = req.legacyAdmin || auth.hasPermission(req.auth, 'rooms.mode.override_lock');
+        if (!permitted && !settings.verifyOverride(req.body?.overridePin)) {
+          return res.status(403).json({ error: 'override_required', mode: mode.id });
+        }
       }
       await applyMode(room, mode); // throws → 502 below, item stays unchecked
     }
 
     checklist.setItem(room.id, plan.id, item.id, done);
+    auditSuccess(req, 'checklists.complete', {
+      resourceType: 'checklist-item',
+      resourceId: item.id,
+      details: { done },
+    });
     res.json({ checklist: checklist.getChecklist(room.id, plan.id, plan.serviceTypeId) });
   } catch (err) {
     res.status(502).json({ error: String(err.message ?? err) });
@@ -415,7 +463,7 @@ app.get('/api/rooms/:id/show/stream', (req, res) => {
 
 app.get('/api/rooms/:id/show', (req, res) => res.json(show.getState(req.params.id)));
 
-app.post('/api/rooms/:id/show/start', async (req, res) => {
+app.post('/api/rooms/:id/show/start', requirePermission('shows.operate'), async (req, res) => {
   if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
   try {
     res.json(await show.startShow(req.params.id, req.body?.planId, String(req.body?.timeId || 'default')));
@@ -424,7 +472,7 @@ app.post('/api/rooms/:id/show/start', async (req, res) => {
   }
 });
 
-app.post('/api/rooms/:id/show/end', (req, res) => {
+app.post('/api/rooms/:id/show/end', requirePermission('shows.operate'), (req, res) => {
   try {
     res.json(show.endShow(req.params.id));
   } catch (err) {
@@ -432,7 +480,7 @@ app.post('/api/rooms/:id/show/end', (req, res) => {
   }
 });
 
-app.post('/api/rooms/:id/show/current', (req, res) => {
+app.post('/api/rooms/:id/show/current', requirePermission('shows.operate'), (req, res) => {
   try {
     res.json(show.setCurrent(req.params.id, { itemId: req.body?.itemId, follow: req.body?.follow }));
   } catch (err) {
@@ -464,25 +512,109 @@ app.get('/api/rooms/:id/service', async (req, res) => {
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
+// Station registration is deliberately unauthenticated: it identifies the
+// browser installation, but grants no authority. Naming a machine is not login.
+app.post('/api/stations/register', (req, res) => {
+  try {
+    res.status(201).json({ station: auth.registerStation(req.body ?? {}) });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.get('/api/stations/current', (req, res) => {
+  res.json({ station: req.station ?? null });
+});
+
+const loginFailures = new Map();
+function failureKey(req) {
+  return `${req.station?.id ?? req.ip}:${String(req.body?.username ?? '').toLowerCase()}`;
+}
+
+app.post('/api/auth/login', (req, res) => {
+  if (!req.station) return res.status(400).json({ error: 'station_required' });
+  const key = failureKey(req);
+  const failure = loginFailures.get(key);
+  if (failure?.lockedUntil > Date.now()) {
+    return res.status(429).json({ error: 'temporarily_locked', retryAfter: failure.lockedUntil - Date.now() });
+  }
+  const session = auth.authenticate(req.body?.username, req.body?.pin, req.station.id);
+  if (!session) {
+    const count = (failure?.count ?? 0) + 1;
+    loginFailures.set(key, { count, lockedUntil: count >= 5 ? Date.now() + 60_000 : 0 });
+    auth.audit({ stationId: req.station.id, action: 'auth.login', result: 'denied', details: { username: req.body?.username ?? '' } });
+    return res.status(401).json({ error: 'Bad username or PIN' });
+  }
+  loginFailures.delete(key);
+  auth.audit({ userId: session.user.id, stationId: req.station.id, action: 'auth.login', result: 'allowed' });
+  res.json(session);
+});
+
 // Admin login. Returns a bearer token the client sends on admin requests.
 app.post('/api/auth/admin', (req, res) => {
   if (!settings.verifyAdmin(req.body?.pin)) return res.status(401).json({ error: 'Bad PIN' });
   res.json({ token: settings.createSession() });
 });
 
-app.post('/api/auth/logout', requireAdmin, (req, res) => {
-  settings.destroySession((req.get('authorization') ?? '').replace(/^Bearer\s+/i, ''));
+app.post('/api/auth/logout', (req, res) => {
+  const token = bearer(req);
+  if (req.auth) auth.audit({ userId: req.auth.user.id, stationId: req.station?.id, action: 'auth.logout', result: 'allowed' });
+  auth.destroySession(token);
+  settings.destroySession(token);
   res.json({ ok: true });
 });
 
 app.get('/api/auth/status', (req, res) => {
-  const token = (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  res.json({ admin: settings.checkSession(token), setupNeeded: settings.isAdminSetupNeeded() });
+  const legacy = req.legacyAdmin;
+  res.json({
+    authenticated: Boolean(req.auth || legacy),
+    admin: Boolean(legacy || auth.hasPermission(req.auth, '*')),
+    setupNeeded: settings.isAdminSetupNeeded(),
+    user: req.auth?.user ?? (legacy ? { id: 'legacy-admin', username: 'admin', displayName: 'System Administrator', planningCenterPersonId: null } : null),
+    permissions: legacy ? ['*'] : req.auth?.permissions ?? [],
+    station: req.station ?? null,
+  });
+});
+
+app.get('/api/users', requirePermission('users.manage'), (_req, res) => {
+  res.json(auth.listDirectory());
+});
+
+app.post('/api/users', requirePermission('users.manage'), (req, res) => {
+  try {
+    const user = auth.createUser(req.body ?? {});
+    auditSuccess(req, 'users.manage', { resourceType: 'user', resourceId: user.id, details: { operation: 'create' } });
+    res.status(201).json({ user });
+  } catch (err) {
+    const message = String(err.message ?? err);
+    res.status(message.includes('UNIQUE') ? 409 : 400).json({ error: message });
+  }
+});
+
+app.post('/api/groups', requirePermission('users.manage'), (req, res) => {
+  try {
+    const group = auth.createGroup(req.body ?? {});
+    auditSuccess(req, 'users.manage', { resourceType: 'permission-group', resourceId: group.id, details: { operation: 'create' } });
+    res.status(201).json({ group });
+  } catch (err) {
+    const message = String(err.message ?? err);
+    res.status(message.includes('UNIQUE') ? 409 : 400).json({ error: message });
+  }
+});
+
+app.put('/api/users/:userId/groups', requirePermission('users.manage'), (req, res) => {
+  try {
+    const user = auth.updateUserGroups(req.params.userId, req.body?.groupIds ?? []);
+    auditSuccess(req, 'users.manage', { resourceType: 'user', resourceId: user.id, details: { operation: 'groups' } });
+    res.json({ user });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
+  }
 });
 
 // ── Settings ───────────────────────────────────────────────────────────────────
 
-app.get('/api/settings', requireAdmin, (_req, res) => {
+app.get('/api/settings', requirePermission('settings.manage'), (_req, res) => {
   res.json(settings.getPublicSettings());
 });
 
@@ -491,14 +623,15 @@ app.get('/api/settings', requireAdmin, (_req, res) => {
 app.post('/api/settings/pins', (req, res) => {
   const bootstrapping = settings.isAdminSetupNeeded() && req.body?.admin;
   if (!bootstrapping) {
-    const token = (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-    if (!settings.checkSession(token)) return res.status(401).json({ error: 'Admin auth required' });
+    if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'settings.manage')) {
+      return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission: 'settings.manage' });
+    }
   }
   settings.setPins({ admin: req.body?.admin, override: req.body?.override });
   res.json({ ok: true, ...settings.getPublicSettings().pins });
 });
 
-app.put('/api/settings/schedules', requireAdmin, (req, res) => {
+app.put('/api/settings/schedules', requirePermission('settings.manage'), (req, res) => {
   try {
     settings.setSchedules(req.body?.schedules);
   } catch (err) {
@@ -516,7 +649,7 @@ app.get('/api/system/version', (_req, res) => {
 // Trigger a self-update (git pull + build + service restart). Runs detached so
 // it survives this process being restarted by the service manager; the client
 // polls /api/system/version to see the new commit land.
-app.post('/api/system/update', requireAdmin, (_req, res) => {
+app.post('/api/system/update', requirePermission('system.update'), (_req, res) => {
   const script = join(__dirname, '..', 'deploy', 'update.sh');
   try {
     const child = spawn('bash', [script], {

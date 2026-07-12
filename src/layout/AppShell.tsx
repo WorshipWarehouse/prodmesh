@@ -9,11 +9,12 @@ import {
   PanelLeftOpen,
   Wrench,
 } from 'lucide-react';
-import { getAbout } from '../api';
+import { getAbout, getAuthStatus, logoutAdmin, type AuthStatus, type Station } from '../api';
 import { church } from '../config/dashboard.config';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { Clock } from '../components/Clock';
 import { SelectField } from '../components/SelectField';
+import { IdentityDialog } from '../components/IdentityDialog';
 import logoUrl from '../assets/logo.png';
 
 const NAV = [
@@ -35,9 +36,21 @@ export function AppShell() {
     () => localStorage.getItem('prodmesh.campus') ?? ALL_CAMPUSES,
   );
   const [version, setVersion] = useState('');
+  const [identity, setIdentity] = useState<AuthStatus | null>(null);
+  const [identityOpen, setIdentityOpen] = useState(false);
 
   useEffect(() => {
     getAbout().then((a) => setVersion(a.version)).catch(() => {});
+    getAuthStatus().then((s) => {
+      setIdentity(s);
+      if (!s.station) setIdentityOpen(true);
+    }).catch(() => setIdentityOpen(true));
+  }, []);
+
+  useEffect(() => {
+    const open = () => setIdentityOpen(true);
+    window.addEventListener('prodmesh:auth-required', open);
+    return () => window.removeEventListener('prodmesh:auth-required', open);
   }, []);
 
   const campus = useMemo(
@@ -58,10 +71,19 @@ export function AppShell() {
     });
   };
 
-  const campusName =
-    campusId === ALL_CAMPUSES
-      ? 'All Campuses'
-      : church.sites.find((s) => s.id === campusId)?.name ?? campusId;
+  const stationName = identity?.station?.name ?? 'Unregistered station';
+  const operatorName = identity?.user?.displayName ?? 'Read-only';
+
+  const lock = async () => {
+    await logoutAdmin();
+    setIdentity(await getAuthStatus());
+  };
+
+  const stationRegistered = async (_station: Station) => {
+    const next = await getAuthStatus();
+    setIdentity(next);
+    setIdentityOpen(false);
+  };
 
   return (
     <CampusContext.Provider value={campus}>
@@ -107,16 +129,17 @@ export function AppShell() {
             <div className="sidebar__clock rail-hide">
               <Clock compact />
             </div>
-            <div
+            <button
               className="sidebar__user"
-              title={`Booth station${version ? ` · prodmesh v${version}` : ''} — user accounts coming later`}
+              title={identity?.authenticated ? `Lock ${operatorName}` : 'Log in'}
+              onClick={identity?.authenticated ? lock : () => setIdentityOpen(true)}
             >
               <CircleUser size={19} className="sidebar__icon" />
               <div className="sidebar__label rail-hide">
-                <span className="sidebar__username">Booth station</span>
-                {version && <span className="sidebar__version">v{version} · {campusName}</span>}
+                <span className="sidebar__username">{operatorName}</span>
+                <span className="sidebar__version">{stationName}{version ? ` · v${version}` : ''}</span>
               </div>
-            </div>
+            </button>
             <button
               className="sidebar__toggle"
               onClick={toggle}
@@ -132,6 +155,16 @@ export function AppShell() {
         <main className="shell__main">
           <Outlet />
         </main>
+        {identityOpen && (
+          <IdentityDialog
+            stationRequired={!identity?.station}
+            campusId={campusId}
+            status={identity}
+            onStation={stationRegistered}
+            onLogin={(next) => { setIdentity(next); setIdentityOpen(false); }}
+            onClose={() => setIdentityOpen(false)}
+          />
+        )}
       </div>
     </CampusContext.Provider>
   );

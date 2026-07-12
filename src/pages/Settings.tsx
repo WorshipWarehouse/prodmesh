@@ -15,10 +15,15 @@ import {
   getChecklistTemplates,
   saveChecklistTemplate,
   deleteChecklistTemplate,
+  getUserDirectory,
+  createUser,
+  createGroup,
+  setUserGroups,
   type RoomMeta,
   type ScheduleWindow,
   type ChecklistTemplatesInfo,
   type TemplateItem,
+  type UserDirectory,
 } from '../api';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -113,10 +118,113 @@ function AdminPanels({ onLogout }: { onLogout: () => void }) {
         </button>
       </div>
       <SecurityPanel />
+      <UserManagementPanel />
       <SystemPanel />
       <SchedulesPanel />
       <ChecklistsPanel />
     </>
+  );
+}
+
+// ── Users, permission groups, and ACLs ───────────────────────────────────────
+function UserManagementPanel() {
+  const [directory, setDirectory] = useState<UserDirectory | null>(null);
+  const [user, setUser] = useState({ displayName: '', username: '', pin: '', planningCenterPersonId: '' });
+  const [userGroups, setUserGroupsDraft] = useState<string[]>([]);
+  const [groupName, setGroupName] = useState('');
+  const [groupPermissions, setGroupPermissions] = useState<string[]>([]);
+  const [msg, setMsg] = useState('');
+
+  const refresh = () => getUserDirectory().then(setDirectory).catch((err) => setMsg(String(err)));
+  useEffect(() => { refresh(); }, []);
+
+  if (!directory) return null;
+
+  const addUser = async () => {
+    setMsg('');
+    try {
+      await createUser({
+        ...user,
+        planningCenterPersonId: user.planningCenterPersonId || null,
+        groupIds: userGroups,
+      });
+      setUser({ displayName: '', username: '', pin: '', planningCenterPersonId: '' });
+      setUserGroupsDraft([]);
+      setMsg('User created.');
+      refresh();
+    } catch (err) { setMsg(err instanceof Error ? err.message : String(err)); }
+  };
+
+  const addGroup = async () => {
+    setMsg('');
+    try {
+      await createGroup(groupName, groupPermissions);
+      setGroupName(''); setGroupPermissions([]); setMsg('Permission group created.');
+      refresh();
+    } catch (err) { setMsg(err instanceof Error ? err.message : String(err)); }
+  };
+
+  const toggle = (values: string[], value: string) =>
+    values.includes(value) ? values.filter((x) => x !== value) : [...values, value];
+
+  return (
+    <section className="panel users">
+      <div>
+        <p className="section-label">Access control</p>
+        <h2 className="panel__title">Users &amp; permissions</h2>
+      </div>
+      <p className="settings__muted">
+        Users authenticate at a named station. Their effective access is the union of every assigned group; Administrators always have all permissions.
+      </p>
+
+      <div className="users__grid">
+        <div className="users__editor">
+          <h3>Create user</h3>
+          <input className="field" placeholder="Display name" value={user.displayName} onChange={(e) => setUser({ ...user, displayName: e.target.value })} />
+          <input className="field" placeholder="Username" autoCapitalize="none" value={user.username} onChange={(e) => setUser({ ...user, username: e.target.value })} />
+          <input className="field" placeholder="PIN" type="password" inputMode="numeric" value={user.pin} onChange={(e) => setUser({ ...user, pin: e.target.value })} />
+          <input className="field" placeholder="Planning Center person ID (optional)" value={user.planningCenterPersonId} onChange={(e) => setUser({ ...user, planningCenterPersonId: e.target.value })} />
+          <div className="users__checks">
+            {directory.groups.map((group) => (
+              <Checkbox key={group.id} label={group.name} checked={userGroups.includes(group.id)} onChange={() => setUserGroupsDraft(toggle(userGroups, group.id))} />
+            ))}
+          </div>
+          <button className="btn btn--primary" disabled={!user.displayName || !user.username || user.pin.length < 4} onClick={addUser}>Create user</button>
+        </div>
+
+        <div className="users__editor">
+          <h3>Create permission group</h3>
+          <input className="field" placeholder="Group name" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+          <div className="users__checks users__checks--permissions">
+            {directory.permissions.map((permission) => (
+              <Checkbox key={permission.id} label={<><strong>{permission.label}</strong><small>{permission.id}</small></>} checked={groupPermissions.includes(permission.id)} onChange={() => setGroupPermissions(toggle(groupPermissions, permission.id))} />
+            ))}
+          </div>
+          <button className="btn btn--primary" disabled={groupName.trim().length < 2} onClick={addGroup}>Create group</button>
+        </div>
+      </div>
+
+      <div className="users__list">
+        <h3>Current users</h3>
+        {directory.users.length === 0 && <p className="settings__muted">No named users yet. The existing Admin PIN remains available for bootstrap access.</p>}
+        {directory.users.map((entry) => (
+          <div className="users__row" key={entry.id}>
+            <span><strong>{entry.displayName}</strong><small>@{entry.username}{entry.planningCenterPersonId ? ` · PCO ${entry.planningCenterPersonId}` : ''}</small></span>
+            <div className="users__groups">
+              {directory.groups.map((group) => {
+                const checked = entry.groups.some((g) => g.id === group.id);
+                return <Checkbox key={group.id} label={group.name} checked={checked} onChange={async () => {
+                  const next = toggle(entry.groups.map((g) => g.id), group.id);
+                  await setUserGroups(entry.id, next);
+                  refresh();
+                }} />;
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {msg && <p className={msg.includes('created') ? 'settings__ok' : 'settings__muted'}>{msg}</p>}
+    </section>
   );
 }
 

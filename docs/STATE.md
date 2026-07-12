@@ -48,6 +48,15 @@ Notes:
     `/settings` → `/admin`.
 - Room Status mode control with confirm + schedule-based **lockouts** (Override PIN).
 - Settings UI: Admin/Override PINs, schedule editor, system self-update.
+- **User-management foundation** (ADR 0008, feature branch): one-time named
+  station registration per browser, anonymous read-only operation, contextual
+  named-user login/lock, SQLite users + permission groups + extensible dotted
+  ACLs, built-in Administrators wildcard, optional Planning Center person ID,
+  login throttling, and user+station audit records. Admin → Users & permissions
+  creates groups/users and assigns memberships. Legacy Admin PIN remains the
+  bootstrap credential. Representative writes now enforced server-side: room
+  modes, checklist completion, show operation/config, templates, settings, and
+  updates.
 - PC Services plan display on Quick Access + Room Status (real data).
 - Run of Show: **server-coordinated show sessions** (one active per room, Start/End
   buttons, browsers are views — see ADR 0004) with live ProPresenter follow, slide
@@ -101,9 +110,10 @@ Notes:
 ## Deferred tech debt (known, low-risk)
 
 - Frontend component tests (backend is covered).
-- PIN brute-force throttling on `/api/auth/admin`.
+- PIN brute-force throttling on legacy `/api/auth/admin` (named-user login is throttled).
 - Backend TypeScript (currently plain JS).
-- In-memory sessions reset on server restart (admins re-login).
+- Legacy Admin-PIN sessions reset on server restart; named-user sessions persist
+  in SQLite and expire after eight hours.
 
 ## Decisions on hold pending info
 
