@@ -226,6 +226,17 @@
   gap: 8px;
 }
 
+.stations__fields .field,
+.stations__fields .selectfield__control,
+.stations__actions .btn {
+  height: 40px;
+  box-sizing: border-box;
+}
+
+.stations__fields .field {
+  font-size: 0.88rem;
+}
+
 .stations__fields label > span {
   display: block;
   margin-bottom: 4px;
