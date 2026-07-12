@@ -8,6 +8,7 @@ import { join } from 'node:path';
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-api-'));
 const { app } = await import('./index.js');
 const settings = await import('./settings.js');
+const auth = await import('./authStore.js');
 
 // north-youth is mock:true, so mode presses resolve in-memory (no Companion).
 const ROOM = 'north-youth';
@@ -15,21 +16,32 @@ settings.setPins({ admin: '1234', override: '9999' });
 settings.setSchedules({
   [ROOM]: [{ id: 't', label: 'Test Lock', days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', lock: ['standby'] }],
 });
+const operatorGroup = auth.createGroup({ name: 'Mode Operators', permissions: ['rooms.mode.change'] });
+auth.createUser({ username: 'operator', displayName: 'Test Operator', pin: '2468', groupIds: [operatorGroup.id] });
+const station = auth.registerStation({ name: 'API Test Station' });
 
 let base;
 let server;
-before(() => {
+let operatorToken;
+before(async () => {
   server = app.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
+  const login = await post('/api/auth/login', { username: 'operator', pin: '2468' }, null, station.token);
+  operatorToken = (await login.json()).token;
 });
 after(() => server.close());
 
-const post = (path, body, token) =>
-  fetch(base + path, {
+function post(path, body, token, stationToken = null) {
+  return fetch(base + path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(stationToken ? { 'X-Prodmesh-Station': stationToken } : {}),
+    },
     body: JSON.stringify(body),
   });
+}
 
 test('admin login rejects a wrong PIN and accepts the right one', async () => {
   assert.equal((await post('/api/auth/admin', { pin: '0000' })).status, 401);
@@ -47,21 +59,27 @@ test('settings endpoint requires an admin token', async () => {
 });
 
 test('locked mode is blocked without override, allowed with it', async () => {
-  const blocked = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby' });
+  const blocked = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby' }, operatorToken, station.token);
   assert.equal(blocked.status, 403);
   assert.equal((await blocked.json()).error, 'override_required');
 
-  const wrong = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby', overridePin: '0000' });
+  const wrong = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby', overridePin: '0000' }, operatorToken, station.token);
   assert.equal(wrong.status, 403);
 
-  const ok = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby', overridePin: '9999' });
+  const ok = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby', overridePin: '9999' }, operatorToken, station.token);
   assert.equal(ok.status, 200);
   assert.equal((await ok.json()).mode, 'standby');
 });
 
 test('unlocked mode needs no PIN', async () => {
-  const res = await post(`/api/rooms/${ROOM}/mode`, { mode: 'sunday' });
+  const res = await post(`/api/rooms/${ROOM}/mode`, { mode: 'sunday' }, operatorToken, station.token);
   assert.equal(res.status, 200);
+});
+
+test('anonymous stations remain read-only', async () => {
+  const res = await post(`/api/rooms/${ROOM}/mode`, { mode: 'sunday' }, null, station.token);
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, 'permission_required');
 });
 
 test('room state exposes protection info', async () => {

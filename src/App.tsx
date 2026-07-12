@@ -18,7 +18,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
         <Route path="/analytics" element={<Analytics />} />
-        <Route path="/admin" element={<Settings />} />
+        <Route path="/admin" element={<Navigate to="/admin/general" replace />} />
+        <Route path="/admin/general" element={<Settings section="general" />} />
+        <Route path="/admin/users" element={<Settings section="users" />} />
+        <Route path="/admin/checklists" element={<Settings section="checklists" />} />
         {/* Room-level pages, reached from Home cards / Services rows.
             Room-Mac homepages point at /room/:id — these paths are stable. */}
         <Route path="/room/:roomId" element={<RoomStatus />} />
@@ -27,7 +30,7 @@ export default function App() {
         <Route path="/room/:roomId/run/:planId" element={<RunOfShow />} />
         <Route path="/room/:roomId/run/:planId/report" element={<ServiceReport />} />
         {/* Old bookmark */}
-        <Route path="/settings" element={<Navigate to="/admin" replace />} />
+        <Route path="/settings" element={<Navigate to="/admin/general" replace />} />
       </Route>
     </Routes>
   );

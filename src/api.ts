@@ -32,7 +32,7 @@ export interface RoomState {
 }
 
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: requestHeaders() });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json() as Promise<T>;
 }
@@ -60,43 +60,88 @@ export async function setRoomMode(
 ): Promise<RoomState> {
   const res = await fetch(`/api/rooms/${encodeURIComponent(id)}/mode`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
     body: JSON.stringify({ mode, overridePin }),
   });
   if (res.status === 403) {
-    const body = await res.json().catch(() => ({}));
+    const body = await res.clone().json().catch(() => ({}));
     if (body.error === 'override_required') throw new OverrideRequiredError();
   }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  await requireOk(res);
   return res.json() as Promise<RoomState>;
 }
 
 // ── Admin auth (bearer token in localStorage) ─────────────────────────────────
 
 const TOKEN_KEY = 'pm_admin_token';
+const STATION_KEY = 'pm_station_token';
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+export const setToken = (t: string) => {
+  localStorage.setItem(TOKEN_KEY, t);
+  window.dispatchEvent(new Event('prodmesh:auth-changed'));
+};
+export const clearToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event('prodmesh:auth-changed'));
+};
 
-function authHeaders(): Record<string, string> {
+export const getStationToken = () => localStorage.getItem(STATION_KEY);
+export const setStationToken = (token: string) => localStorage.setItem(STATION_KEY, token);
+
+function requestHeaders(): Record<string, string> {
   const t = getToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  const station = getStationToken();
+  return {
+    ...(t ? { Authorization: `Bearer ${t}` } : {}),
+    ...(station ? { 'X-Prodmesh-Station': station } : {}),
+  };
+}
+
+function promptForAuth(permission?: string) {
+  window.dispatchEvent(new CustomEvent('prodmesh:auth-required', { detail: { permission } }));
+}
+
+async function requireOk(res: Response) {
+  if (res.status === 401 || res.status === 403) {
+    const body = await res.clone().json().catch(() => ({}));
+    if (body.error === 'permission_required') promptForAuth(body.permission);
+  }
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
+}
+
+export interface Station {
+  id: string;
+  name: string;
+  campusId: string | null;
+  roomId: string | null;
+}
+
+export interface CurrentUser {
+  id: string;
+  username: string;
+  displayName: string;
+  planningCenterPersonId: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface AuthStatus {
+  authenticated: boolean;
   admin: boolean;
   setupNeeded: boolean;
+  user: CurrentUser | null;
+  permissions: string[];
+  station: Station | null;
 }
 
 export const getAuthStatus = () =>
-  fetch('/api/auth/status', { headers: authHeaders() }).then(
+  fetch('/api/auth/status', { headers: requestHeaders() }).then(
     (r) => r.json() as Promise<AuthStatus>,
   );
 
 export async function loginAdmin(pin: string): Promise<boolean> {
   const res = await fetch('/api/auth/admin', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
     body: JSON.stringify({ pin }),
   });
   if (!res.ok) return false;
@@ -106,8 +151,89 @@ export async function loginAdmin(pin: string): Promise<boolean> {
 }
 
 export async function logoutAdmin(): Promise<void> {
-  await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() }).catch(() => {});
+  await fetch('/api/auth/logout', { method: 'POST', headers: requestHeaders() }).catch(() => {});
   clearToken();
+}
+
+export async function registerStation(input: { name: string; campusId?: string | null; roomId?: string | null }): Promise<Station> {
+  const res = await fetch('/api/stations/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  await requireOk(res);
+  const { station } = (await res.json()) as { station: Station & { token: string } };
+  setStationToken(station.token);
+  return station;
+}
+
+export async function loginUser(username: string, pin: string): Promise<AuthStatus> {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ username, pin }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? 'Login failed');
+  const { token } = await res.json();
+  setToken(token);
+  return getAuthStatus();
+}
+
+export interface PermissionGroup {
+  id: string;
+  name: string;
+  systemKey: string | null;
+  permissions: string[];
+}
+
+export interface ManagedUser extends CurrentUser {
+  active: boolean;
+  groups: PermissionGroup[];
+  permissions: string[];
+}
+
+export interface UserDirectory {
+  users: ManagedUser[];
+  groups: PermissionGroup[];
+  permissions: { id: string; label: string; description: string }[];
+}
+
+export const getUserDirectory = () => getJson<UserDirectory>('/api/users');
+
+export async function createUser(input: {
+  username: string;
+  displayName: string;
+  pin: string;
+  planningCenterPersonId?: string | null;
+  groupIds: string[];
+}): Promise<ManagedUser> {
+  const res = await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify(input),
+  });
+  await requireOk(res);
+  return ((await res.json()) as { user: ManagedUser }).user;
+}
+
+export async function setUserGroups(userId: string, groupIds: string[]): Promise<ManagedUser> {
+  const res = await fetch(`/api/users/${encodeURIComponent(userId)}/groups`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ groupIds }),
+  });
+  await requireOk(res);
+  return ((await res.json()) as { user: ManagedUser }).user;
+}
+
+export async function createGroup(name: string, permissions: string[]): Promise<PermissionGroup> {
+  const res = await fetch('/api/groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ name, permissions }),
+  });
+  await requireOk(res);
+  return ((await res.json()) as { group: PermissionGroup }).group;
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -127,7 +253,7 @@ export interface Settings {
 }
 
 export const getSettings = () =>
-  fetch('/api/settings', { headers: authHeaders() }).then((r) => {
+  fetch('/api/settings', { headers: requestHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json() as Promise<Settings>;
   });
@@ -137,7 +263,7 @@ export const getSettings = () =>
 export async function setPins(pins: { admin?: string; override?: string }): Promise<void> {
   const res = await fetch('/api/settings/pins', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
     body: JSON.stringify(pins),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -148,7 +274,7 @@ export async function saveSchedules(
 ): Promise<void> {
   const res = await fetch('/api/settings/schedules', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
     body: JSON.stringify({ schedules }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -177,7 +303,7 @@ export async function saveChecklistTemplate(
 ): Promise<Record<string, TemplateItem[]>> {
   const res = await fetch(`/api/checklist-templates/${encodeURIComponent(serviceTypeId)}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
     body: JSON.stringify({ items }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
@@ -189,7 +315,7 @@ export async function deleteChecklistTemplate(
 ): Promise<Record<string, TemplateItem[]>> {
   const res = await fetch(`/api/checklist-templates/${encodeURIComponent(serviceTypeId)}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    headers: requestHeaders(),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return ((await res.json()) as { templates: Record<string, TemplateItem[]> }).templates;
@@ -311,18 +437,18 @@ export async function saveShowConfig(
 ): Promise<ShowConfig> {
   const res = await fetch(
     `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}/show-config`,
-    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config) },
+    { method: 'PUT', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify(config) },
   );
-  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
+  await requireOk(res);
   return ((await res.json()) as { showConfig: ShowConfig }).showConfig;
 }
 
 export async function clearShowConfig(id: string, planId: string): Promise<void> {
   const res = await fetch(
     `/api/rooms/${encodeURIComponent(id)}/event/${encodeURIComponent(planId)}/show-config`,
-    { method: 'DELETE' },
+    { method: 'DELETE', headers: requestHeaders() },
   );
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  await requireOk(res);
 }
 
 export const getPpPlaylist = (id: string, planId: string) =>
@@ -414,10 +540,10 @@ export const getShow = (roomId: string) =>
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  await requireOk(res);
   return res.json() as Promise<T>;
 }
 
@@ -458,7 +584,7 @@ export const getHistory = () => getJson<{ shows: HistoryShow[] }>('/api/history'
 export const getAbout = () => getJson<{ name: string; version: string }>('/api/about');
 
 export const triggerUpdate = () =>
-  fetch('/api/system/update', { method: 'POST', headers: authHeaders() }).then((r) => {
+  fetch('/api/system/update', { method: 'POST', headers: requestHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.json();
   });

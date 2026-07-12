@@ -48,6 +48,15 @@ Notes:
     `/settings` → `/admin`.
 - Room Status mode control with confirm + schedule-based **lockouts** (Override PIN).
 - Settings UI: Admin/Override PINs, schedule editor, system self-update.
+- **User-management foundation** (ADR 0008, feature branch): one-time named
+  station registration per browser, anonymous read-only operation, contextual
+  named-user login/lock, SQLite users + permission groups + extensible dotted
+  ACLs, built-in Administrators wildcard, optional Planning Center person ID,
+  login throttling, and user+station audit records. Admin → Users & permissions
+  creates groups/users and assigns memberships. Legacy Admin PIN remains the
+  bootstrap credential. Representative writes now enforced server-side: room
+  modes, checklist completion, show operation/config, templates, settings, and
+  updates.
 - PC Services plan display on Quick Access + Room Status (real data).
 - Run of Show: **server-coordinated show sessions** (one active per room, Start/End
   buttons, browsers are views — see ADR 0004) with live ProPresenter follow, slide
@@ -74,7 +83,21 @@ Notes:
   every room it runs in — the room supplies execution context. Run state is
   per-event in SQLite (shared across browsers). Automated items press the real
   Companion button via the shared mode path, so schedule lockouts still apply.
-- Deploy/update scripts (launchd/systemd), tests, CI.
+- Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
+  combines **79 server tests** with **7 frontend interaction/configuration tests**
+  (Vitest + Testing Library); CI runs build, both test layers, and lint. See
+  `docs/TESTING.md` for the required pattern as configuration moves into Admin.
+- **Station identity + named users** (feature branch): each browser registers a
+  station name once, then remains a read-only dashboard until an operator signs
+  in. Users inherit extensible permissions from groups; the Administrators system
+  group grants all actions. Admin is split into General, Users & access, and
+  Checklists subpages. The account menu requires confirmation before returning a
+  station to read-only mode. When a user has a Planning Center Services Person ID,
+  their Services profile thumbnail is shown as their avatar.
+- **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
+  Server-managed configuration and operational facts live in SQLite; only
+  deployment bootstrap and restricted secrets remain outside it. Portability is
+  provided by versioned JSON import/export and consistent full-database backups.
 
 ## Roadmap / open threads (roughly prioritized)
 
@@ -100,10 +123,12 @@ Notes:
 
 ## Deferred tech debt (known, low-risk)
 
-- Frontend component tests (backend is covered).
-- PIN brute-force throttling on `/api/auth/admin`.
+- Full browser end-to-end tests against a running server (critical component
+  interactions are now covered in jsdom; live integration flows remain manual).
+- PIN brute-force throttling on legacy `/api/auth/admin` (named-user login is throttled).
 - Backend TypeScript (currently plain JS).
-- In-memory sessions reset on server restart (admins re-login).
+- Legacy Admin-PIN sessions reset on server restart; named-user sessions persist
+  in SQLite and expire after eight hours.
 
 ## Decisions on hold pending info
 

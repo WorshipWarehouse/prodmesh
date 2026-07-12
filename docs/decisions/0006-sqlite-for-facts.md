@@ -1,6 +1,6 @@
 # ADR 0006 — SQLite for facts & events; JSON files stay for config
 
-Status: accepted · 2026-07-02
+Status: superseded by ADR 0009 · 2026-07-12
 
 ## Context
 

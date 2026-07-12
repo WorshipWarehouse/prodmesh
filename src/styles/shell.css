@@ -150,6 +150,30 @@
   flex-shrink: 0;
 }
 
+.sidebar__navgroup { display: flex; flex-direction: column; }
+
+.sidebar__subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 7px 18px;
+  padding-left: 11px;
+  border-left: 1px solid var(--border);
+}
+
+.sidebar__subitem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  color: var(--text-faint);
+  font-size: 0.76rem;
+  text-decoration: none;
+}
+
+.sidebar__subitem:hover { color: var(--text); }
+.sidebar__subitem--active { color: var(--accent-text); }
+
 /* ── Footer: clock + user + collapse ─────────────────────────────────────── */
 .sidebar__foot {
   margin-top: auto;
@@ -168,6 +192,10 @@
   align-items: flex-start;
 }
 
+.sidebar__account {
+  min-width: 0;
+}
+
 .sidebar__user {
   display: flex;
   align-items: center;
@@ -175,6 +203,189 @@
   padding: 6px 10px;
   color: var(--text-dim);
   min-width: 0;
+  width: 100%;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar__user:hover {
+  background: var(--bg-tile);
+  color: var(--text);
+}
+
+.sidebar__avatar {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.accountmenu {
+  position: absolute;
+  z-index: 20;
+  bottom: 55px;
+  left: 8px;
+  width: calc(var(--sidebar-w) - 16px);
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tile);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.4);
+}
+
+.shell--rail .accountmenu {
+  left: calc(var(--sidebar-rail) - 2px);
+  width: 220px;
+}
+
+.accountmenu__identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.accountmenu__identity img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.accountmenu__identity span { min-width: 0; }
+.accountmenu__identity strong { display: block; font-size: 0.8rem; }
+.accountmenu__identity small { display: block; overflow: hidden; color: var(--text-faint); font-size: 0.65rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.accountmenu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.accountmenu > button:hover { background: var(--bg-tile-hover); color: var(--text); }
+
+@media (max-width: 860px) {
+  .accountmenu {
+    left: calc(var(--sidebar-rail) - 2px);
+    width: 220px;
+  }
+}
+
+/* ── Station registration / operator login ───────────────────────────────── */
+.identity {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(3, 6, 9, 0.82);
+  backdrop-filter: blur(5px);
+}
+
+.identity__card {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 28px;
+  border: 1px solid var(--border-strong);
+  border-top: 2px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.45);
+}
+
+.identity__mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 18px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.identity__card h2 {
+  margin: 3px 0 8px;
+  font-size: 1.45rem;
+  font-weight: 600;
+}
+
+.identity__hint {
+  margin: 0 0 20px;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.identity__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 13px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.identity__field .field,
+.identity__field .selectfield {
+  width: 100%;
+}
+
+.identity__field .field,
+.identity__field .selectfield__control {
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.identity__submit {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.identity__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.identity__close:hover { color: var(--text); }
+
+.identity__error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 0.82rem;
 }
 
 .sidebar__user .sidebar__label {

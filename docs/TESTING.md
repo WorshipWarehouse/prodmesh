@@ -1,0 +1,38 @@
+# Testing strategy
+
+Prodmesh uses two complementary test layers. Every feature should add coverage
+at the lowest layer that can catch its likely regressions.
+
+## Server tests
+
+`npm run test:server` runs Node's built-in test runner against the API,
+integrations, authorization rules, persistence, and coordination logic. Use
+throwaway data directories and local fake servers; never depend on production
+credentials or live church equipment.
+
+## Frontend tests
+
+`npm run test:ui` runs Vitest + Testing Library in jsdom. These tests exercise
+behavior visible to an operator: forms, permission states, navigation, dialogs,
+and configuration-driven rendering. Mock the API boundary, not internal React
+components. Prefer role- and label-based queries so tests also enforce basic
+accessibility.
+
+The initial regression suite protects:
+
+- station registration and named-user login;
+- account menu dismissal and lock confirmation;
+- Planning Center avatars;
+- Admin subnavigation;
+- stable, unique dashboard configuration IDs and valid launcher targets.
+
+## Commands and CI
+
+- `npm test` runs both suites exactly as CI does.
+- `npm run test:ui:watch` reruns frontend tests while developing.
+- `npm run build` remains the TypeScript and production-bundle check.
+- `npm run lint` runs static analysis.
+
+New configurable settings should include: validation tests for accepted and
+rejected values, a persistence/API test, and a frontend interaction test for the
+admin control that edits them.
