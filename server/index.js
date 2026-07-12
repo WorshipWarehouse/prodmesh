@@ -564,13 +564,17 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/auth/status', (req, res) => {
+app.get('/api/auth/status', async (req, res) => {
   const legacy = req.legacyAdmin;
+  const user = req.auth?.user ?? (legacy ? { id: 'legacy-admin', username: 'admin', displayName: 'System Administrator', planningCenterPersonId: null } : null);
+  const pcProfile = user?.planningCenterPersonId
+    ? await pco.getPersonProfile(user.planningCenterPersonId).catch(() => null)
+    : null;
   res.json({
     authenticated: Boolean(req.auth || legacy),
     admin: Boolean(legacy || auth.hasPermission(req.auth, '*')),
     setupNeeded: settings.isAdminSetupNeeded(),
-    user: req.auth?.user ?? (legacy ? { id: 'legacy-admin', username: 'admin', displayName: 'System Administrator', planningCenterPersonId: null } : null),
+    user: user ? { ...user, avatarUrl: pcProfile?.avatarUrl ?? null } : null,
     permissions: legacy ? ['*'] : req.auth?.permissions ?? [],
     station: req.station ?? null,
   });

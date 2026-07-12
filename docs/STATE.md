@@ -84,6 +84,13 @@ Notes:
   per-event in SQLite (shared across browsers). Automated items press the real
   Companion button via the shared mode path, so schedule lockouts still apply.
 - Deploy/update scripts (launchd/systemd), tests, CI.
+- **Station identity + named users** (feature branch): each browser registers a
+  station name once, then remains a read-only dashboard until an operator signs
+  in. Users inherit extensible permissions from groups; the Administrators system
+  group grants all actions. Admin is split into General, Users & access, and
+  Checklists subpages. The account menu requires confirmation before returning a
+  station to read-only mode. When a user has a Planning Center Services Person ID,
+  their Services profile thumbnail is shown as their avatar.
 
 ## Roadmap / open threads (roughly prioritized)
 

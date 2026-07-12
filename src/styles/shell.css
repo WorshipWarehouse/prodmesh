@@ -150,6 +150,30 @@
   flex-shrink: 0;
 }
 
+.sidebar__navgroup { display: flex; flex-direction: column; }
+
+.sidebar__subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 7px 18px;
+  padding-left: 11px;
+  border-left: 1px solid var(--border);
+}
+
+.sidebar__subitem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  color: var(--text-faint);
+  font-size: 0.76rem;
+  text-decoration: none;
+}
+
+.sidebar__subitem:hover { color: var(--text); }
+.sidebar__subitem--active { color: var(--accent-text); }
+
 /* ── Footer: clock + user + collapse ─────────────────────────────────────── */
 .sidebar__foot {
   margin-top: auto;
@@ -187,6 +211,77 @@
 .sidebar__user:hover {
   background: var(--bg-tile);
   color: var(--text);
+}
+
+.sidebar__avatar {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.accountmenu {
+  position: absolute;
+  z-index: 20;
+  bottom: 55px;
+  left: 8px;
+  width: calc(var(--sidebar-w) - 16px);
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tile);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.4);
+}
+
+.shell--rail .accountmenu {
+  left: calc(var(--sidebar-rail) - 2px);
+  width: 220px;
+}
+
+.accountmenu__identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.accountmenu__identity img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.accountmenu__identity span { min-width: 0; }
+.accountmenu__identity strong { display: block; font-size: 0.8rem; }
+.accountmenu__identity small { display: block; overflow: hidden; color: var(--text-faint); font-size: 0.65rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.accountmenu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.accountmenu > button:hover { background: var(--bg-tile-hover); color: var(--text); }
+
+@media (max-width: 860px) {
+  .accountmenu {
+    left: calc(var(--sidebar-rail) - 2px);
+    width: 220px;
+  }
 }
 
 /* ── Station registration / operator login ───────────────────────────────── */

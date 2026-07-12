@@ -121,6 +121,26 @@ export function getPlan(serviceType, planId) {
   });
 }
 
+/** A Services person profile for the signed-in prodmesh user. Services exposes
+ * photo_thumbnail_url directly, so this does not require People-app access. */
+export function getPersonProfile(personId) {
+  return cached(`person:${personId}`, async () => {
+    if (!isConfigured() || !personId) return null;
+    try {
+      const body = await pcGet(`/people/${encodeURIComponent(personId)}`);
+      const data = body?.data;
+      const a = data?.attributes ?? {};
+      return data ? {
+        id: data.id,
+        name: a.full_name ?? a.name ?? null,
+        avatarUrl: a.photo_thumbnail_url ?? null,
+      } : null;
+    } catch {
+      return null;
+    }
+  });
+}
+
 /** A plan's service + rehearsal times, chronological. (Auditions/meetings out.) */
 export function getPlanTimes(serviceType, planId) {
   return cached(`times:${planId}`, async () => {

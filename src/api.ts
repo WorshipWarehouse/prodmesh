@@ -76,8 +76,14 @@ export async function setRoomMode(
 const TOKEN_KEY = 'pm_admin_token';
 const STATION_KEY = 'pm_station_token';
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+export const setToken = (t: string) => {
+  localStorage.setItem(TOKEN_KEY, t);
+  window.dispatchEvent(new Event('prodmesh:auth-changed'));
+};
+export const clearToken = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event('prodmesh:auth-changed'));
+};
 
 export const getStationToken = () => localStorage.getItem(STATION_KEY);
 export const setStationToken = (token: string) => localStorage.setItem(STATION_KEY, token);
@@ -115,6 +121,7 @@ export interface CurrentUser {
   username: string;
   displayName: string;
   planningCenterPersonId: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface AuthStatus {

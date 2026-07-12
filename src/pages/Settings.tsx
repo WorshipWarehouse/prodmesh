@@ -5,7 +5,6 @@ import { SelectField } from '../components/SelectField';
 import {
   getAuthStatus,
   loginAdmin,
-  logoutAdmin,
   setPins,
   getSettings,
   saveSchedules,
@@ -28,7 +27,9 @@ import {
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function Settings() {
+type AdminSection = 'general' | 'users' | 'checklists';
+
+export function Settings({ section = 'general' }: { section?: AdminSection }) {
   const [phase, setPhase] = useState<Phase>('loading');
 
   const refreshStatus = useCallback(async () => {
@@ -38,21 +39,30 @@ export function Settings() {
 
   useEffect(() => {
     refreshStatus();
+    window.addEventListener('prodmesh:auth-changed', refreshStatus);
+    return () => window.removeEventListener('prodmesh:auth-changed', refreshStatus);
   }, [refreshStatus]);
+
+  const titles = {
+    general: ['General', 'Security, schedules, and system maintenance'],
+    users: ['Users & access', 'Operators, permission groups, and Planning Center identities'],
+    checklists: ['Checklists', 'Startup checklist templates by event type'],
+  } as const;
 
   return (
     <div className="settings">
       <div className="pagehead">
         <div>
-          <h1 className="pagehead__title">Settings</h1>
-          <p className="pagehead__sub">Admin</p>
+          <p className="eyebrow">Administration</p>
+          <h1 className="pagehead__title">{titles[section][0]}</h1>
+          <p className="pagehead__sub">{titles[section][1]}</p>
         </div>
       </div>
 
       {phase === 'loading' && <p className="settings__muted">Loading…</p>}
       {phase === 'setup' && <SetupForm onDone={refreshStatus} />}
       {phase === 'login' && <LoginForm onDone={refreshStatus} />}
-      {phase === 'admin' && <AdminPanels onLogout={refreshStatus} />}
+      {phase === 'admin' && <AdminPanels section={section} />}
     </div>
   );
 }
@@ -109,19 +119,12 @@ function LoginForm({ onDone }: { onDone: () => void }) {
 }
 
 // ── Admin panels ───────────────────────────────────────────────────────────────
-function AdminPanels({ onLogout }: { onLogout: () => void }) {
+function AdminPanels({ section }: { section: AdminSection }) {
   return (
     <>
-      <div className="settings__toolbar">
-        <button className="btn" onClick={async () => { await logoutAdmin(); onLogout(); }}>
-          Log out
-        </button>
-      </div>
-      <SecurityPanel />
-      <UserManagementPanel />
-      <SystemPanel />
-      <SchedulesPanel />
-      <ChecklistsPanel />
+      {section === 'general' && <><SecurityPanel /><SystemPanel /><SchedulesPanel /></>}
+      {section === 'users' && <UserManagementPanel />}
+      {section === 'checklists' && <ChecklistsPanel />}
     </>
   );
 }
