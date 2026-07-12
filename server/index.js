@@ -261,11 +261,14 @@ app.get('/api/rooms/:id/event/:planId', async (req, res) => {
     const plan = await planForRoom(room, req.params.planId);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
     const st = stOf(plan);
-    const [times, detail] = await Promise.all([
+    // Items feed the Show Automation widget (start/end pickers + mapping).
+    const [times, detail, items] = await Promise.all([
       pco.getPlanTimes(st, plan.id),
       pco.getPlanDetail(st, plan.id),
+      pco.getPlanItems(st, plan.id).catch(() => []),
     ]);
     plan.times = times;
+    plan.items = items;
     res.json({
       live: pco.isConfigured(),
       plan,
