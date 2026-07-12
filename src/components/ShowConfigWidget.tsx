@@ -9,6 +9,7 @@ import {
   type ShowConfig,
 } from '../api';
 import { Widget } from './Widget';
+import { SelectField } from './SelectField';
 
 const EMPTY: ShowConfig = { startItemId: null, endItemId: null, map: {} };
 
@@ -67,8 +68,8 @@ export function ShowConfigWidget({
     onChange: (v: string | null) => void,
     placeholder: string,
   ) => (
-    <select
-      className="field field--sm showcfg__select"
+    <SelectField
+      className="showcfg__select"
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value || null)}
     >
@@ -78,7 +79,7 @@ export function ShowConfigWidget({
           {i.title}
         </option>
       ))}
-    </select>
+    </SelectField>
   );
 
   return (
@@ -142,8 +143,8 @@ export function ShowConfigWidget({
             {trackable.map((it) => (
               <div key={it.id} className="showcfg__maprow">
                 <span className="showcfg__pcitem">{it.title}</span>
-                <select
-                  className="field field--sm showcfg__select"
+                <SelectField
+                  className="showcfg__select"
                   value={draft.map[it.id]?.ppIndex ?? ''}
                   onChange={(e) =>
                     setDraft((d) => ({
@@ -166,7 +167,7 @@ export function ShowConfigWidget({
                       {p.name}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
             ))}
           </div>

@@ -130,11 +130,7 @@
 }
 
 .lockchk {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   font-size: 0.85rem;
-  color: var(--text);
 }
 
 /* ── Checklist template editor ───────────────────────────────────────────── */

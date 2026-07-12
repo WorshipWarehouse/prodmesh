@@ -2,24 +2,27 @@
    Components reference these vars; don't hard-code hex values in feature CSS. */
 :root {
   /* Surfaces */
-  --bg: #0d1117;
-  --bg-raised: #161b22;
-  --bg-tile: #1c2330;
-  --bg-tile-hover: #232c3d;
-  --border: #2a3240;
+  --bg: #090d11;
+  --bg-sidebar: #0c1117;
+  --bg-raised: #10161d;
+  --bg-tile: #151d26;
+  --bg-tile-hover: #1a2530;
+  --border: #27323d;
+  --border-subtle: #1b242d;
+  --border-strong: #3a4856;
 
   /* Text */
-  --text: #e8edf4;
-  --text-dim: #8b97a8;
-  --text-faint: #5a6675;
-  --text-on-accent: #0d1117;
+  --text: #edf2f7;
+  --text-dim: #95a2af;
+  --text-faint: #65717d;
+  --text-on-accent: #07111c;
 
   /* Accents */
-  --accent: #5b8def;
-  --accent-text: #a9c7ff;
-  --accent-soft: rgba(91, 141, 239, 0.12);
-  --accent-border: rgba(91, 141, 239, 0.35);
-  --ok: #34c759;
+  --accent: #52a8ff;
+  --accent-text: #9fd0ff;
+  --accent-soft: rgba(82, 168, 255, 0.1);
+  --accent-border: rgba(82, 168, 255, 0.34);
+  --ok: #43d17d;
   --ok-soft: rgba(52, 199, 89, 0.12);
   --ok-border: rgba(52, 199, 89, 0.35);
   --warn: #ffb020;
@@ -33,14 +36,15 @@
   --purple-border: rgba(175, 123, 240, 0.45);
 
   /* Shape */
-  --radius-sm: 8px;
-  --radius: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
 
   /* Type */
-  --font-ui: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    system-ui, sans-serif;
+  --font-ui: 'IBM Plex Sans Variable', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
 
   /* Layout */
   --sidebar-w: 236px;

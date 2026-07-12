@@ -5,17 +5,20 @@
   display: flex;
   align-items: baseline;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .site__name {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 650;
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
 .site__badge {
-  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 700;
@@ -23,7 +26,7 @@
   background: var(--warn-soft);
   border: 1px solid var(--warn-border);
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: 3px;
 }
 
 .site__note {
@@ -37,32 +40,35 @@
 
 .site__auditoriums {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
 }
 
 /* ── Auditorium card ─────────────────────────────────────────────────────── */
 .auditorium {
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 18px;
+  border-radius: var(--radius-sm);
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 9px;
 }
 
 .auditorium__name {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 650;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text);
 }
 
 .auditorium__tiles {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
 }
 
 /* ── Tile ────────────────────────────────────────────────────────────────── */
@@ -70,12 +76,12 @@
   --tile-accent: var(--accent);
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 9px 10px;
   background: var(--bg-tile);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--tile-accent);
-  border-radius: var(--radius);
+  border-left: 2px solid var(--tile-accent);
+  border-radius: 2px;
   text-decoration: none;
   color: var(--text);
   transition: background 0.12s ease, transform 0.12s ease, border-color 0.12s ease;
@@ -84,7 +90,6 @@
 
 .tile:hover {
   background: var(--bg-tile-hover);
-  transform: translateY(-1px);
   border-color: var(--tile-accent);
 }
 
@@ -95,17 +100,17 @@
 .tile__icon {
   display: inline-flex;
   align-items: center;
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   line-height: 1;
   flex-shrink: 0;
   color: var(--tile-accent);
 }
 
 .tile__icon-img {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: 3px;
   object-fit: contain;
 }
 
@@ -117,12 +122,12 @@
 }
 
 .tile__label {
-  font-weight: 600;
-  font-size: 1rem;
+  font-weight: 500;
+  font-size: 0.82rem;
 }
 
 .tile__note {
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   color: var(--text-dim);
 }
 
