@@ -83,7 +83,10 @@ Notes:
   every room it runs in — the room supplies execution context. Run state is
   per-event in SQLite (shared across browsers). Automated items press the real
   Companion button via the shared mode path, so schedule lockouts still apply.
-- Deploy/update scripts (launchd/systemd), tests, CI.
+- Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
+  combines **79 server tests** with **7 frontend interaction/configuration tests**
+  (Vitest + Testing Library); CI runs build, both test layers, and lint. See
+  `docs/TESTING.md` for the required pattern as configuration moves into Admin.
 - **Station identity + named users** (feature branch): each browser registers a
   station name once, then remains a read-only dashboard until an operator signs
   in. Users inherit extensible permissions from groups; the Administrators system
@@ -116,7 +119,8 @@ Notes:
 
 ## Deferred tech debt (known, low-risk)
 
-- Frontend component tests (backend is covered).
+- Full browser end-to-end tests against a running server (critical component
+  interactions are now covered in jsdom; live integration flows remain manual).
 - PIN brute-force throttling on legacy `/api/auth/admin` (named-user login is throttled).
 - Backend TypeScript (currently plain JS).
 - Legacy Admin-PIN sessions reset on server restart; named-user sessions persist
