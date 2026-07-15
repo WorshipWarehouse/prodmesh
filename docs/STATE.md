@@ -15,7 +15,7 @@ opens Dec 2026, no rooms wired yet.
 | Auditorium (`north-main`) | **live** — 192.0.2.31, var `roomState`, buttons pg3 | Sunday/Second Service/Midweek/Evening/Event/Standby (real) | **live** — Sunday, Second Service, Midweek, Evening |
 | Youth (`north-youth`) | mock — 192.0.2.150 (config ready) | standard set (Sunday/Mid-Week/Event/Standby) — **real modes unknown** | **live** — Youth Service |
 | Chapel (`north-chapel`) | mock — 192.0.2.101 (config ready) | standard set — **real modes unknown** | **live** — Chapel Service |
-| Local Test (`local-test`) | live — 127.0.0.1 (dev fixture) | standard set | live — Sunday (demo) |
+| Local Test (`local-test`) | live — 127.0.0.1 (dev fixture; **opt-in via `PRODMESH_LOCAL_TEST=1`**, set by the npm dev scripts — hidden in production) | standard set | live — Sunday (demo) |
 
 Notes:
 - Companion "live" means `mock: false`; it only actually reaches Companion when the
