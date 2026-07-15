@@ -8,6 +8,7 @@ import type { AuthStatus } from '../api';
 const api = vi.hoisted(() => ({
   getAbout: vi.fn(),
   getAuthStatus: vi.fn(),
+  getConfig: vi.fn(),
   logoutAdmin: vi.fn(),
   registerStation: vi.fn(),
   loginUser: vi.fn(),
@@ -52,6 +53,10 @@ function renderShell(path = '/admin/users') {
 describe('AppShell identity and Admin navigation', () => {
   beforeEach(() => {
     api.getAbout.mockResolvedValue({ version: '1.0.0' });
+    api.getConfig.mockResolvedValue({
+      name: 'Test Church',
+      sites: [{ id: 'north', name: 'North', status: 'active', auditoriums: [] }],
+    });
     api.getAuthStatus.mockResolvedValue(authenticated);
     api.logoutAdmin.mockResolvedValue(undefined);
   });

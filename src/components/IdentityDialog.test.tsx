@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { IdentityDialog } from './IdentityDialog';
+import { ChurchContext } from '../layout/church';
 import type { AuthStatus, Station } from '../api';
 
 const api = vi.hoisted(() => ({
@@ -10,6 +11,14 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('../api', () => api);
+
+const testChurch = {
+  name: 'Test Church',
+  sites: [
+    { id: 'north', name: 'North', status: 'active' as const, auditoriums: [] },
+    { id: 'south-everett', name: 'South Campus', status: 'coming-soon' as const, auditoriums: [] },
+  ],
+};
 
 const station: Station = {
   id: 'station-1',
@@ -39,6 +48,7 @@ describe('IdentityDialog', () => {
     const user = userEvent.setup();
 
     render(
+      <ChurchContext.Provider value={testChurch}>
       <IdentityDialog
         stationRequired
         campusId="*"
@@ -46,7 +56,8 @@ describe('IdentityDialog', () => {
         onStation={onStation}
         onLogin={vi.fn()}
         onClose={vi.fn()}
-      />,
+      />
+      </ChurchContext.Provider>,
     );
 
     const submit = screen.getByRole('button', { name: 'Register station' });
@@ -68,6 +79,7 @@ describe('IdentityDialog', () => {
     const user = userEvent.setup();
 
     render(
+      <ChurchContext.Provider value={testChurch}>
       <IdentityDialog
         stationRequired={false}
         campusId="north"
@@ -75,7 +87,8 @@ describe('IdentityDialog', () => {
         onStation={vi.fn()}
         onLogin={vi.fn()}
         onClose={vi.fn()}
-      />,
+      />
+      </ChurchContext.Provider>,
     );
 
     await user.type(screen.getByRole('textbox', { name: 'Username' }), 'operator');

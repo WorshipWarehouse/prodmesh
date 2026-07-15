@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **85 server tests** with **10 frontend interaction/configuration tests**
+  combines **89 server tests** with **10 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin.
 - **Station identity + named users** (feature branch): each browser registers a
@@ -104,6 +104,17 @@ Notes:
   stations, assign campus/room context, or revoke them. Revocation invalidates
   sessions created at that station; revoking the current browser returns it to
   first-run registration. Guarded by the extensible `stations.manage` permission.
+- **Server-owned topology** (2026-07-15, ADR 0009 milestone): the institution
+  name, sites, rooms, and Quick Access tiles now live in SQLite (`sites`,
+  `site_rooms`, `tiles`) and are served by `GET /api/config`; the frontend's
+  static `src/config/dashboard.config.ts` is deleted (seeded verbatim into the
+  database on first boot via `server/topologySeed.js`). **Admin → Campuses**
+  edits the whole tree (draft + transactional whole-tree save, `config.manage`
+  permission) — adding a site, room, or device tile is a browser action, no
+  rebuild. The frontend is now purely an API client: every screen's topology
+  comes from the server, refreshed live after a save. Room *integration*
+  wiring (`rooms.config.js`) intentionally remains a dev-owned server file
+  until an Admin UI takes ownership of it.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is

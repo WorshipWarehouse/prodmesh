@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LogsPanel, StationsPanel, UserManagementPanel } from './Settings';
+import { CampusesPanel, LogsPanel, StationsPanel, UserManagementPanel } from './Settings';
 
 const api = vi.hoisted(() => ({
   getUserDirectory: vi.fn(),
@@ -14,6 +14,8 @@ const api = vi.hoisted(() => ({
   revokeStation: vi.fn(),
   getServerLog: vi.fn(),
   getAuditLog: vi.fn(),
+  getConfig: vi.fn(),
+  saveConfig: vi.fn(),
 }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -129,5 +131,65 @@ describe('Logs', () => {
     expect(await screen.findByText('rooms.mode.change')).toBeInTheDocument();
     expect(screen.getByText('the maintainer')).toBeInTheDocument();
     expect(screen.getByText('allowed')).toBeInTheDocument();
+  });
+});
+
+describe('Campuses', () => {
+  const church = {
+    name: 'Test Church',
+    sites: [{
+      id: 'north', name: 'North', status: 'active' as const,
+      auditoriums: [{
+        id: 'north-main', name: 'Main Auditorium',
+        tiles: [
+          { id: 'main-companion', type: 'companion' as const, label: 'Companion', host: '192.0.2.31' },
+          { id: 'main-cam', type: 'link' as const, label: 'Camera 9', url: 'http://192.0.2.129' },
+        ],
+      }],
+    }],
+  };
+
+  beforeEach(() => {
+    api.getConfig.mockReset();
+    api.saveConfig.mockReset();
+    api.getConfig.mockResolvedValue(structuredClone(church));
+    api.saveConfig.mockImplementation(async (c: unknown) => c);
+  });
+
+  it('edits a tile host and saves the whole tree', async () => {
+    const user = userEvent.setup();
+    render(<CampusesPanel />);
+
+    expect(await screen.findByText('Campuses & tiles')).toBeInTheDocument();
+    const save = screen.getByRole('button', { name: 'Saved' });
+    expect(save).toBeDisabled();
+
+    const host = screen.getByLabelText('Host');
+    await user.clear(host);
+    await user.type(host, '192.0.2.99');
+
+    const enabled = screen.getByRole('button', { name: 'Save changes' });
+    await user.click(enabled);
+
+    await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
+    const sent = api.saveConfig.mock.calls[0][0];
+    expect(sent.sites[0].auditoriums[0].tiles[0].host).toBe('192.0.2.99');
+    expect(await screen.findByText(/Saved\. All screens/)).toBeInTheDocument();
+  });
+
+  it('adds a room and a tile to the draft', async () => {
+    const user = userEvent.setup();
+    render(<CampusesPanel />);
+    await screen.findByText('Campuses & tiles');
+
+    await user.click(screen.getByRole('button', { name: '+ Add room' }));
+    expect(screen.getAllByLabelText('Room name')).toHaveLength(2);
+
+    await user.click(screen.getAllByRole('button', { name: '+ Add tile' })[1]);
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
+    const sent = api.saveConfig.mock.calls[0][0];
+    expect(sent.sites[0].auditoriums).toHaveLength(2);
+    expect(sent.sites[0].auditoriums[1].tiles).toHaveLength(1);
   });
 });

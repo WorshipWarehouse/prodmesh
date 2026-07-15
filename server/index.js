@@ -26,6 +26,7 @@ import * as chkTemplates from './checklistTemplates.js';
 import * as showCfg from './showConfig.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as auth from './authStore.js';
+import * as appConfig from './appConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -698,6 +699,30 @@ app.put('/api/settings/schedules', requirePermission('settings.manage'), (req, r
     return res.status(400).json({ error: String(err.message ?? err) });
   }
   res.json({ ok: true, schedules: settings.getPublicSettings().schedules });
+});
+
+// ── Institution config (name, sites, Quick Access tiles — ADR 0009) ───────────
+
+// Public read: the shell needs it before anyone signs in (like /api/rooms).
+app.get('/api/config', (_req, res) => {
+  res.json(appConfig.getChurch());
+});
+
+// Whole-tree save from Admin → Campuses (transactional replace).
+app.put('/api/config', requirePermission('config.manage'), (req, res) => {
+  try {
+    const stored = appConfig.replaceChurch(req.body);
+    auditSuccess(req, 'config.manage', {
+      resourceType: 'topology',
+      details: {
+        sites: stored.sites.length,
+        tiles: stored.sites.flatMap((s) => s.auditoriums).flatMap((a) => a.tiles).length,
+      },
+    });
+    res.json(stored);
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
+  }
 });
 
 // ── System (version + self-update) ─────────────────────────────────────────────

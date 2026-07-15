@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   ['stations.manage', 'Manage stations', 'Rename, assign, and revoke registered browser stations.'],
   ['system.update', 'Run system updates', 'Install a prodmesh system update.'],
   ['system.logs', 'View logs', 'Read the server process log and the audit trail.'],
+  ['config.manage', 'Manage campuses & tiles', 'Edit the institution name, sites, and Quick Access tiles.'],
 ];
 
 const SESSION_TTL = 8 * 60 * 60 * 1000;

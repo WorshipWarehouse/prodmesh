@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2, Zap } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { SelectField } from '../components/SelectField';
-import { church } from '../config/dashboard.config';
+import { useChurch } from '../layout/church';
 import {
   getAuthStatus,
   loginAdmin,
@@ -24,6 +24,8 @@ import {
   revokeStation,
   getServerLog,
   getAuditLog,
+  getConfig,
+  saveConfig,
   type ServerLogTail,
   type AuditEntry,
   type RoomMeta,
@@ -33,10 +35,11 @@ import {
   type UserDirectory,
   type ManagedStation,
 } from '../api';
+import type { Church, Site, Tile } from '../types';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type AdminSection = 'general' | 'users' | 'stations' | 'checklists' | 'logs';
+type AdminSection = 'general' | 'campuses' | 'users' | 'stations' | 'checklists' | 'logs';
 
 export function Settings({ section = 'general' }: { section?: AdminSection }) {
   const [phase, setPhase] = useState<Phase>('loading');
@@ -56,6 +59,7 @@ export function Settings({ section = 'general' }: { section?: AdminSection }) {
     general: ['General', 'Security, schedules, and system maintenance'],
     users: ['Users & access', 'Operators, permission groups, and Planning Center identities'],
     stations: ['Stations', 'Registered browsers, assignments, and recent activity'],
+    campuses: ['Campuses', 'Institution name, sites, rooms, and Quick Access tiles'],
     checklists: ['Checklists', 'Startup checklist templates by event type'],
     logs: ['Logs', 'Server process log and the audit trail'],
   } as const;
@@ -134,6 +138,7 @@ function AdminPanels({ section }: { section: AdminSection }) {
   return (
     <>
       {section === 'general' && <><SecurityPanel /><SystemPanel /><SchedulesPanel /></>}
+      {section === 'campuses' && <CampusesPanel />}
       {section === 'users' && <UserManagementPanel />}
       {section === 'stations' && <StationsPanel />}
       {section === 'checklists' && <ChecklistsPanel />}
@@ -356,6 +361,7 @@ function StationEditor({
   onSaved: (station: ManagedStation) => void;
   onRevoke: () => void;
 }) {
+  const church = useChurch();
   const [name, setName] = useState(station.name);
   const [campusId, setCampusId] = useState(station.campusId ?? '');
   const [roomId, setRoomId] = useState(station.roomId ?? '');
@@ -949,5 +955,277 @@ function AuditTrail() {
         </div>
       )}
     </section>
+  );
+}
+
+// ── Campuses: institution name, sites, rooms, Quick Access tiles ──────────────
+// Edits a local draft of the whole tree; Save replaces it transactionally on
+// the server (PUT /api/config). Nothing is destructive until Save.
+
+const TILE_TYPE_LABELS: Record<Tile['type'], string> = {
+  route: 'Room Status link',
+  companion: 'Companion',
+  screenshare: 'Screen Sharing (Mac)',
+  link: 'Web link',
+  placeholder: 'Placeholder',
+};
+
+function slugId(label: string, taken: Set<string>) {
+  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
+  let id = base;
+  for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`;
+  taken.add(id);
+  return id;
+}
+
+function allIds(church: Church) {
+  const ids = new Set<string>();
+  for (const site of church.sites) {
+    ids.add(site.id);
+    for (const room of site.auditoriums) {
+      ids.add(room.id);
+      for (const tile of room.tiles) ids.add(tile.id);
+    }
+  }
+  return ids;
+}
+
+export function CampusesPanel() {
+  const [draft, setDraft] = useState<Church | null>(null);
+  const [baseline, setBaseline] = useState('');
+  const [selectedSite, setSelectedSite] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    getConfig().then((c) => {
+      setDraft(c);
+      setBaseline(JSON.stringify(c));
+      setSelectedSite(c.sites[0]?.id ?? '');
+    }).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, []);
+
+  if (!draft) return err ? <p className="settings__error">{err}</p> : <p className="settings__muted">Loading…</p>;
+
+  const dirty = JSON.stringify(draft) !== baseline;
+  const site = draft.sites.find((s) => s.id === selectedSite) ?? draft.sites[0];
+
+  const update = (fn: (next: Church) => void) => {
+    setMsg('');
+    setDraft((cur) => {
+      const next = structuredClone(cur!);
+      fn(next);
+      return next;
+    });
+  };
+
+  const move = <T,>(arr: T[], from: number, dir: -1 | 1) => {
+    const to = from + dir;
+    if (to < 0 || to >= arr.length) return;
+    [arr[from], arr[to]] = [arr[to], arr[from]];
+  };
+
+  const save = async () => {
+    setErr('');
+    try {
+      const stored = await saveConfig(draft);
+      setDraft(stored);
+      setBaseline(JSON.stringify(stored));
+      setMsg('Saved. All screens will pick this up.');
+      window.dispatchEvent(new Event('prodmesh:config-changed'));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <section className="panel campuses">
+      <div className="campuses__head">
+        <div>
+          <p className="section-label">Topology</p>
+          <h2 className="panel__title">Campuses &amp; tiles</h2>
+        </div>
+        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
+          {dirty ? 'Save changes' : 'Saved'}
+        </button>
+      </div>
+      <p className="settings__muted">
+        What every screen shows: sites, their rooms, and each room's Quick Access tiles.
+        Changes apply everywhere when you save — nothing is final until then.
+      </p>
+
+      <label className="campuses__institution">
+        <span>Institution name</span>
+        <input className="field" value={draft.name}
+          onChange={(e) => update((n) => { n.name = e.target.value; })} />
+      </label>
+
+      <div className="campuses__sitebar">
+        {draft.sites.map((s) => (
+          <button key={s.id}
+            className={`typebtn${s.id === site?.id ? ' typebtn--on' : ''}`}
+            onClick={() => setSelectedSite(s.id)}>
+            {s.name || s.id}
+            {s.status !== 'active' && <span className="typebtn__uses">soon</span>}
+          </button>
+        ))}
+        <button className="btn" onClick={() => update((n) => {
+          const id = slugId('new-site', allIds(n));
+          n.sites.push({ id, name: 'New Site', status: 'coming-soon', auditoriums: [] });
+          setSelectedSite(id);
+        })}>+ Add site</button>
+      </div>
+
+      {site && (
+        <div className="campuses__site" key={site.id}>
+          <div className="campuses__siterow">
+            <label><span>Site name</span>
+              <input className="field" value={site.name}
+                onChange={(e) => update((n) => { n.sites.find((s) => s.id === site.id)!.name = e.target.value; })} />
+            </label>
+            <label><span>Status</span>
+              <SelectField value={site.status}
+                onChange={(e) => update((n) => { n.sites.find((s) => s.id === site.id)!.status = e.target.value as Site['status']; })}>
+                <option value="active">Active</option>
+                <option value="coming-soon">Coming soon</option>
+              </SelectField>
+            </label>
+            <label className="campuses__grow"><span>Note</span>
+              <input className="field" placeholder="e.g. Opens December 2026" value={site.note ?? ''}
+                onChange={(e) => update((n) => { n.sites.find((s) => s.id === site.id)!.note = e.target.value || undefined; })} />
+            </label>
+            <div className="campuses__rowactions">
+              <button className="iconbtn" title="Move site left" aria-label="Move site left"
+                onClick={() => update((n) => move(n.sites, n.sites.findIndex((s) => s.id === site.id), -1))}><ArrowUp size={14} /></button>
+              <button className="iconbtn" title="Move site right" aria-label="Move site right"
+                onClick={() => update((n) => move(n.sites, n.sites.findIndex((s) => s.id === site.id), 1))}><ArrowDown size={14} /></button>
+              <button className="iconbtn iconbtn--danger" title="Remove site" aria-label="Remove site"
+                onClick={() => update((n) => {
+                  n.sites = n.sites.filter((s) => s.id !== site.id);
+                  setSelectedSite(n.sites[0]?.id ?? '');
+                })}><Trash2 size={14} /></button>
+            </div>
+          </div>
+
+          {site.auditoriums.map((room, roomIdx) => (
+            <div className="campuses__room" key={room.id}>
+              <div className="campuses__roomhead">
+                <input className="field campuses__roomname" aria-label="Room name" value={room.name}
+                  onChange={(e) => update((n) => {
+                    n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].name = e.target.value;
+                  })} />
+                <div className="campuses__rowactions">
+                  <button className="iconbtn" title="Move room up" aria-label="Move room up"
+                    onClick={() => update((n) => move(n.sites.find((s) => s.id === site.id)!.auditoriums, roomIdx, -1))}><ArrowUp size={14} /></button>
+                  <button className="iconbtn" title="Move room down" aria-label="Move room down"
+                    onClick={() => update((n) => move(n.sites.find((s) => s.id === site.id)!.auditoriums, roomIdx, 1))}><ArrowDown size={14} /></button>
+                  <button className="iconbtn iconbtn--danger" title="Remove room" aria-label="Remove room"
+                    onClick={() => update((n) => {
+                      const s = n.sites.find((x) => x.id === site.id)!;
+                      s.auditoriums = s.auditoriums.filter((r) => r.id !== room.id);
+                    })}><Trash2 size={14} /></button>
+                </div>
+              </div>
+
+              {room.tiles.map((tile, tileIdx) => (
+                <TileEditor key={tile.id} tile={tile}
+                  onChange={(patch) => update((n) => {
+                    const tiles = n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].tiles;
+                    tiles[tileIdx] = patch;
+                  })}
+                  onMove={(dir) => update((n) => move(n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].tiles, tileIdx, dir))}
+                  onRemove={() => update((n) => {
+                    const r = n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx];
+                    r.tiles = r.tiles.filter((t) => t.id !== tile.id);
+                  })}
+                />
+              ))}
+
+              <button className="btn campuses__addtile" onClick={() => update((n) => {
+                const id = slugId(`${room.id}-tile`, allIds(n));
+                n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].tiles.push({
+                  id, type: 'link', label: 'New tile', url: 'http://',
+                });
+              })}>+ Add tile</button>
+            </div>
+          ))}
+
+          <button className="btn" onClick={() => update((n) => {
+            const id = slugId(`${site.id}-room`, allIds(n));
+            n.sites.find((s) => s.id === site.id)!.auditoriums.push({ id, name: 'New Room', tiles: [] });
+          })}>+ Add room</button>
+        </div>
+      )}
+
+      {err && <p className="settings__error">{err}</p>}
+      {msg && <p className="settings__ok">{msg}</p>}
+    </section>
+  );
+}
+
+function TileEditor({ tile, onChange, onMove, onRemove }: {
+  tile: Tile;
+  onChange: (tile: Tile) => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const set = (field: string, value: string) => {
+    const next = { ...tile } as Record<string, unknown>;
+    if (value === '') delete next[field];
+    else next[field] = value;
+    onChange(next as unknown as Tile);
+  };
+
+  const retype = (type: Tile['type']) => {
+    const base = { id: tile.id, label: tile.label, note: tile.note, icon: tile.icon };
+    if (type === 'companion') onChange({ ...base, type, host: '' });
+    else if (type === 'screenshare') onChange({ ...base, type, host: '' });
+    else if (type === 'link') onChange({ ...base, type, url: 'http://' });
+    else if (type === 'route') onChange({ ...base, type, to: '/' });
+    else onChange({ ...base, type });
+  };
+
+  const t = tile as unknown as Record<string, string | undefined>;
+
+  return (
+    <div className="campuses__tile">
+      <SelectField value={tile.type} aria-label="Tile type"
+        onChange={(e) => retype(e.target.value as Tile['type'])}>
+        {Object.entries(TILE_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </SelectField>
+      <input className="field campuses__tileicon" aria-label="Icon" placeholder="🎛️" value={tile.icon ?? ''}
+        onChange={(e) => set('icon', e.target.value)} />
+      <input className="field" aria-label="Label" placeholder="Label" value={tile.label}
+        onChange={(e) => onChange({ ...tile, label: e.target.value })} />
+      <input className="field campuses__grow" aria-label="Note" placeholder="Note (optional)" value={tile.note ?? ''}
+        onChange={(e) => set('note', e.target.value)} />
+
+      {(tile.type === 'companion' || tile.type === 'screenshare') && (
+        <input className="field" aria-label="Host" placeholder="Host / IP" value={t.host ?? ''}
+          onChange={(e) => set('host', e.target.value)} />
+      )}
+      {tile.type === 'companion' && (
+        <input className="field campuses__tileport" aria-label="Port" placeholder="8000" value={t.port ?? ''}
+          onChange={(e) => set('port', e.target.value)} />
+      )}
+      {tile.type === 'screenshare' && (
+        <input className="field" aria-label="Username" placeholder="Mac username (optional)" value={t.username ?? ''}
+          onChange={(e) => set('username', e.target.value)} />
+      )}
+      {tile.type === 'link' && (
+        <input className="field campuses__grow" aria-label="URL" placeholder="http://…" value={t.url ?? ''}
+          onChange={(e) => set('url', e.target.value)} />
+      )}
+      {tile.type === 'route' && (
+        <input className="field campuses__grow" aria-label="Route" placeholder="/room/…" value={t.to ?? ''}
+          onChange={(e) => set('to', e.target.value)} />
+      )}
+
+      <div className="campuses__rowactions">
+        <button className="iconbtn" title="Move tile up" aria-label="Move tile up" onClick={() => onMove(-1)}><ArrowUp size={14} /></button>
+        <button className="iconbtn" title="Move tile down" aria-label="Move tile down" onClick={() => onMove(1)}><ArrowDown size={14} /></button>
+        <button className="iconbtn iconbtn--danger" title="Remove tile" aria-label="Remove tile" onClick={onRemove}><Trash2 size={14} /></button>
+      </div>
+    </div>
   );
 }

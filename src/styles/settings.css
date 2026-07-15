@@ -538,3 +538,147 @@
   background: rgba(255, 107, 107, 0.12);
   border: 1px solid var(--danger-soft);
 }
+
+/* ── Admin → Campuses ───────────────────────────────────────────────────────── */
+.campuses__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.campuses__institution {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 360px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.campuses__institution .field {
+  margin: 0;
+}
+
+.campuses__sitebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.campuses__site {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.campuses__siterow {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.campuses__siterow label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
+.campuses__siterow .field {
+  margin: 0;
+}
+
+.campuses__grow {
+  flex: 1;
+  min-width: 160px;
+}
+
+.campuses__room {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-raised);
+}
+
+.campuses__roomhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.campuses__roomname {
+  margin: 0;
+  max-width: 260px;
+  font-weight: 600;
+}
+
+.campuses__tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.campuses__tile .field {
+  margin: 0;
+  min-width: 120px;
+  flex: 0 1 auto;
+}
+
+.campuses__tile .campuses__grow {
+  flex: 1 1 180px;
+}
+
+.campuses__tileicon {
+  width: 52px;
+  min-width: 52px !important;
+  flex: 0 0 52px !important;
+  text-align: center;
+}
+
+.campuses__tileport {
+  width: 76px;
+  min-width: 76px !important;
+  flex: 0 0 76px !important;
+}
+
+.campuses__addtile {
+  align-self: flex-start;
+}
+
+.campuses__rowactions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tile);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.iconbtn:hover {
+  color: var(--text);
+  background: var(--bg-tile-hover);
+}
+
+.iconbtn--danger:hover {
+  color: var(--danger);
+  border-color: var(--danger-soft);
+}

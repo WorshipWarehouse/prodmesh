@@ -60,6 +60,41 @@ function migrate(d) {
       PRIMARY KEY (room_id, plan_id)
     );
 
+    -- Institution topology (ADR 0009): what the frontend used to compile in as
+    -- dashboard.config.ts. Seeded once from server/topologySeed.js, then owned
+    -- by Admin → Campuses. Tiles keep per-type fields (host/url/username/…) in
+    -- a validated JSON blob; the tree structure itself is relational.
+    CREATE TABLE IF NOT EXISTS app_config (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sites (
+      id       TEXT PRIMARY KEY,
+      name     TEXT NOT NULL,
+      status   TEXT NOT NULL DEFAULT 'active',
+      note     TEXT,
+      position INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS site_rooms (
+      id       TEXT PRIMARY KEY,
+      site_id  TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      name     TEXT NOT NULL,
+      position INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tiles (
+      id       TEXT PRIMARY KEY,
+      room_id  TEXT NOT NULL REFERENCES site_rooms(id) ON DELETE CASCADE,
+      type     TEXT NOT NULL,
+      label    TEXT NOT NULL,
+      note     TEXT,
+      icon     TEXT,
+      config   TEXT NOT NULL DEFAULT '{}',
+      position INTEGER NOT NULL
+    );
+
     -- Browser installation identity. The token is stored as a SHA-256 hash;
     -- the browser keeps the secret token. A station says WHERE an action came
     -- from, while a user session says WHO authorized it.
