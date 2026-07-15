@@ -724,6 +724,53 @@ app.post('/api/system/update', requirePermission('system.update'), (_req, res) =
   }
 });
 
+// ── Logs (Admin → Logs) ────────────────────────────────────────────────────────
+
+// Tail of the server process log. The installed service (install-service.sh)
+// writes stdout/stderr to <repo>/logs/server.log; PRODMESH_LOG_FILE overrides
+// (tests, unusual deployments). Reads at most the last 512 KB.
+app.get('/api/system/logs', requirePermission('system.logs'), async (req, res) => {
+  const file = process.env.PRODMESH_LOG_FILE ?? join(__dirname, '..', 'logs', 'server.log');
+  const lines = Math.max(50, Math.min(2000, Number(req.query.lines) || 500));
+  try {
+    const { stat, open } = await import('node:fs/promises');
+    const info = await stat(file);
+    const readFrom = Math.max(0, info.size - 512 * 1024);
+    const fh = await open(file, 'r');
+    let text;
+    try {
+      const { buffer, bytesRead } = await fh.read({
+        buffer: Buffer.alloc(info.size - readFrom),
+        position: readFrom,
+      });
+      text = buffer.toString('utf8', 0, bytesRead);
+    } finally {
+      await fh.close();
+    }
+    const all = text.split('\n');
+    if (all.at(-1) === '') all.pop();
+    if (readFrom > 0) all.shift(); // first line may be a partial from mid-file
+    res.json({
+      exists: true,
+      file,
+      size: info.size,
+      mtime: info.mtimeMs,
+      truncated: readFrom > 0 || all.length > lines,
+      lines: all.slice(-lines),
+    });
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return res.json({ exists: false, file, lines: [] });
+    }
+    res.status(500).json({ error: String(err.message ?? err) });
+  }
+});
+
+// The audit trail (named-user actions with station context) from SQLite.
+app.get('/api/system/audit', requirePermission('system.logs'), (req, res) => {
+  res.json({ entries: auth.listAudit(req.query.limit) });
+});
+
 // ── Static frontend (production) ───────────────────────────────────────────────
 const distDir = join(__dirname, '..', 'dist');
 if (existsSync(distDir)) {

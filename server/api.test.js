@@ -1,11 +1,16 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Isolated store + import the app (which won't listen on its own).
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-api-'));
+process.env.PRODMESH_LOG_FILE = join(process.env.PRODMESH_DATA_DIR, 'server.log');
+writeFileSync(
+  process.env.PRODMESH_LOG_FILE,
+  Array.from({ length: 30 }, (_, i) => `log line ${i + 1}`).join('\n') + '\n',
+);
 const { app } = await import('./index.js');
 const settings = await import('./settings.js');
 const auth = await import('./authStore.js');
@@ -103,6 +108,33 @@ test('admins can rename, assign, and revoke a station', async () => {
   assert.equal(revoke.status, 200);
   assert.equal((await revoke.json()).current, true);
   assert.equal(auth.resolveStation(managed.token), null);
+});
+
+test('server log tail and audit trail require system.logs', async () => {
+  const denied = await apiRequest('/api/system/logs', { token: operatorToken, stationToken: station.token });
+  assert.equal(denied.status, 403);
+  const deniedAudit = await apiRequest('/api/system/audit', { token: operatorToken, stationToken: station.token });
+  assert.equal(deniedAudit.status, 403);
+
+  const viewerGroup = auth.createGroup({ name: 'Log Viewers', permissions: ['system.logs'] });
+  auth.createUser({ username: 'viewer', displayName: 'Log Viewer', pin: '1357', groupIds: [viewerGroup.id] });
+  const login = await post('/api/auth/login', { username: 'viewer', pin: '1357' }, null, station.token);
+  const { token } = await login.json();
+
+  const logs = await apiRequest('/api/system/logs?lines=50', { token, stationToken: station.token });
+  assert.equal(logs.status, 200);
+  const body = await logs.json();
+  assert.equal(body.exists, true);
+  assert.equal(body.lines.length, 30);
+  assert.equal(body.lines.at(-1), 'log line 30');
+
+  const audit = await apiRequest('/api/system/audit', { token, stationToken: station.token });
+  assert.equal(audit.status, 200);
+  const { entries } = await audit.json();
+  assert.ok(entries.length > 0);
+  const loginEntry = entries.find((e) => e.action === 'auth.login' && e.username === 'viewer');
+  assert.ok(loginEntry, 'expected the viewer login in the audit trail');
+  assert.equal(loginEntry.stationName, 'API Test Station');
 });
 
 test('locked mode is blocked without override, allowed with it', async () => {

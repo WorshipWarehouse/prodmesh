@@ -23,6 +23,7 @@ export default function App() {
         <Route path="/admin/users" element={<Settings section="users" />} />
         <Route path="/admin/stations" element={<Settings section="stations" />} />
         <Route path="/admin/checklists" element={<Settings section="checklists" />} />
+        <Route path="/admin/logs" element={<Settings section="logs" />} />
         {/* Room-level pages, reached from Home cards / Services rows.
             Room-Mac homepages point at /room/:id — these paths are stable. */}
         <Route path="/room/:roomId" element={<RoomStatus />} />

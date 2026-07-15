@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { StationsPanel, UserManagementPanel } from './Settings';
+import { LogsPanel, StationsPanel, UserManagementPanel } from './Settings';
 
 const api = vi.hoisted(() => ({
   getUserDirectory: vi.fn(),
@@ -12,6 +12,8 @@ const api = vi.hoisted(() => ({
   getRooms: vi.fn(),
   updateStation: vi.fn(),
   revokeStation: vi.fn(),
+  getServerLog: vi.fn(),
+  getAuditLog: vi.fn(),
 }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -85,5 +87,47 @@ describe('Stations', () => {
     expect(screen.getByRole('dialog', { name: /Unregister FOH – Producer/ })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Revoke station' }));
     expect(api.revokeStation).toHaveBeenCalledWith('station-1');
+  });
+});
+
+describe('Logs', () => {
+  beforeEach(() => {
+    api.getServerLog.mockResolvedValue({
+      exists: true,
+      file: '/srv/prodmesh/logs/server.log',
+      size: 2048,
+      mtime: Date.now(),
+      truncated: false,
+      lines: [
+        'Production dashboard server on http://localhost:8080',
+        '[smaart] 192.0.2.7: Smaart v8 8.5.2.2 via /api/v3/',
+        '[autostart] north-main: armed for 900102',
+      ],
+    });
+    api.getAuditLog.mockResolvedValue({
+      entries: [{
+        id: 1, ts: Date.now(), action: 'rooms.mode.change', result: 'allowed',
+        resourceType: 'room-mode', resourceId: 'sunday', roomId: 'north-main', planId: null,
+        userName: 'the maintainer', username: 'justin', stationName: 'FOH – Producer', details: null,
+      }],
+    });
+  });
+
+  it('shows the server log tail, filters it, and switches to the audit trail', async () => {
+    const user = userEvent.setup();
+    render(<LogsPanel />);
+
+    const log = await screen.findByTestId('server-log');
+    expect(log).toHaveTextContent('Smaart v8 8.5.2.2');
+    expect(log).toHaveTextContent('Production dashboard server');
+
+    await user.type(screen.getByPlaceholderText(/Filter lines/), 'smaart');
+    expect(log).toHaveTextContent('Smaart v8 8.5.2.2');
+    expect(log).not.toHaveTextContent('Production dashboard server');
+
+    await user.click(screen.getByRole('button', { name: 'Audit trail' }));
+    expect(await screen.findByText('rooms.mode.change')).toBeInTheDocument();
+    expect(screen.getByText('the maintainer')).toBeInTheDocument();
+    expect(screen.getByText('allowed')).toBeInTheDocument();
   });
 });

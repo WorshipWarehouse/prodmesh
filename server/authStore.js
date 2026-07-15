@@ -13,6 +13,7 @@ export const PERMISSIONS = [
   ['users.manage', 'Manage users', 'Create users and assign permission groups.'],
   ['stations.manage', 'Manage stations', 'Rename, assign, and revoke registered browser stations.'],
   ['system.update', 'Run system updates', 'Install a prodmesh system update.'],
+  ['system.logs', 'View logs', 'Read the server process log and the audit trail.'],
 ];
 
 const SESSION_TTL = 8 * 60 * 60 * 1000;
@@ -230,6 +231,19 @@ export function updateUserGroups(userId, groupIds) {
     for (const groupId of groupIds ?? []) add.run(userId, groupId);
   })();
   return getUser(userId);
+}
+
+export function listAudit(limit = 200) {
+  const n = Math.max(1, Math.min(500, Number(limit) || 200));
+  return getDb().prepare(
+    `SELECT a.id, a.ts, a.action, a.resource_type AS resourceType, a.resource_id AS resourceId,
+            a.room_id AS roomId, a.plan_id AS planId, a.result, a.details,
+            u.display_name AS userName, u.username, s.name AS stationName
+       FROM audit_log a
+       LEFT JOIN users u ON u.id = a.user_id
+       LEFT JOIN stations s ON s.id = a.station_id
+      ORDER BY a.ts DESC, a.id DESC LIMIT ?`,
+  ).all(n).map((row) => ({ ...row, details: row.details ? JSON.parse(row.details) : null }));
 }
 
 export function audit({ userId = null, stationId = null, action, resourceType = null, resourceId = null, roomId = null, planId = null, result, details = null }) {

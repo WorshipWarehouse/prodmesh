@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2, Zap } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { SelectField } from '../components/SelectField';
@@ -22,6 +22,10 @@ import {
   getStations,
   updateStation,
   revokeStation,
+  getServerLog,
+  getAuditLog,
+  type ServerLogTail,
+  type AuditEntry,
   type RoomMeta,
   type ScheduleWindow,
   type ChecklistTemplatesInfo,
@@ -32,7 +36,7 @@ import {
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type AdminSection = 'general' | 'users' | 'stations' | 'checklists';
+type AdminSection = 'general' | 'users' | 'stations' | 'checklists' | 'logs';
 
 export function Settings({ section = 'general' }: { section?: AdminSection }) {
   const [phase, setPhase] = useState<Phase>('loading');
@@ -53,6 +57,7 @@ export function Settings({ section = 'general' }: { section?: AdminSection }) {
     users: ['Users & access', 'Operators, permission groups, and Planning Center identities'],
     stations: ['Stations', 'Registered browsers, assignments, and recent activity'],
     checklists: ['Checklists', 'Startup checklist templates by event type'],
+    logs: ['Logs', 'Server process log and the audit trail'],
   } as const;
 
   return (
@@ -132,6 +137,7 @@ function AdminPanels({ section }: { section: AdminSection }) {
       {section === 'users' && <UserManagementPanel />}
       {section === 'stations' && <StationsPanel />}
       {section === 'checklists' && <ChecklistsPanel />}
+      {section === 'logs' && <LogsPanel />}
     </>
   );
 }
@@ -777,6 +783,171 @@ function SchedulesPanel() {
         <button className="btn btn--primary" onClick={save}>Save schedules</button>
         {msg && <span className="settings__ok">{msg}</span>}
       </div>
+    </section>
+  );
+}
+
+// ── Logs: server process log + audit trail ─────────────────────────────────────
+export function LogsPanel() {
+  const [tab, setTab] = useState<'server' | 'audit'>('server');
+  return (
+    <>
+      <div className="logtabs">
+        <button className={`typebtn${tab === 'server' ? ' typebtn--on' : ''}`} onClick={() => setTab('server')}>
+          Server log
+        </button>
+        <button className={`typebtn${tab === 'audit' ? ' typebtn--on' : ''}`} onClick={() => setTab('audit')}>
+          Audit trail
+        </button>
+      </div>
+      {tab === 'server' ? <ServerLogViewer /> : <AuditTrail />}
+    </>
+  );
+}
+
+function ServerLogViewer() {
+  const [log, setLog] = useState<ServerLogTail | null>(null);
+  const [lines, setLines] = useState(500);
+  const [follow, setFollow] = useState(true);
+  const [filter, setFilter] = useState('');
+  const [error, setError] = useState('');
+  const preRef = useRef<HTMLPreElement>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      setLog(await getServerLog(lines));
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [lines]);
+
+  useEffect(() => {
+    refresh();
+    if (!follow) return;
+    const t = setInterval(refresh, 5000);
+    return () => clearInterval(t);
+  }, [refresh, follow]);
+
+  const shown = (log?.lines ?? []).filter(
+    (line) => !filter || line.toLowerCase().includes(filter.toLowerCase()),
+  );
+
+  // Keep the newest lines in view as the log grows (unless filtering around).
+  useEffect(() => {
+    const el = preRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [shown.length, log?.size]);
+
+  return (
+    <section className="panel logview">
+      <div>
+        <p className="section-label">Diagnostics</p>
+        <h2 className="panel__title">Server log</h2>
+      </div>
+
+      <div className="logview__controls">
+        <input
+          className="field logview__filter"
+          placeholder="Filter lines… (e.g. smaart, autostart)"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <SelectField value={lines} onChange={(e) => setLines(Number(e.target.value))} aria-label="Lines to show">
+          <option value={200}>Last 200</option>
+          <option value={500}>Last 500</option>
+          <option value={1000}>Last 1,000</option>
+          <option value={2000}>Last 2,000</option>
+        </SelectField>
+        <Checkbox label="Auto-refresh" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
+      </div>
+
+      {log && !log.exists && (
+        <p className="settings__muted">
+          No log file yet at <code>{log.file}</code> — it appears when prodmesh runs as the
+          installed service (deploy/install-service.sh).
+        </p>
+      )}
+      {log?.exists && (
+        <>
+          <pre ref={preRef} className="logview__pre" data-testid="server-log">
+            {shown.join('\n') || (filter ? 'No lines match the filter.' : 'Log is empty.')}
+          </pre>
+          <p className="settings__muted logview__meta">
+            {shown.length === log.lines.length
+              ? `${log.lines.length} lines`
+              : `${shown.length} of ${log.lines.length} lines`}
+            {log.size != null && <> · {Math.max(1, Math.round(log.size / 1024))} KB</>}
+            {log.mtime != null && <> · updated {relativeTime(log.mtime)}</>}
+          </p>
+        </>
+      )}
+      {error && <p className="settings__error">{error}</p>}
+    </section>
+  );
+}
+
+function AuditTrail() {
+  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [error, setError] = useState('');
+
+  const refresh = useCallback(async () => {
+    try {
+      setEntries((await getAuditLog(200)).entries);
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  return (
+    <section className="panel audittrail">
+      <div className="audittrail__head">
+        <div>
+          <p className="section-label">Accountability</p>
+          <h2 className="panel__title">Audit trail</h2>
+        </div>
+        <button className="btn" onClick={refresh}>Refresh</button>
+      </div>
+      <p className="settings__muted">
+        Who did what, from which station. The most recent 200 entries.
+      </p>
+
+      {error && <p className="settings__error">{error}</p>}
+      {entries && entries.length === 0 && <p className="settings__muted">Nothing recorded yet.</p>}
+      {entries && entries.length > 0 && (
+        <div className="audittrail__scroll">
+          <table className="audittrail__table">
+            <thead>
+              <tr><th>When</th><th>User</th><th>Station</th><th>Action</th><th>Result</th></tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td className="audittrail__when" title={new Date(entry.ts).toLocaleString()}>
+                    {relativeTime(entry.ts)}
+                  </td>
+                  <td>{entry.userName ?? <span className="settings__muted">anonymous</span>}</td>
+                  <td>{entry.stationName ?? <span className="settings__muted">—</span>}</td>
+                  <td className="audittrail__action">
+                    {entry.action}
+                    {(entry.roomId || entry.resourceId) && (
+                      <span className="settings__muted"> · {entry.roomId ?? `${entry.resourceType}:${entry.resourceId}`}</span>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`audittrail__result audittrail__result--${entry.result === 'allowed' ? 'ok' : 'denied'}`}>
+                      {entry.result}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

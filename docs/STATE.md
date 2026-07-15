@@ -83,8 +83,13 @@ Notes:
   every room it runs in — the room supplies execution context. Run state is
   per-event in SQLite (shared across browsers). Automated items press the real
   Companion button via the shared mode path, so schedule lockouts still apply.
+- **Admin → Logs** (2026-07-14): server process log tail (the file
+  `install-service.sh` writes; filter box, line-count picker, 5s auto-refresh)
+  and the **audit trail** (who did what, from which station, allowed/denied)
+  side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
+  overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **79 server tests** with **7 frontend interaction/configuration tests**
+  combines **85 server tests** with **10 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin.
 - **Station identity + named users** (feature branch): each browser registers a

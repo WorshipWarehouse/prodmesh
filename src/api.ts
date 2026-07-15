@@ -369,6 +369,36 @@ export interface Version {
 
 export const getVersion = () => getJson<Version>('/api/system/version');
 
+export interface ServerLogTail {
+  exists: boolean;
+  file: string;
+  size?: number;
+  mtime?: number;
+  truncated?: boolean;
+  lines: string[];
+}
+
+export const getServerLog = (lines = 500) =>
+  getJson<ServerLogTail>(`/api/system/logs?lines=${lines}`);
+
+export interface AuditEntry {
+  id: number;
+  ts: number;
+  action: string;
+  result: string;
+  resourceType: string | null;
+  resourceId: string | null;
+  roomId: string | null;
+  planId: string | null;
+  userName: string | null;
+  username: string | null;
+  stationName: string | null;
+  details: Record<string, unknown> | null;
+}
+
+export const getAuditLog = (limit = 200) =>
+  getJson<{ entries: AuditEntry[] }>(`/api/system/audit?limit=${limit}`);
+
 // ── Planning Center Services ──────────────────────────────────────────────────
 
 export interface PlanTime {
