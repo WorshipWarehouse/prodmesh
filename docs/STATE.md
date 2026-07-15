@@ -30,7 +30,7 @@ Notes:
 | Bitfocus Companion (per room) | Live for Auditorium; Youth/Chapel mock pending real setup |
 | Planning Center **Services** | **Live** — plan display + order of service, PAT in `server/data/secrets.json` |
 | Planning Center **Calendar** | **Not started** — awaiting read-only access. High value (see below) |
-| **Smaart SPL** | **Transport implemented** (SDK v4 doc received 2026-07-06) — full pipeline (capture → SQLite → live meter + report, ADR 0006) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream, tested against a protocol-faithful fake). Remaining: enable API in Smaart on the FOH Mac, set `smaart.host` in rooms.config, verify on-site. Rooms stay `mock: true` until then |
+| **Smaart SPL** | **Transport implemented; v8 compat added 2026-07-14** — full pipeline (capture → SQLite → live meter + report) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream). FOH Mac probe (2026-07-14) found **Smaart v8 (8.5.2.2)**: its `/api/v4/` socket accepts connections but never answers RPCs; the same dialect lives at `/api/v3/`. Transport now negotiates v4 → v3 and caches the answering path (`smaart.apiPath` pins it). Remaining: with SPL metering running on a calibrated input (Sunday), re-run `server/tools/smaart-probe.js` to confirm the v3 stream frame shape, then flip the room off `mock` |
 
 ## What's live right now
 
