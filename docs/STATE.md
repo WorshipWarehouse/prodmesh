@@ -117,8 +117,11 @@ Notes:
 3. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
    `mock: false`. (Auditorium is the template.)
 4. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
-5. **Confirm production deployment** on the Producer Mac via `deploy/install-service.sh`
-   (dev has happened on jbeale's Mac; verify the box is running the service).
+5. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
+   `install-service.sh` run on Booth-Producer (launchd label `com.prodmesh.dashboard`,
+   port 8080, logs in `~/prodmesh/logs/server.log`, RunAtLoad + KeepAlive). The
+   Producer bridges the production LAN and the audio network, so it reaches
+   Smaart directly.
 6. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
 
 ## Deferred tech debt (known, low-risk)
