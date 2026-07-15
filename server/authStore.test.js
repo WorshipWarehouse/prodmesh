@@ -14,6 +14,24 @@ test('station identity is token-backed but grants no authority', () => {
   assert.equal(auth.hasPermission(null, 'rooms.mode.change'), false);
 });
 
+test('stations can be listed, renamed, assigned, and revoked', () => {
+  const registered = auth.registerStation({ name: 'Old Booth', campusId: 'north' });
+  const listed = auth.listStations().find((station) => station.id === registered.id);
+  assert.equal(listed.name, 'Old Booth');
+  assert.ok(listed.createdAt);
+  assert.ok(listed.lastSeen);
+
+  const updated = auth.updateStation(registered.id, {
+    name: 'FOH – Producer', campusId: 'north', roomId: 'north-main',
+  });
+  assert.equal(updated.name, 'FOH – Producer');
+  assert.equal(updated.roomId, 'north-main');
+
+  auth.revokeStation(registered.id);
+  assert.equal(auth.resolveStation(registered.token), null);
+  assert.equal(auth.listStations().some((station) => station.id === registered.id), false);
+});
+
 test('user receives the union of assigned group permissions', () => {
   const checklist = auth.createGroup({ name: 'Checklist Operators', permissions: ['checklists.complete'] });
   const rooms = auth.createGroup({ name: 'Room Operators', permissions: ['rooms.mode.change'] });

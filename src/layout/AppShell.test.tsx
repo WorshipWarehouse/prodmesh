@@ -61,6 +61,7 @@ describe('AppShell identity and Admin navigation', () => {
 
     expect(await screen.findByRole('link', { name: 'Users & access' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'General' })).toHaveAttribute('href', '/admin/general');
+    expect(screen.getByRole('link', { name: 'Stations' })).toHaveAttribute('href', '/admin/stations');
     expect(screen.getByRole('link', { name: 'Checklists' })).toHaveAttribute('href', '/admin/checklists');
     expect(screen.getByRole('button', { name: /the maintainer Beale/ }).querySelector('img')).toHaveAttribute(
       'src',

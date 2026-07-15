@@ -43,6 +43,18 @@ function post(path, body, token, stationToken = null) {
   });
 }
 
+function apiRequest(path, { method = 'GET', body, token, stationToken } = {}) {
+  return fetch(base + path, {
+    method,
+    headers: {
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(stationToken ? { 'X-Prodmesh-Station': stationToken } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
 test('admin login rejects a wrong PIN and accepts the right one', async () => {
   assert.equal((await post('/api/auth/admin', { pin: '0000' })).status, 401);
   const res = await post('/api/auth/admin', { pin: '1234' });
@@ -65,6 +77,32 @@ test('user directory includes the avatar contract', async () => {
   const directory = await res.json();
   assert.ok(directory.users.length > 0);
   assert.ok(directory.users.every((user) => Object.hasOwn(user, 'avatarUrl')));
+});
+
+test('admins can rename, assign, and revoke a station', async () => {
+  const managed = auth.registerStation({ name: 'Temporary Booth' });
+  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+
+  const list = await apiRequest('/api/stations', { token, stationToken: managed.token });
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).stations.find((entry) => entry.id === managed.id).current, true);
+
+  const update = await apiRequest(`/api/stations/${managed.id}`, {
+    method: 'PUT', token, stationToken: managed.token,
+    body: { name: 'FOH – Temporary', campusId: 'north', roomId: 'north-main' },
+  });
+  assert.equal(update.status, 200);
+  const updated = (await update.json()).station;
+  assert.equal(updated.name, 'FOH – Temporary');
+  assert.equal(updated.roomId, 'north-main');
+  assert.equal(updated.current, true);
+
+  const revoke = await apiRequest(`/api/stations/${managed.id}`, {
+    method: 'DELETE', token, stationToken: managed.token,
+  });
+  assert.equal(revoke.status, 200);
+  assert.equal((await revoke.json()).current, true);
+  assert.equal(auth.resolveStation(managed.token), null);
 });
 
 test('locked mode is blocked without override, allowed with it', async () => {

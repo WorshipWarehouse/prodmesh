@@ -11,6 +11,7 @@ export const PERMISSIONS = [
   ['reports.view', 'View reports', 'View completed show reports and analytics.'],
   ['settings.manage', 'Manage settings', 'Edit operational settings and schedules.'],
   ['users.manage', 'Manage users', 'Create users and assign permission groups.'],
+  ['stations.manage', 'Manage stations', 'Rename, assign, and revoke registered browser stations.'],
   ['system.update', 'Run system updates', 'Install a prodmesh system update.'],
 ];
 
@@ -71,6 +72,35 @@ export function resolveStation(token) {
   ).get(digest(token));
   if (row) getDb().prepare('UPDATE stations SET last_seen = ? WHERE id = ?').run(Date.now(), row.id);
   return row ?? null;
+}
+
+export function listStations() {
+  return getDb().prepare(
+    `SELECT id, name, campus_id AS campusId, room_id AS roomId,
+            created_at AS createdAt, last_seen AS lastSeen
+       FROM stations ORDER BY name COLLATE NOCASE`,
+  ).all();
+}
+
+export function updateStation(stationId, { name, campusId = null, roomId = null }) {
+  const clean = String(name ?? '').trim();
+  if (clean.length < 2 || clean.length > 80) throw new Error('Station name must be 2–80 characters');
+  const result = getDb().prepare(
+    'UPDATE stations SET name = ?, campus_id = ?, room_id = ? WHERE id = ?',
+  ).run(clean, campusId || null, roomId || null, stationId);
+  if (!result.changes) throw new Error('Unknown station');
+  return listStations().find((station) => station.id === stationId);
+}
+
+export function revokeStation(stationId) {
+  const db = getDb();
+  const station = listStations().find((entry) => entry.id === stationId);
+  if (!station) throw new Error('Unknown station');
+  db.transaction(() => {
+    db.prepare('DELETE FROM user_sessions WHERE station_id = ?').run(stationId);
+    db.prepare('DELETE FROM stations WHERE id = ?').run(stationId);
+  })();
+  return station;
 }
 
 function permissionsFor(userId) {

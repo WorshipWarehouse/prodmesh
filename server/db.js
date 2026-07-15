@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  SQLITE  —  the store for facts & events (time-series, high write rates).
+//  SQLITE  —  authoritative runtime state and configuration.
 //
-//  Per ADR 0006: config stays in human-inspectable JSON files; measurements
-//  and event streams (SPL samples, future show reports/notes) live here.
-//  Still just a file on the LAN box — zero ops, backup = copy the file.
+//  Per ADR 0009: server-managed config and operational facts live here; JSON
+//  is a portable import/export format rather than the live source of truth.
+//  Still just a file on the LAN box — zero ops, with explicit backup planned.
 //  WAL mode: writes don't block reads, and the single-writer process model
 //  (ADR 0004) means no contention.
 // ─────────────────────────────────────────────────────────────────────────────

@@ -94,6 +94,11 @@ Notes:
   Checklists subpages. The account menu requires confirmation before returning a
   station to read-only mode. When a user has a Planning Center Services Person ID,
   their Services profile thumbnail is shown as their avatar.
+- **Station management** (feature branch): Admin → Stations lists registered
+  browsers with current-station and last-seen status. Administrators can rename
+  stations, assign campus/room context, or revoke them. Revocation invalidates
+  sessions created at that station; revoking the current browser returns it to
+  first-run registration. Guarded by the extensible `stations.manage` permission.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is

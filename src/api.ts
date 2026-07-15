@@ -87,6 +87,11 @@ export const clearToken = () => {
 
 export const getStationToken = () => localStorage.getItem(STATION_KEY);
 export const setStationToken = (token: string) => localStorage.setItem(STATION_KEY, token);
+export const clearStationIdentity = () => {
+  localStorage.removeItem(STATION_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event('prodmesh:auth-changed'));
+};
 
 function requestHeaders(): Record<string, string> {
   const t = getToken();
@@ -114,6 +119,12 @@ export interface Station {
   name: string;
   campusId: string | null;
   roomId: string | null;
+}
+
+export interface ManagedStation extends Station {
+  createdAt: number;
+  lastSeen: number;
+  current: boolean;
 }
 
 export interface CurrentUser {
@@ -165,6 +176,34 @@ export async function registerStation(input: { name: string; campusId?: string |
   const { station } = (await res.json()) as { station: Station & { token: string } };
   setStationToken(station.token);
   return station;
+}
+
+export const getStations = () => getJson<{ stations: ManagedStation[] }>('/api/stations');
+
+export async function updateStation(
+  stationId: string,
+  input: { name: string; campusId: string | null; roomId: string | null },
+): Promise<ManagedStation> {
+  const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify(input),
+  });
+  await requireOk(res);
+  const station = ((await res.json()) as { station: ManagedStation }).station;
+  if (station.current) window.dispatchEvent(new Event('prodmesh:auth-changed'));
+  return station;
+}
+
+export async function revokeStation(stationId: string): Promise<{ current: boolean }> {
+  const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}`, {
+    method: 'DELETE',
+    headers: requestHeaders(),
+  });
+  await requireOk(res);
+  const result = (await res.json()) as { current: boolean };
+  if (result.current) clearStationIdentity();
+  return result;
 }
 
 export async function loginUser(username: string, pin: string): Promise<AuthStatus> {

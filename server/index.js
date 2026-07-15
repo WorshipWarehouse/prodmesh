@@ -526,6 +526,55 @@ app.get('/api/stations/current', (req, res) => {
   res.json({ station: req.station ?? null });
 });
 
+app.get('/api/stations', requirePermission('stations.manage'), (req, res) => {
+  res.json({
+    stations: auth.listStations().map((station) => ({
+      ...station,
+      current: station.id === req.station?.id,
+    })),
+  });
+});
+
+app.put('/api/stations/:stationId', requirePermission('stations.manage'), (req, res) => {
+  try {
+    const roomId = req.body?.roomId || null;
+    const requestedCampus = req.body?.campusId || null;
+    const room = roomId ? rooms[roomId] : null;
+    if (roomId && !room) return res.status(400).json({ error: 'Unknown room' });
+    const knownCampuses = new Set(Object.values(rooms).map((entry) => entry.site));
+    if (requestedCampus && !knownCampuses.has(requestedCampus)) {
+      return res.status(400).json({ error: 'Unknown campus' });
+    }
+    if (room && requestedCampus && room.site !== requestedCampus) {
+      return res.status(400).json({ error: 'Room does not belong to that campus' });
+    }
+    const station = auth.updateStation(req.params.stationId, {
+      name: req.body?.name,
+      campusId: room?.site ?? requestedCampus,
+      roomId,
+    });
+    auditSuccess(req, 'stations.manage', {
+      resourceType: 'station', resourceId: station.id, details: { operation: 'update' },
+    });
+    res.json({ station: { ...station, current: station.id === req.station?.id } });
+  } catch (err) {
+    res.status(String(err.message ?? err).includes('Unknown') ? 404 : 400).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.delete('/api/stations/:stationId', requirePermission('stations.manage'), (req, res) => {
+  try {
+    const current = req.station?.id === req.params.stationId;
+    const station = auth.revokeStation(req.params.stationId);
+    auditSuccess(req, 'stations.manage', {
+      resourceType: 'station', resourceId: station.id, details: { operation: 'revoke', name: station.name },
+    });
+    res.json({ ok: true, current });
+  } catch (err) {
+    res.status(404).json({ error: String(err.message ?? err) });
+  }
+});
+
 const loginFailures = new Map();
 function failureKey(req) {
   return `${req.station?.id ?? req.ip}:${String(req.body?.username ?? '').toLowerCase()}`;
