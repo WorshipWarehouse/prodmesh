@@ -19,8 +19,13 @@
 //    (stream commands get no response). Metric names include "SPL A Slow",
 //    "SPL Slow", "LAeq 10", etc. — whatever the input's meter config exposes.
 //
+//  API versions: Smaart v9-era products serve API v4 at /api/v4/. Smaart v8
+//  (verified live on 8.5.2.2) serves the same dialect at /api/v3/ — its v4
+//  path accepts the WebSocket but never answers RPCs. We try v4 then v3 and
+//  cache whichever answered; set cfg.apiPath to pin one explicitly.
+//
 //  config = { mock?: true, host?, port?, password?, device?, channel?,
-//             metric?, target?, limit? }
+//             metric?, target?, limit?, apiPath? }
 //    device/channel: pick a specific logging input (default: first active one).
 //    metric: which meter to record (default "SPL A Slow" — A-weighted slow is
 //            the venue-loudness standard).
@@ -35,7 +40,9 @@ export const isConfigured = (cfg) => Boolean(cfg && (cfg.mock || cfg.host));
 
 const RETRY_MS = 5000;
 const RPC_TIMEOUT_MS = 8000;
+const HELLO_TIMEOUT_MS = 3000; // per-path liveness check while finding the API
 const STALE_STREAM_MS = 15000; // no frames for this long → reconnect
+const API_PATHS = ['/api/v4/', '/api/v3/'];
 
 function sleep(ms, signal) {
   return new Promise((resolve) => {
@@ -73,9 +80,10 @@ async function mockLoop(cfg, onSample, signal, intervalMs) {
 
 async function realLoop(cfg, onSample, signal, intervalMs) {
   let warned = false;
+  const state = { path: null, announced: null }; // API path cache across reconnects
   while (!signal.aborted) {
     try {
-      await streamOnce(cfg, onSample, signal, intervalMs);
+      await streamOnce(cfg, onSample, signal, intervalMs, state);
       warned = false; // stream worked at some point; re-warn if it breaks again
     } catch (err) {
       if (!signal.aborted && !warned) {
@@ -89,16 +97,20 @@ async function realLoop(cfg, onSample, signal, intervalMs) {
 
 // One full connect → discover input → stream cycle. Throws on any failure;
 // returns when the stream closes (realLoop reconnects) or the signal aborts.
-async function streamOnce(cfg, onSample, signal, intervalMs) {
+async function streamOnce(cfg, onSample, signal, intervalMs, state) {
   const base = `ws://${cfg.host}:${cfg.port ?? 26000}`;
-  const rpc = await openSocket(`${base}/api/v4/`, signal);
+  const { rpc, call, info } = await connectRpc(base, cfg, state, signal);
   let endpoint;
   try {
-    const call = makeRpc(rpc, signal);
-    const info = await call({ action: 'get' });
     if (info.authenticationRequired) {
       if (!cfg.password) throw new Error('Smaart API requires a password (set smaart.password)');
       await call({ action: 'set', properties: [{ password: cfg.password }] });
+    }
+    if (state.announced !== state.path) {
+      console.log(
+        `[smaart] ${cfg.host}: ${info.applicationName ?? 'Smaart'} ${info.applicationVersion ?? ''} via ${state.path}`.replace(/\s+/g, ' '),
+      );
+      state.announced = state.path;
     }
     const inputs = await call({ action: 'get', target: 'activeCalibratedInputs' });
     endpoint = pickChannel(inputs, cfg).streamEndpoint;
@@ -186,6 +198,35 @@ function pickChannel(inputs, cfg) {
   return match;
 }
 
+// Connect to whichever API path this Smaart answers on. The bare `get`
+// doubles as the liveness hello: a silent path (v8's /api/v4/) times out
+// quickly and we move on. The answering path is cached; if it later goes
+// quiet (Smaart upgraded?) the cache clears and the next cycle re-probes.
+async function connectRpc(base, cfg, state, signal) {
+  const paths = cfg.apiPath
+    ? [cfg.apiPath]
+    : state.path
+      ? [state.path, ...API_PATHS.filter((p) => p !== state.path)]
+      : API_PATHS;
+  let lastErr;
+  for (const path of paths) {
+    if (signal.aborted) break;
+    let rpc;
+    try {
+      rpc = await openSocket(base + path, signal);
+      const call = makeRpc(rpc, signal);
+      const info = await call({ action: 'get' }, cfg.helloMs ?? HELLO_TIMEOUT_MS);
+      state.path = path;
+      return { rpc, call, info };
+    } catch (err) {
+      rpc?.close();
+      lastErr = err;
+      if (state.path === path) state.path = null;
+    }
+  }
+  throw new Error(`no answering Smaart API (tried ${paths.join(', ')}): ${lastErr?.message ?? 'aborted'}`);
+}
+
 // ── WebSocket plumbing ───────────────────────────────────────────────────────
 
 function openSocket(url, signal) {
@@ -206,10 +247,10 @@ function openSocket(url, signal) {
 // (the server echoes it back when non-zero).
 function makeRpc(ws, signal) {
   let seq = 0;
-  return (req) =>
+  return (req, timeoutMs = RPC_TIMEOUT_MS) =>
     new Promise((resolve, reject) => {
       const sequenceNumber = ++seq;
-      const timer = setTimeout(() => finish(new Error('Smaart RPC timeout')), RPC_TIMEOUT_MS);
+      const timer = setTimeout(() => finish(new Error('Smaart RPC timeout')), timeoutMs);
       const finish = (err, val) => {
         clearTimeout(timer);
         ws.off('message', onMsg);
