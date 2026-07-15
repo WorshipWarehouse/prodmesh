@@ -735,3 +735,20 @@
 .campuses__back:hover {
   color: var(--accent-text);
 }
+
+/* Room page: Planning Center service types editor */
+.pctypes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pctypes__title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.pctypes__hint {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+}

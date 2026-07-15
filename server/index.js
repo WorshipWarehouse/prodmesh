@@ -27,6 +27,7 @@ import * as showCfg from './showConfig.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as auth from './authStore.js';
 import * as appConfig from './appConfig.js';
+import * as connectivity from './connectivity.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -722,6 +723,35 @@ app.put('/api/config', requirePermission('config.manage'), (req, res) => {
     res.json(stored);
   } catch (err) {
     res.status(400).json({ error: String(err.message ?? err) });
+  }
+});
+
+// ── Room connectivity (room configuration page) ───────────────────────────────
+
+// What integrations this room has. hasServerRoom=false means the topology
+// knows the room but the server integration map (rooms.config.js) doesn't.
+app.get('/api/config/rooms/:roomId/connectivity', (req, res) => {
+  if (!rooms[req.params.roomId]) {
+    return res.json({ hasServerRoom: false, planningCenter: null });
+  }
+  res.json({
+    hasServerRoom: true,
+    planningCenter: connectivity.getPlanningCenter(req.params.roomId) ?? { serviceTypes: [] },
+  });
+});
+
+app.put('/api/config/rooms/:roomId/connectivity/planning-center', requirePermission('config.manage'), (req, res) => {
+  try {
+    const stored = connectivity.setPlanningCenter(req.params.roomId, req.body?.serviceTypes);
+    auditSuccess(req, 'config.manage', {
+      resourceType: 'room-connectivity',
+      resourceId: req.params.roomId,
+      roomId: req.params.roomId,
+      details: { integration: 'planningCenter', serviceTypes: stored.serviceTypes.length },
+    });
+    res.json({ planningCenter: stored });
+  } catch (err) {
+    res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
   }
 });
 

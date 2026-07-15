@@ -385,6 +385,33 @@ export async function saveConfig(church: Church): Promise<Church> {
   return res.json();
 }
 
+// Per-room integration connectivity (migrating out of rooms.config.js).
+export interface PcServiceType {
+  id: string;
+  name: string;
+}
+
+export interface RoomConnectivity {
+  hasServerRoom: boolean;
+  planningCenter: { serviceTypes: PcServiceType[] } | null;
+}
+
+export const getRoomConnectivity = (roomId: string) =>
+  getJson<RoomConnectivity>(`/api/config/rooms/${roomId}/connectivity`);
+
+export async function savePcServiceTypes(
+  roomId: string,
+  serviceTypes: PcServiceType[],
+): Promise<{ serviceTypes: PcServiceType[] }> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/planning-center`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ serviceTypes }),
+  });
+  await requireOk(res);
+  return (await res.json()).planningCenter;
+}
+
 export interface ServerLogTail {
   exists: boolean;
   file: string;
