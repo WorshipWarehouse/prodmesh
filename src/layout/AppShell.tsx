@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart3,
+  Building2,
   CalendarDays,
   CircleUser,
   ClipboardList,
@@ -15,9 +16,10 @@ import {
   PanelLeftOpen,
   Wrench,
 } from 'lucide-react';
-import { getAbout, getAuthStatus, logoutAdmin, type AuthStatus, type Station } from '../api';
-import { church } from '../config/dashboard.config';
+import { getAbout, getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
 import { ALL_CAMPUSES, CampusContext } from './campus';
+import { ChurchContext, EMPTY_CHURCH } from './church';
+import type { Church } from '../types';
 import { Clock } from '../components/Clock';
 import { SelectField } from '../components/SelectField';
 import { IdentityDialog } from '../components/IdentityDialog';
@@ -32,6 +34,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { to: '/admin/general', label: 'General', icon: Settings2 },
+  { to: '/admin/campuses', label: 'Campuses', icon: Building2 },
   { to: '/admin/users', label: 'Users & access', icon: Users },
   { to: '/admin/stations', label: 'Stations', icon: MonitorCog },
   { to: '/admin/checklists', label: 'Checklists', icon: ClipboardList },
@@ -51,6 +54,7 @@ export function AppShell() {
     () => localStorage.getItem('prodmesh.campus') ?? ALL_CAMPUSES,
   );
   const [version, setVersion] = useState('');
+  const [church, setChurch] = useState<Church>(EMPTY_CHURCH);
   const [identity, setIdentity] = useState<AuthStatus | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -63,6 +67,15 @@ export function AppShell() {
       setIdentity(s);
       if (!s.station) setIdentityOpen(true);
     }).catch(() => setIdentityOpen(true));
+  }, []);
+
+  // Server-owned topology (ADR 0009): fetch at boot, refetch when the
+  // Campuses editor announces a save.
+  useEffect(() => {
+    const load = () => getConfig().then(setChurch).catch(() => {});
+    load();
+    window.addEventListener('prodmesh:config-changed', load);
+    return () => window.removeEventListener('prodmesh:config-changed', load);
   }, []);
 
   useEffect(() => {
@@ -130,6 +143,7 @@ export function AppShell() {
   };
 
   return (
+    <ChurchContext.Provider value={church}>
     <CampusContext.Provider value={campus}>
       <div className={`shell${collapsed ? ' shell--rail' : ''}`}>
         <aside className="sidebar">
@@ -147,7 +161,7 @@ export function AppShell() {
                 {church.sites.map((s) => (
                   <option key={s.id} value={s.id} disabled={s.status !== 'active'}>
                     {s.name}
-                    {s.status !== 'active' ? ' (soon)' : ''}
+                    {s.status !== 'active' ? ' (disabled)' : ''}
                   </option>
                 ))}
               </SelectField>
@@ -251,5 +265,6 @@ export function AppShell() {
         )}
       </div>
     </CampusContext.Provider>
+    </ChurchContext.Provider>
   );
 }

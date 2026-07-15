@@ -1,5 +1,7 @@
 // Frontend client for the dashboard backend (which proxies to Companion).
 
+import type { Church } from './types';
+
 export interface RoomMode {
   id: string;
   label: string;
@@ -368,6 +370,20 @@ export interface Version {
 }
 
 export const getVersion = () => getJson<Version>('/api/system/version');
+
+// Institution topology (name, sites, Quick Access tiles) — server-owned per
+// ADR 0009; the Admin → Campuses editor saves the whole tree transactionally.
+export const getConfig = () => getJson<Church>('/api/config');
+
+export async function saveConfig(church: Church): Promise<Church> {
+  const res = await fetch('/api/config', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify(church),
+  });
+  await requireOk(res);
+  return res.json();
+}
 
 export interface ServerLogTail {
   exists: boolean;

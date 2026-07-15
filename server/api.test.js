@@ -137,6 +137,29 @@ test('server log tail and audit trail require system.logs', async () => {
   assert.equal(loginEntry.stationName, 'API Test Station');
 });
 
+test('config is public to read, config.manage to write', async () => {
+  const read = await fetch(base + '/api/config');
+  assert.equal(read.status, 200);
+  const church = await read.json();
+  assert.ok(church.sites.length > 0);
+
+  const denied = await apiRequest('/api/config', {
+    method: 'PUT', body: church, token: operatorToken, stationToken: station.token,
+  });
+  assert.equal(denied.status, 403);
+
+  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const edited = structuredClone(church);
+  edited.name = 'Renamed Institution';
+  const saved = await apiRequest('/api/config', { method: 'PUT', body: edited, token });
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).name, 'Renamed Institution');
+  assert.equal((await (await fetch(base + '/api/config')).json()).name, 'Renamed Institution');
+
+  const bad = await apiRequest('/api/config', { method: 'PUT', body: { name: 'X', sites: [] }, token });
+  assert.equal(bad.status, 400);
+});
+
 test('locked mode is blocked without override, allowed with it', async () => {
   const blocked = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby' }, operatorToken, station.token);
   assert.equal(blocked.status, 403);

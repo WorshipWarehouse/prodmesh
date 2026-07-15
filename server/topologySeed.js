@@ -1,20 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  DASHBOARD CONFIG  —  this file is the dashboard.
+//  TOPOLOGY SEED  —  first-boot data for Admin-owned institution config.
 //
-//  Everything on screen comes from the object below. To make changes you almost
-//  never touch other files — you edit this one:
-//
-//   • New machine to screen-share into?  add a { type: 'screenshare', ... } tile
-//   • New Companion install?              add a { type: 'companion', ... } tile
-//   • New auditorium / site?              add to the arrays below
-//
-//  IMPORTANT: replace the placeholder hosts (PLACEHOLDER-*) with real IPs or
-//  hostnames. Hostnames like "main-companion.local" work great on a Bonjour LAN.
+//  This is the one-time seed for the sites / site_rooms / tiles tables (see
+//  appConfig.js). It is a verbatim port of the frontend's former static
+//  src/config/dashboard.config.ts. After the first boot the database owns the
+//  topology (Admin → Campuses edits it); this file only matters for a fresh
+//  install with an empty database.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Church } from '../types';
-
-export const church: Church = {
+export const seedChurch = {
   name: 'Production Dashboard',
 
   sites: [
@@ -226,7 +220,7 @@ export const church: Church = {
     {
       id: 'south-everett',
       name: 'South Campus',
-      status: 'coming-soon', // opens December 2026
+      status: 'disabled', // opens December 2026
       auditoriums: [
         {
           id: 'south-main',

@@ -1,13 +1,15 @@
 // Core data model for the production dashboard.
 //
-// The whole UI is driven by this shape — adding a site, auditorium, or tile is
-// a data edit in src/config/dashboard.config.ts, never a code change.
+// The whole UI is driven by this shape. It is served by GET /api/config
+// (server-owned in SQLite per ADR 0009) and edited in Admin → Campuses —
+// adding a site, auditorium, or tile is an Admin action, never a code change.
 //
 // To add a NEW kind of tile (a future "module"): add a variant to the `Tile`
-// union below and register a renderer in src/tiles/registry.tsx. Nothing else
-// in the app needs to change. That's the modularity guarantee.
+// union below, register a renderer in src/tiles/registry.tsx, and teach
+// server/validate.js validateChurch about its fields. That's the modularity
+// guarantee.
 
-export type SiteStatus = 'active' | 'coming-soon';
+export type SiteStatus = 'active' | 'disabled';
 
 export interface Church {
   name: string;
@@ -18,8 +20,6 @@ export interface Site {
   id: string;
   name: string;
   status: SiteStatus;
-  /** Short note shown under the site title, e.g. "Opens December 2026". */
-  note?: string;
   auditoriums: Auditorium[];
 }
 

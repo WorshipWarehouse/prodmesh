@@ -538,3 +538,156 @@
   background: rgba(255, 107, 107, 0.12);
   border: 1px solid var(--danger-soft);
 }
+
+/* Shared labeled-field pattern (matches the Stations form). */
+.lfield {
+  display: block;
+}
+
+.lfield > span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-faint);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lfield .field,
+.lfield .selectfield__control {
+  height: 40px;
+  box-sizing: border-box;
+  font-size: 0.88rem;
+  margin: 0;
+  width: 100%;
+}
+
+/* ── Admin → Campuses ───────────────────────────────────────────────────────── */
+.campuses__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.campuses__institution {
+  max-width: 360px;
+}
+
+.campuses__sitebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.campuses__site {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.campuses__siterow {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.campuses__siterow .lfield {
+  min-width: 180px;
+}
+
+.campuses__grow {
+  flex: 1;
+  min-width: 160px;
+}
+
+.campuses__room {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-raised);
+}
+
+.campuses__roomhead {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.campuses__roomname {
+  width: 260px;
+}
+
+.campuses__roomname .field {
+  font-weight: 600;
+}
+
+.campuses__tile {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.campuses__tile .lfield {
+  flex: 0 1 auto;
+  min-width: 130px;
+}
+
+.campuses__tile .lfield.campuses__grow {
+  flex: 1 1 180px;
+}
+
+.campuses__tileicon {
+  min-width: 132px !important;
+  flex: 0 0 132px !important;
+}
+
+.campuses__tileport {
+  min-width: 84px !important;
+  flex: 0 0 84px !important;
+}
+
+.campuses__tile .campuses__rowactions {
+  padding-bottom: 7px;
+}
+
+.campuses__addtile {
+  align-self: flex-start;
+}
+
+.campuses__rowactions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tile);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.iconbtn:hover {
+  color: var(--text);
+  background: var(--bg-tile-hover);
+}
+
+.iconbtn--danger:hover {
+  color: var(--danger);
+  border-color: var(--danger-soft);
+}

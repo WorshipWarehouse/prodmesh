@@ -6,7 +6,7 @@ import {
   type AuthStatus,
   type Station,
 } from '../api';
-import { church } from '../config/dashboard.config';
+import { useChurch } from '../layout/church';
 import { SelectField } from './SelectField';
 
 export function IdentityDialog({
@@ -24,6 +24,7 @@ export function IdentityDialog({
   onLogin: (status: AuthStatus) => void;
   onClose: () => void;
 }) {
+  const church = useChurch();
   const [name, setName] = useState('');
   const [stationCampus, setStationCampus] = useState(campusId === '*' ? '' : campusId);
   const [username, setUsername] = useState('');

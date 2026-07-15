@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getRooms, type RoomMeta } from '../api';
-import { church } from '../config/dashboard.config';
+import { useChurch } from '../layout/church';
 import { inCampus, useCampus, ALL_CAMPUSES } from '../layout/campus';
 import { RoomCard } from '../components/RoomCard';
 import { SiteSection } from '../components/SiteSection';
@@ -10,6 +10,7 @@ import { ChevronDown, Network } from 'lucide-react';
 // launcher (Companion / Screen Sharing / device UIs) for the same campus.
 export function Home() {
   const { campusId } = useCampus();
+  const church = useChurch();
   const [rooms, setRooms] = useState<RoomMeta[]>([]);
 
   useEffect(() => {

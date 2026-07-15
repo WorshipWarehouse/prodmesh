@@ -34,7 +34,7 @@
   color: var(--text-dim);
 }
 
-.site--coming-soon {
+.site--disabled {
   opacity: 0.78;
 }
 

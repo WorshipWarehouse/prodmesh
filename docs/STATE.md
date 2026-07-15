@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **85 server tests** with **10 frontend interaction/configuration tests**
+  combines **89 server tests** with **10 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin.
 - **Station identity + named users** (feature branch): each browser registers a
@@ -104,6 +104,17 @@ Notes:
   stations, assign campus/room context, or revoke them. Revocation invalidates
   sessions created at that station; revoking the current browser returns it to
   first-run registration. Guarded by the extensible `stations.manage` permission.
+- **Server-owned topology** (2026-07-15, ADR 0009 milestone): the institution
+  name, sites, rooms, and Quick Access tiles now live in SQLite (`sites`,
+  `site_rooms`, `tiles`) and are served by `GET /api/config`; the frontend's
+  static `src/config/dashboard.config.ts` is deleted (seeded verbatim into the
+  database on first boot via `server/topologySeed.js`). **Admin → Campuses**
+  edits the whole tree (draft + transactional whole-tree save, `config.manage`
+  permission) — adding a site, room, or device tile is a browser action, no
+  rebuild. The frontend is now purely an API client: every screen's topology
+  comes from the server, refreshed live after a save. Room *integration*
+  wiring (`rooms.config.js`) intentionally remains a dev-owned server file
+  until an Admin UI takes ownership of it.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is
@@ -121,18 +132,25 @@ Notes:
      `?chunked=true` does NOT push item changes, so we poll `/v1/playlist/active`.
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
      port per machine); wire Youth (PP host TBD).
-2. **PC Calendar integration** — authoritative event→room→time. Unlocks:
+2. **Room configuration page** (`/admin/campuses/<roomId>`, agreed 2026-07-15):
+   Campuses becomes a site/room overview; each room gets its own page with
+   sections — Identity (name, site), Quick Access tiles (move the tile editor
+   there), and later **Connectivity**, where `rooms.config.js` migrates in one
+   integration at a time (Companion host + mode buttons, ProPresenter, Smaart,
+   PC service types). This is the seam that converges `site_rooms` (topology)
+   with the server rooms map (integration wiring) — same ids, one entity.
+3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
-3. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
+4. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
    `mock: false`. (Auditorium is the template.)
-4. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
-5. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
+5. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
+6. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
    `install-service.sh` run on Booth-Producer (launchd label `com.prodmesh.dashboard`,
    port 8080, logs in `~/prodmesh/logs/server.log`, RunAtLoad + KeepAlive). The
    Producer bridges the production LAN and the audio network, so it reaches
    Smaart directly.
-6. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
+7. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
 
 ## Deferred tech debt (known, low-risk)
 

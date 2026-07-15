@@ -81,3 +81,106 @@ export function validateTemplateItems(items) {
   }
   return items;
 }
+
+// ── Institution topology (sites / rooms / Quick Access tiles) ────────────────
+// Validates the whole tree the Admin → Campuses editor saves. Returns a
+// normalized copy (trimmed strings, only known fields) so junk never persists.
+
+const TOPO_ID = /^[a-z0-9][a-z0-9-]{0,59}$/;
+const TILE_TYPES = new Set(['companion', 'screenshare', 'link', 'route', 'placeholder']);
+const COMPANION_VIEWS = new Set(['admin', 'tablet', 'emulator']);
+
+export function validateChurch(input) {
+  if (!input || typeof input !== 'object') throw new Error('config must be an object');
+  const name = String(input.name ?? '').trim();
+  if (!name || name.length > 80) throw new Error('Institution name must be 1–80 characters');
+  if (!Array.isArray(input.sites) || input.sites.length === 0) throw new Error('At least one site is required');
+  if (input.sites.length > 20) throw new Error('Too many sites (max 20)');
+
+  const seen = new Set();
+  const claim = (id, what) => {
+    if (typeof id !== 'string' || !TOPO_ID.test(id)) {
+      throw new Error(`${what} id "${id}" must be lowercase letters, numbers, and dashes`);
+    }
+    if (seen.has(id)) throw new Error(`Duplicate id "${id}"`);
+    seen.add(id);
+    return id;
+  };
+  const text = (value, what, max, { required = false } = {}) => {
+    const s = String(value ?? '').trim();
+    if (required && !s) throw new Error(`${what} is required`);
+    if (s.length > max) throw new Error(`${what} must be at most ${max} characters`);
+    return s || undefined;
+  };
+
+  const sites = input.sites.map((site) => {
+    const id = claim(site?.id, 'Site');
+    if (site.status !== 'active' && site.status !== 'disabled') {
+      throw new Error(`Site "${id}" status must be active or disabled`);
+    }
+    const auditoriums = Array.isArray(site.auditoriums) ? site.auditoriums : [];
+    if (auditoriums.length > 20) throw new Error(`Site "${id}" has too many rooms (max 20)`);
+    return {
+      id,
+      name: text(site.name, `Site "${id}" name`, 60, { required: true }),
+      status: site.status,
+      auditoriums: auditoriums.map((room) => {
+        const roomId = claim(room?.id, 'Room');
+        const tiles = Array.isArray(room.tiles) ? room.tiles : [];
+        if (tiles.length > 40) throw new Error(`Room "${roomId}" has too many tiles (max 40)`);
+        return {
+          id: roomId,
+          name: text(room.name, `Room "${roomId}" name`, 60, { required: true }),
+          tiles: tiles.map((tile) => validateTile(tile, claim, text)),
+        };
+      }),
+    };
+  });
+
+  return { name, sites };
+}
+
+function validateTile(tile, claim, text) {
+  const id = claim(tile?.id, 'Tile');
+  if (!TILE_TYPES.has(tile.type)) throw new Error(`Tile "${id}" has unknown type "${tile.type}"`);
+  const base = {
+    id,
+    type: tile.type,
+    label: text(tile.label, `Tile "${id}" label`, 60, { required: true }),
+    note: text(tile.note, `Tile "${id}" note`, 120),
+    icon: text(tile.icon, `Tile "${id}" icon`, 8),
+  };
+  switch (tile.type) {
+    case 'companion': {
+      const out = { ...base, host: text(tile.host, `Tile "${id}" host`, 120, { required: true }) };
+      if (tile.port != null && tile.port !== '') {
+        const port = Number(tile.port);
+        if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Tile "${id}" port must be 1–65535`);
+        out.port = port;
+      }
+      if (tile.view != null && tile.view !== '') {
+        if (!COMPANION_VIEWS.has(tile.view)) throw new Error(`Tile "${id}" view must be admin, tablet, or emulator`);
+        out.view = tile.view;
+      }
+      return out;
+    }
+    case 'screenshare':
+      return {
+        ...base,
+        host: text(tile.host, `Tile "${id}" host`, 120, { required: true }),
+        username: text(tile.username, `Tile "${id}" username`, 60),
+      };
+    case 'link': {
+      const url = text(tile.url, `Tile "${id}" url`, 300, { required: true });
+      if (!/^https?:\/\//.test(url)) throw new Error(`Tile "${id}" url must start with http:// or https://`);
+      return { ...base, url };
+    }
+    case 'route': {
+      const to = text(tile.to, `Tile "${id}" route`, 200, { required: true });
+      if (!to.startsWith('/')) throw new Error(`Tile "${id}" route must start with /`);
+      return { ...base, to };
+    }
+    default: // placeholder
+      return base;
+  }
+}
