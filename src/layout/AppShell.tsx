@@ -7,6 +7,7 @@ import {
   ClipboardList,
   MonitorCog,
   LockKeyhole,
+  ScrollText,
   Settings2,
   Users,
   Home as HomeIcon,
@@ -34,6 +35,7 @@ const ADMIN_NAV = [
   { to: '/admin/users', label: 'Users & access', icon: Users },
   { to: '/admin/stations', label: 'Stations', icon: MonitorCog },
   { to: '/admin/checklists', label: 'Checklists', icon: ClipboardList },
+  { to: '/admin/logs', label: 'Logs', icon: ScrollText },
 ];
 
 // Persistent chrome: a left sidebar (collapsible to an icon rail) with the
