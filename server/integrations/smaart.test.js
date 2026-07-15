@@ -67,6 +67,50 @@ function fakeSmaart({ requireAuth = true } = {}) {
   };
 }
 
+// A fake Smaart v8 (as observed live on 8.5.2.2 at Grace Community FOH):
+// /api/v4/ accepts the WebSocket but never answers RPCs; the real API is the
+// same dialect at /api/v3/.
+function fakeSmaartV8() {
+  const wss = new WebSocketServer({ port: 0 });
+  const seen = { v4Messages: 0, streamPath: null };
+
+  wss.on('connection', (ws, req) => {
+    if (req.url === '/api/v4/') {
+      ws.on('message', () => { seen.v4Messages += 1; }); // silence, like the real thing
+      return;
+    }
+    if (req.url === '/api/v3/') {
+      ws.on('message', (data) => {
+        const { sequenceNumber, action, target } = JSON.parse(data);
+        const reply = (response) => ws.send(JSON.stringify({ sequenceNumber, response }));
+        if (action === 'get' && !target) {
+          return reply({ applicationName: 'Smaart v8', applicationVersion: '8.5.2.2', authenticationRequired: false });
+        }
+        if (action === 'get' && target === 'activeCalibratedInputs') {
+          return reply({
+            devices: [{
+              deviceName: 'SoundGrid',
+              activeCalibratedChannels: [
+                { channelIndex: 0, channelName: 'FOH Mic', streamEndpoint: '/api/v3/devices/SoundGrid/channels/FOH%20Mic' },
+              ],
+            }],
+            metrics: ['FS Peak', 'SPL A Slow', 'LAeq 10'],
+          });
+        }
+        reply({ error: 'unknown action' });
+      });
+      return;
+    }
+    seen.streamPath = req.url;
+    const iv = setInterval(() => {
+      ws.send(JSON.stringify({ metrics: [{ 'SPL A Slow': 91.24 }] }));
+    }, 20);
+    ws.on('close', () => clearInterval(iv));
+  });
+
+  return { seen, port: () => wss.address().port, close: () => new Promise((r) => wss.close(r)) };
+}
+
 function collectSamples(cfg, count) {
   const ctl = new AbortController();
   const samples = [];
@@ -114,6 +158,18 @@ test('real transport: unknown metric falls back to an SPL/Leq meter, never dBFS'
       1,
     );
     assert.equal(samples[0].spl, 85.3); // first SPL-family meter, not FS Peak (-54.4)
+  } finally {
+    await srv.close();
+  }
+});
+
+test('real transport: falls back to API v3 when the v4 socket is silent (Smaart v8)', async () => {
+  const srv = fakeSmaartV8();
+  try {
+    const samples = await collectSamples({ host: '127.0.0.1', port: srv.port(), helloMs: 200 }, 2);
+    assert.equal(samples[0].spl, 91.2);
+    assert.ok(srv.seen.v4Messages >= 1, 'should have tried /api/v4/ first');
+    assert.equal(decodeURIComponent(srv.seen.streamPath), '/api/v3/devices/SoundGrid/channels/FOH Mic');
   } finally {
     await srv.close();
   }

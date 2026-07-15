@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
+    "dev": "PRODMESH_LOCAL_TEST=1 concurrently -n web,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
     "dev:web": "vite",
-    "dev:api": "node --watch server/index.js",
+    "dev:api": "PRODMESH_LOCAL_TEST=1 node --watch server/index.js",
     "build": "tsc -b && vite build",
     "start": "NODE_ENV=production node server/index.js",
     "update": "bash deploy/update.sh",

@@ -35,7 +35,9 @@ function mode(id, label, color, match, [page, row, column], extra = {}) {
   return { id, label, color, match, press: { page, row, column }, ...extra };
 }
 
-export const rooms = {
+// The dev fixture room. Opt-in via PRODMESH_LOCAL_TEST=1 (the npm dev scripts
+// set it) so production deployments never show it.
+const localTest = {
   // ── Local test against the Companion running on THIS machine ────────────────
   'local-test': {
     id: 'local-test',
@@ -56,6 +58,10 @@ export const rooms = {
     smaart: { mock: true, target: 90, limit: 95 },
     modes: standardModes(),
   },
+};
+
+export const rooms = {
+  ...(process.env.PRODMESH_LOCAL_TEST === '1' ? localTest : {}),
 
   // ── North rooms (pre-filled with the standard convention; flip mock when ──
   //    each room's Companion has the roomState variable + row-3 buttons set up) ─
@@ -77,11 +83,11 @@ export const rooms = {
       ],
     },
     proPresenter: { host: '192.0.2.74', port: 62202 }, // ProPresenter (confirm port on-site)
-    // Smaart SPL — live transport is implemented (SDK v4, integrations/smaart.js);
-    // fill in the FOH Mac once Smaart's API is enabled there (Options → API,
-    // default port 26000). Optional: password, device/channel (default: first
-    // logging input), metric (default 'SPL A Slow').
-    // smaart: { host: '<FOH Mac>', port: 26000, target: 90, limit: 95 },
+    // Smaart SPL — FOH Mac ("FOH-Soundgrid"), Smaart v8 8.5.2.2, API v3 (the
+    // transport negotiates the path automatically; verified live 2026-07-14).
+    // Optional: password, device/channel (default: first logging input),
+    // metric (default 'SPL A Slow'), apiPath (to pin a specific API version).
+    smaart: { host: '192.0.2.7', port: 26000, target: 90, limit: 95 },
     // Auditorium-specific modes. Button locations [page, row, column].
     modes: [
       mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),

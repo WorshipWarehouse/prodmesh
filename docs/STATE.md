@@ -15,7 +15,7 @@ opens Dec 2026, no rooms wired yet.
 | Auditorium (`north-main`) | **live** — 192.0.2.31, var `roomState`, buttons pg3 | Sunday/Second Service/Midweek/Evening/Event/Standby (real) | **live** — Sunday, Second Service, Midweek, Evening |
 | Youth (`north-youth`) | mock — 192.0.2.150 (config ready) | standard set (Sunday/Mid-Week/Event/Standby) — **real modes unknown** | **live** — Youth Service |
 | Chapel (`north-chapel`) | mock — 192.0.2.101 (config ready) | standard set — **real modes unknown** | **live** — Chapel Service |
-| Local Test (`local-test`) | live — 127.0.0.1 (dev fixture) | standard set | live — Sunday (demo) |
+| Local Test (`local-test`) | live — 127.0.0.1 (dev fixture; **opt-in via `PRODMESH_LOCAL_TEST=1`**, set by the npm dev scripts — hidden in production) | standard set | live — Sunday (demo) |
 
 Notes:
 - Companion "live" means `mock: false`; it only actually reaches Companion when the
@@ -30,7 +30,7 @@ Notes:
 | Bitfocus Companion (per room) | Live for Auditorium; Youth/Chapel mock pending real setup |
 | Planning Center **Services** | **Live** — plan display + order of service, PAT in `server/data/secrets.json` |
 | Planning Center **Calendar** | **Not started** — awaiting read-only access. High value (see below) |
-| **Smaart SPL** | **Transport implemented** (SDK v4 doc received 2026-07-06) — full pipeline (capture → SQLite → live meter + report, ADR 0006) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream, tested against a protocol-faithful fake). Remaining: enable API in Smaart on the FOH Mac, set `smaart.host` in rooms.config, verify on-site. Rooms stay `mock: true` until then |
+| **Smaart SPL** | **Transport implemented; v8 compat added 2026-07-14** — full pipeline (capture → SQLite → live meter + report) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream). FOH Mac probe (2026-07-14) found **Smaart v8 (8.5.2.2)**: its `/api/v4/` socket accepts connections but never answers RPCs; the same dialect lives at `/api/v3/`. Transport now negotiates v4 → v3 and caches the answering path (`smaart.apiPath` pins it). Remaining: with SPL metering running on a calibrated input (Sunday), re-run `server/tools/smaart-probe.js` to confirm the v3 stream frame shape, then flip the room off `mock` |
 
 ## What's live right now
 
@@ -122,8 +122,11 @@ Notes:
 3. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
    `mock: false`. (Auditorium is the template.)
 4. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
-5. **Confirm production deployment** on the Producer Mac via `deploy/install-service.sh`
-   (dev has happened on jbeale's Mac; verify the box is running the service).
+5. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
+   `install-service.sh` run on Booth-Producer (launchd label `com.prodmesh.dashboard`,
+   port 8080, logs in `~/prodmesh/logs/server.log`, RunAtLoad + KeepAlive). The
+   Producer bridges the production LAN and the audio network, so it reaches
+   Smaart directly.
 6. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
 
 ## Deferred tech debt (known, low-risk)
