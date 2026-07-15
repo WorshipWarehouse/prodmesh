@@ -16,7 +16,7 @@ const testChurch = {
   name: 'Test Church',
   sites: [
     { id: 'north', name: 'North', status: 'active' as const, auditoriums: [] },
-    { id: 'south-everett', name: 'South Campus', status: 'coming-soon' as const, auditoriums: [] },
+    { id: 'south-everett', name: 'South Campus', status: 'disabled' as const, auditoriums: [] },
   ],
 };
 

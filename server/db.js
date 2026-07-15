@@ -73,9 +73,11 @@ function migrate(d) {
       id       TEXT PRIMARY KEY,
       name     TEXT NOT NULL,
       status   TEXT NOT NULL DEFAULT 'active',
-      note     TEXT,
       position INTEGER NOT NULL
     );
+    -- Early builds of this table used status 'coming-soon'; the model is now
+    -- simply active/disabled.
+    UPDATE sites SET status = 'disabled' WHERE status = 'coming-soon';
 
     CREATE TABLE IF NOT EXISTS site_rooms (
       id       TEXT PRIMARY KEY,

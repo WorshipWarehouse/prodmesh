@@ -9,7 +9,7 @@
 // server/validate.js validateChurch about its fields. That's the modularity
 // guarantee.
 
-export type SiteStatus = 'active' | 'coming-soon';
+export type SiteStatus = 'active' | 'disabled';
 
 export interface Church {
   name: string;
@@ -20,8 +20,6 @@ export interface Site {
   id: string;
   name: string;
   status: SiteStatus;
-  /** Short note shown under the site title, e.g. "Opens December 2026". */
-  note?: string;
   auditoriums: Auditorium[];
 }
 

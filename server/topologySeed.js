@@ -220,7 +220,7 @@ export const seedChurch = {
     {
       id: 'south-everett',
       name: 'South Campus',
-      status: 'coming-soon', // opens December 2026
+      status: 'disabled', // opens December 2026
       auditoriums: [
         {
           id: 'south-main',

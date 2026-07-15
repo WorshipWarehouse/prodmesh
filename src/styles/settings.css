@@ -539,6 +539,29 @@
   border: 1px solid var(--danger-soft);
 }
 
+/* Shared labeled-field pattern (matches the Stations form). */
+.lfield {
+  display: block;
+}
+
+.lfield > span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-faint);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lfield .field,
+.lfield .selectfield__control {
+  height: 40px;
+  box-sizing: border-box;
+  font-size: 0.88rem;
+  margin: 0;
+  width: 100%;
+}
+
 /* ── Admin → Campuses ───────────────────────────────────────────────────────── */
 .campuses__head {
   display: flex;
@@ -548,16 +571,7 @@
 }
 
 .campuses__institution {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   max-width: 360px;
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-
-.campuses__institution .field {
-  margin: 0;
 }
 
 .campuses__sitebar {
@@ -580,16 +594,8 @@
   flex-wrap: wrap;
 }
 
-.campuses__siterow label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.74rem;
-  color: var(--text-dim);
-}
-
-.campuses__siterow .field {
-  margin: 0;
+.campuses__siterow .lfield {
+  min-width: 180px;
 }
 
 .campuses__grow {
@@ -609,44 +615,47 @@
 
 .campuses__roomhead {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
 }
 
 .campuses__roomname {
-  margin: 0;
-  max-width: 260px;
+  width: 260px;
+}
+
+.campuses__roomname .field {
   font-weight: 600;
 }
 
 .campuses__tile {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  padding-top: 4px;
 }
 
-.campuses__tile .field {
-  margin: 0;
-  min-width: 120px;
+.campuses__tile .lfield {
   flex: 0 1 auto;
+  min-width: 130px;
 }
 
-.campuses__tile .campuses__grow {
+.campuses__tile .lfield.campuses__grow {
   flex: 1 1 180px;
 }
 
 .campuses__tileicon {
-  width: 52px;
-  min-width: 52px !important;
-  flex: 0 0 52px !important;
-  text-align: center;
+  min-width: 132px !important;
+  flex: 0 0 132px !important;
 }
 
 .campuses__tileport {
-  width: 76px;
-  min-width: 76px !important;
-  flex: 0 0 76px !important;
+  min-width: 84px !important;
+  flex: 0 0 84px !important;
+}
+
+.campuses__tile .campuses__rowactions {
+  padding-bottom: 7px;
 }
 
 .campuses__addtile {

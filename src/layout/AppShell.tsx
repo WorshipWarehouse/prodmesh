@@ -161,7 +161,7 @@ export function AppShell() {
                 {church.sites.map((s) => (
                   <option key={s.id} value={s.id} disabled={s.status !== 'active'}>
                     {s.name}
-                    {s.status !== 'active' ? ' (soon)' : ''}
+                    {s.status !== 'active' ? ' (disabled)' : ''}
                   </option>
                 ))}
               </SelectField>

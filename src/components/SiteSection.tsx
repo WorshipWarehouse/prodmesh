@@ -6,10 +6,9 @@ export function SiteSection({ site }: { site: Site }) {
     <section className={`site site--${site.status}`}>
       <header className="site__header">
         <h2 className="site__name">{site.name}</h2>
-        {site.status === 'coming-soon' && (
+        {site.status === 'disabled' && (
           <span className="site__badge">DISABLED</span>
         )}
-        {site.note && <span className="site__note">{site.note}</span>}
       </header>
       <div className="site__auditoriums">
         {site.auditoriums.map((auditorium) => (

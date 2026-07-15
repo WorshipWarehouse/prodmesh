@@ -115,8 +115,8 @@ export function validateChurch(input) {
 
   const sites = input.sites.map((site) => {
     const id = claim(site?.id, 'Site');
-    if (site.status !== 'active' && site.status !== 'coming-soon') {
-      throw new Error(`Site "${id}" status must be active or coming-soon`);
+    if (site.status !== 'active' && site.status !== 'disabled') {
+      throw new Error(`Site "${id}" status must be active or disabled`);
     }
     const auditoriums = Array.isArray(site.auditoriums) ? site.auditoriums : [];
     if (auditoriums.length > 20) throw new Error(`Site "${id}" has too many rooms (max 20)`);
@@ -124,7 +124,6 @@ export function validateChurch(input) {
       id,
       name: text(site.name, `Site "${id}" name`, 60, { required: true }),
       status: site.status,
-      note: text(site.note, `Site "${id}" note`, 120),
       auditoriums: auditoriums.map((room) => {
         const roomId = claim(room?.id, 'Room');
         const tiles = Array.isArray(room.tiles) ? room.tiles : [];
