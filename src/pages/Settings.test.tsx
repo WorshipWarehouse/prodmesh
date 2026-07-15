@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CampusesPanel, LogsPanel, StationsPanel, UserManagementPanel } from './Settings';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { CampusesPanel, LogsPanel, RoomConfigPanel, StationsPanel, UserManagementPanel } from './Settings';
 
 const api = vi.hoisted(() => ({
   getUserDirectory: vi.fn(),
@@ -156,40 +157,53 @@ describe('Campuses', () => {
     api.saveConfig.mockImplementation(async (c: unknown) => c);
   });
 
-  it('edits a tile host and saves the whole tree', async () => {
+  it('overview lists rooms with Configure links; new rooms need a save first', async () => {
     const user = userEvent.setup();
-    render(<CampusesPanel />);
+    render(<MemoryRouter><CampusesPanel /></MemoryRouter>);
 
-    expect(await screen.findByText('Campuses & tiles')).toBeInTheDocument();
-    const save = screen.getByRole('button', { name: 'Saved' });
-    expect(save).toBeDisabled();
-
-    const host = screen.getByLabelText('Host');
-    await user.clear(host);
-    await user.type(host, '192.0.2.99');
-
-    const enabled = screen.getByRole('button', { name: 'Save changes' });
-    await user.click(enabled);
-
-    await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
-    const sent = api.saveConfig.mock.calls[0][0];
-    expect(sent.sites[0].auditoriums[0].tiles[0].host).toBe('192.0.2.99');
-    expect(await screen.findByText(/Saved\. All screens/)).toBeInTheDocument();
-  });
-
-  it('adds a room and a tile to the draft', async () => {
-    const user = userEvent.setup();
-    render(<CampusesPanel />);
-    await screen.findByText('Campuses & tiles');
+    expect(await screen.findByText('Main Auditorium')).toBeInTheDocument();
+    expect(screen.getByText('2 tiles')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Configure' })).toHaveAttribute('href', '/admin/campuses/north-main');
 
     await user.click(screen.getByRole('button', { name: '+ Add room' }));
-    expect(screen.getAllByLabelText('Room name')).toHaveLength(2);
+    expect(screen.getByText('save to configure')).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole('button', { name: '+ Add tile' })[1]);
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
     const sent = api.saveConfig.mock.calls[0][0];
     expect(sent.sites[0].auditoriums).toHaveLength(2);
-    expect(sent.sites[0].auditoriums[1].tiles).toHaveLength(1);
+  });
+
+  it('room page edits a tile host and saves the whole tree', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
+        <Routes>
+          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Quick Access tiles')).toBeInTheDocument();
+    const host = screen.getByLabelText('Host');
+    await user.clear(host);
+    await user.type(host, '192.0.2.99');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
+    const sent = api.saveConfig.mock.calls[0][0];
+    expect(sent.sites[0].auditoriums[0].tiles[0].host).toBe('192.0.2.99');
+  });
+
+  it('room page shows not-found for an unknown room id', async () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/campuses/nope']}>
+        <Routes>
+          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/No room "nope" exists/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '← All campuses' })).toBeInTheDocument();
   });
 });
