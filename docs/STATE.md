@@ -104,6 +104,12 @@ Notes:
   stations, assign campus/room context, or revoke them. Revocation invalidates
   sessions created at that station; revoking the current browser returns it to
   first-run registration. Guarded by the extensible `stations.manage` permission.
+- **Room configuration page** (2026-07-15): Admin → Campuses is a site/room
+  overview (institution name, site chips, room rows with tile counts); each
+  room's **Configure** opens `/admin/campuses/<roomId>` with Identity (name,
+  site, stable room id), the Quick Access tile editor, and a Connectivity
+  section that will absorb `rooms.config.js` one integration at a time.
+  Rooms added in an unsaved draft show "save to configure" until saved.
 - **Server-owned topology** (2026-07-15, ADR 0009 milestone): the institution
   name, sites, rooms, and Quick Access tiles now live in SQLite (`sites`,
   `site_rooms`, `tiles`) and are served by `GET /api/config`; the frontend's
@@ -132,13 +138,12 @@ Notes:
      `?chunked=true` does NOT push item changes, so we poll `/v1/playlist/active`.
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
      port per machine); wire Youth (PP host TBD).
-2. **Room configuration page** (`/admin/campuses/<roomId>`, agreed 2026-07-15):
-   Campuses becomes a site/room overview; each room gets its own page with
-   sections — Identity (name, site), Quick Access tiles (move the tile editor
-   there), and later **Connectivity**, where `rooms.config.js` migrates in one
-   integration at a time (Companion host + mode buttons, ProPresenter, Smaart,
-   PC service types). This is the seam that converges `site_rooms` (topology)
-   with the server rooms map (integration wiring) — same ids, one entity.
+2. **Connectivity migration into the room page** (page built 2026-07-15; see
+   "What's live"): migrate `rooms.config.js` into the room configuration page
+   one integration at a time — Companion host + mode buttons, ProPresenter,
+   Smaart, PC service types. This is the seam that converges `site_rooms`
+   (topology) with the server rooms map (integration wiring) — same ids, one
+   entity.
 3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.

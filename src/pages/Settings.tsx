@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2, Zap } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { SelectField } from '../components/SelectField';
@@ -39,7 +40,7 @@ import type { Church, Site, Tile } from '../types';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type AdminSection = 'general' | 'campuses' | 'users' | 'stations' | 'checklists' | 'logs';
+type AdminSection = 'general' | 'campuses' | 'room' | 'users' | 'stations' | 'checklists' | 'logs';
 
 export function Settings({ section = 'general' }: { section?: AdminSection }) {
   const [phase, setPhase] = useState<Phase>('loading');
@@ -60,6 +61,7 @@ export function Settings({ section = 'general' }: { section?: AdminSection }) {
     users: ['Users & access', 'Operators, permission groups, and Planning Center identities'],
     stations: ['Stations', 'Registered browsers, assignments, and recent activity'],
     campuses: ['Campuses', 'Institution name, sites, rooms, and Quick Access tiles'],
+    room: ['Room configuration', 'Identity, Quick Access tiles, and connectivity'],
     checklists: ['Checklists', 'Startup checklist templates by event type'],
     logs: ['Logs', 'Server process log and the audit trail'],
   } as const;
@@ -139,6 +141,7 @@ function AdminPanels({ section }: { section: AdminSection }) {
     <>
       {section === 'general' && <><SecurityPanel /><SystemPanel /><SchedulesPanel /></>}
       {section === 'campuses' && <CampusesPanel />}
+      {section === 'room' && <RoomConfigPanel />}
       {section === 'users' && <UserManagementPanel />}
       {section === 'stations' && <StationsPanel />}
       {section === 'checklists' && <ChecklistsPanel />}
@@ -1006,10 +1009,11 @@ function allIds(church: Church) {
   return ids;
 }
 
-export function CampusesPanel() {
+// Shared draft plumbing: both the overview and the room page edit a local
+// copy of the whole tree and save it transactionally (PUT /api/config).
+function useChurchDraft() {
   const [draft, setDraft] = useState<Church | null>(null);
   const [baseline, setBaseline] = useState('');
-  const [selectedSite, setSelectedSite] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
 
@@ -1017,14 +1021,8 @@ export function CampusesPanel() {
     getConfig().then((c) => {
       setDraft(c);
       setBaseline(JSON.stringify(c));
-      setSelectedSite(c.sites[0]?.id ?? '');
     }).catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, []);
-
-  if (!draft) return err ? <p className="settings__error">{err}</p> : <p className="settings__muted">Loading…</p>;
-
-  const dirty = JSON.stringify(draft) !== baseline;
-  const site = draft.sites.find((s) => s.id === selectedSite) ?? draft.sites[0];
 
   const update = (fn: (next: Church) => void) => {
     setMsg('');
@@ -1035,16 +1033,10 @@ export function CampusesPanel() {
     });
   };
 
-  const move = <T,>(arr: T[], from: number, dir: -1 | 1) => {
-    const to = from + dir;
-    if (to < 0 || to >= arr.length) return;
-    [arr[from], arr[to]] = [arr[to], arr[from]];
-  };
-
   const save = async () => {
     setErr('');
     try {
-      const stored = await saveConfig(draft);
+      const stored = await saveConfig(draft!);
       setDraft(stored);
       setBaseline(JSON.stringify(stored));
       setMsg('Saved. All screens will pick this up.');
@@ -1054,19 +1046,51 @@ export function CampusesPanel() {
     }
   };
 
+  return {
+    draft,
+    baseline,
+    dirty: draft != null && JSON.stringify(draft) !== baseline,
+    msg,
+    err,
+    update,
+    save,
+  };
+}
+
+const moveIn = <T,>(arr: T[], from: number, dir: -1 | 1) => {
+  const to = from + dir;
+  if (to < 0 || to >= arr.length) return;
+  [arr[from], arr[to]] = [arr[to], arr[from]];
+};
+
+// The overview: institution name, sites, and each site's rooms as rows that
+// link into their own configuration page.
+export function CampusesPanel() {
+  const { draft, baseline, dirty, msg, err, update, save } = useChurchDraft();
+  const [selectedSite, setSelectedSite] = useState('');
+
+  if (!draft) return err ? <p className="settings__error">{err}</p> : <p className="settings__muted">Loading…</p>;
+
+  const site = draft.sites.find((s) => s.id === selectedSite) ?? draft.sites[0];
+  // Rooms that exist on the server (vs. added to this unsaved draft) — a new
+  // room's page can only load after the draft is saved.
+  const savedRoomIds = new Set(
+    (JSON.parse(baseline || '{"sites":[]}') as Church).sites.flatMap((s) => s.auditoriums).map((r) => r.id),
+  );
+
   return (
     <section className="panel campuses">
       <div className="campuses__head">
         <div>
           <p className="section-label">Topology</p>
-          <h2 className="panel__title">Campuses &amp; tiles</h2>
+          <h2 className="panel__title">Campuses</h2>
         </div>
         <button className="btn btn--primary" onClick={save} disabled={!dirty}>
           {dirty ? 'Save changes' : 'Saved'}
         </button>
       </div>
       <p className="settings__muted">
-        What every screen shows: sites, their rooms, and each room's Quick Access tiles.
+        Sites and their rooms. Open a room to configure its Quick Access tiles.
         Changes apply everywhere when you save — nothing is final until then.
       </p>
 
@@ -1108,9 +1132,9 @@ export function CampusesPanel() {
             </label>
             <div className="campuses__rowactions">
               <button className="iconbtn" title="Move site left" aria-label="Move site left"
-                onClick={() => update((n) => move(n.sites, n.sites.findIndex((s) => s.id === site.id), -1))}><ArrowUp size={14} /></button>
+                onClick={() => update((n) => moveIn(n.sites, n.sites.findIndex((s) => s.id === site.id), -1))}><ArrowUp size={14} /></button>
               <button className="iconbtn" title="Move site right" aria-label="Move site right"
-                onClick={() => update((n) => move(n.sites, n.sites.findIndex((s) => s.id === site.id), 1))}><ArrowDown size={14} /></button>
+                onClick={() => update((n) => moveIn(n.sites, n.sites.findIndex((s) => s.id === site.id), 1))}><ArrowDown size={14} /></button>
               <button className="iconbtn iconbtn--danger" title="Remove site" aria-label="Remove site"
                 onClick={() => update((n) => {
                   n.sites = n.sites.filter((s) => s.id !== site.id);
@@ -1119,20 +1143,22 @@ export function CampusesPanel() {
             </div>
           </div>
 
-          {site.auditoriums.map((room, roomIdx) => (
-            <div className="campuses__room" key={room.id}>
-              <div className="campuses__roomhead">
-                <label className="lfield campuses__roomname"><span>Room name</span>
-                  <input className="field" value={room.name}
-                    onChange={(e) => update((n) => {
-                      n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].name = e.target.value;
-                    })} />
-                </label>
+          <div className="campuses__roomlist">
+            {site.auditoriums.length === 0 && <p className="settings__muted">No rooms yet.</p>}
+            {site.auditoriums.map((room, roomIdx) => (
+              <div className="campuses__roomrow" key={room.id}>
+                <div className="campuses__roominfo">
+                  <strong>{room.name}</strong>
+                  <small>{room.tiles.length} tile{room.tiles.length === 1 ? '' : 's'}</small>
+                </div>
+                {savedRoomIds.has(room.id)
+                  ? <Link className="btn" to={`/admin/campuses/${room.id}`}>Configure</Link>
+                  : <span className="settings__muted campuses__unsaved">save to configure</span>}
                 <div className="campuses__rowactions">
                   <button className="iconbtn" title="Move room up" aria-label="Move room up"
-                    onClick={() => update((n) => move(n.sites.find((s) => s.id === site.id)!.auditoriums, roomIdx, -1))}><ArrowUp size={14} /></button>
+                    onClick={() => update((n) => moveIn(n.sites.find((s) => s.id === site.id)!.auditoriums, roomIdx, -1))}><ArrowUp size={14} /></button>
                   <button className="iconbtn" title="Move room down" aria-label="Move room down"
-                    onClick={() => update((n) => move(n.sites.find((s) => s.id === site.id)!.auditoriums, roomIdx, 1))}><ArrowDown size={14} /></button>
+                    onClick={() => update((n) => moveIn(n.sites.find((s) => s.id === site.id)!.auditoriums, roomIdx, 1))}><ArrowDown size={14} /></button>
                   <button className="iconbtn iconbtn--danger" title="Remove room" aria-label="Remove room"
                     onClick={() => update((n) => {
                       const s = n.sites.find((x) => x.id === site.id)!;
@@ -1140,29 +1166,8 @@ export function CampusesPanel() {
                     })}><Trash2 size={14} /></button>
                 </div>
               </div>
-
-              {room.tiles.map((tile, tileIdx) => (
-                <TileEditor key={tile.id} tile={tile}
-                  onChange={(patch) => update((n) => {
-                    const tiles = n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].tiles;
-                    tiles[tileIdx] = patch;
-                  })}
-                  onMove={(dir) => update((n) => move(n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].tiles, tileIdx, dir))}
-                  onRemove={() => update((n) => {
-                    const r = n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx];
-                    r.tiles = r.tiles.filter((t) => t.id !== tile.id);
-                  })}
-                />
-              ))}
-
-              <button className="btn campuses__addtile" onClick={() => update((n) => {
-                const id = slugId(`${room.id}-tile`, allIds(n));
-                n.sites.find((s) => s.id === site.id)!.auditoriums[roomIdx].tiles.push({
-                  id, type: 'link', label: 'New tile', url: 'http://',
-                });
-              })}>+ Add tile</button>
-            </div>
-          ))}
+            ))}
+          </div>
 
           <button className="btn" onClick={() => update((n) => {
             const id = slugId(`${site.id}-room`, allIds(n));
@@ -1174,6 +1179,114 @@ export function CampusesPanel() {
       {err && <p className="settings__error">{err}</p>}
       {msg && <p className="settings__ok">{msg}</p>}
     </section>
+  );
+}
+
+// One room's configuration page (/admin/campuses/:roomId): identity, Quick
+// Access tiles, and (soon) integration connectivity as rooms.config.js
+// migrates into the database.
+export function RoomConfigPanel() {
+  const { roomId } = useParams();
+  const { draft, dirty, msg, err, update, save } = useChurchDraft();
+
+  if (!draft) return err ? <p className="settings__error">{err}</p> : <p className="settings__muted">Loading…</p>;
+
+  const owner = draft.sites.find((s) => s.auditoriums.some((r) => r.id === roomId));
+  const room = owner?.auditoriums.find((r) => r.id === roomId);
+
+  if (!owner || !room) {
+    return (
+      <section className="panel">
+        <p className="settings__error">No room "{roomId}" exists.</p>
+        <Link className="btn" to="/admin/campuses">← All campuses</Link>
+      </section>
+    );
+  }
+
+  // Locate this room inside a draft copy, wherever it currently lives.
+  const findRoom = (n: Church) => {
+    const s = n.sites.find((x) => x.auditoriums.some((r) => r.id === roomId))!;
+    return { site: s, room: s.auditoriums.find((r) => r.id === roomId)! };
+  };
+
+  return (
+    <>
+      <section className="panel campuses">
+        <div className="campuses__head">
+          <div>
+            <p className="section-label"><Link className="campuses__back" to="/admin/campuses">← All campuses</Link></p>
+            <h2 className="panel__title">{room.name}</h2>
+          </div>
+          <button className="btn btn--primary" onClick={save} disabled={!dirty}>
+            {dirty ? 'Save changes' : 'Saved'}
+          </button>
+        </div>
+
+        <div className="campuses__siterow">
+          <label className="lfield"><span>Room name</span>
+            <input className="field" value={room.name}
+              onChange={(e) => update((n) => { findRoom(n).room.name = e.target.value; })} />
+          </label>
+          <label className="lfield"><span>Site</span>
+            <SelectField value={owner.id}
+              onChange={(e) => update((n) => {
+                const from = findRoom(n);
+                const dest = n.sites.find((x) => x.id === e.target.value)!;
+                from.site.auditoriums = from.site.auditoriums.filter((r) => r.id !== roomId);
+                dest.auditoriums.push(from.room);
+              })}>
+              {draft.sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </SelectField>
+          </label>
+          <label className="lfield"><span>Room ID</span>
+            <input className="field" value={room.id} disabled
+              title="Stable identifier — links this room to its server integrations" />
+          </label>
+        </div>
+
+        {err && <p className="settings__error">{err}</p>}
+        {msg && <p className="settings__ok">{msg}</p>}
+      </section>
+
+      <section className="panel campuses">
+        <div>
+          <p className="section-label">Launcher</p>
+          <h2 className="panel__title">Quick Access tiles</h2>
+        </div>
+        <p className="settings__muted">
+          The shortcuts this room shows on Home: Companion, screen sharing, device web UIs.
+        </p>
+
+        <div className="campuses__room">
+          {room.tiles.map((tile, tileIdx) => (
+            <TileEditor key={tile.id} tile={tile}
+              onChange={(patch) => update((n) => { findRoom(n).room.tiles[tileIdx] = patch; })}
+              onMove={(dir) => update((n) => moveIn(findRoom(n).room.tiles, tileIdx, dir))}
+              onRemove={() => update((n) => {
+                const r = findRoom(n).room;
+                r.tiles = r.tiles.filter((t) => t.id !== tile.id);
+              })}
+            />
+          ))}
+          <button className="btn campuses__addtile" onClick={() => update((n) => {
+            const id = slugId(`${roomId}-tile`, allIds(n));
+            findRoom(n).room.tiles.push({ id, type: 'link', label: 'New tile', url: 'http://' });
+          })}>+ Add tile</button>
+        </div>
+      </section>
+
+      <section className="panel campuses">
+        <div>
+          <p className="section-label">Connectivity</p>
+          <h2 className="panel__title">Integrations</h2>
+        </div>
+        <p className="settings__muted">
+          Companion, ProPresenter, Smaart, and Planning Center wiring for this room still
+          lives in <code>server/rooms.config.js</code> — it migrates here, one integration
+          at a time.
+        </p>
+      </section>
+    </>
   );
 }
 

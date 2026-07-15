@@ -691,3 +691,47 @@
   color: var(--danger);
   border-color: var(--danger-soft);
 }
+
+/* Campuses overview room rows + room page back link */
+.campuses__roomlist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campuses__roomrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  padding: 10px 12px;
+}
+
+.campuses__roominfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
+
+.campuses__roominfo small {
+  color: var(--text-faint);
+  font-size: 0.7rem;
+}
+
+.campuses__unsaved {
+  font-size: 0.74rem;
+}
+
+.campuses__back {
+  color: var(--text-faint);
+  text-decoration: none;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.campuses__back:hover {
+  color: var(--accent-text);
+}
