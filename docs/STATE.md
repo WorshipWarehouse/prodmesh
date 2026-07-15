@@ -132,18 +132,25 @@ Notes:
      `?chunked=true` does NOT push item changes, so we poll `/v1/playlist/active`.
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
      port per machine); wire Youth (PP host TBD).
-2. **PC Calendar integration** — authoritative event→room→time. Unlocks:
+2. **Room configuration page** (`/admin/campuses/<roomId>`, agreed 2026-07-15):
+   Campuses becomes a site/room overview; each room gets its own page with
+   sections — Identity (name, site), Quick Access tiles (move the tile editor
+   there), and later **Connectivity**, where `rooms.config.js` migrates in one
+   integration at a time (Companion host + mode buttons, ProPresenter, Smaart,
+   PC service types). This is the seam that converges `site_rooms` (topology)
+   with the server rooms map (integration wiring) — same ids, one entity.
+3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
-3. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
+4. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
    `mock: false`. (Auditorium is the template.)
-4. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
-5. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
+5. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
+6. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
    `install-service.sh` run on Booth-Producer (launchd label `com.prodmesh.dashboard`,
    port 8080, logs in `~/prodmesh/logs/server.log`, RunAtLoad + KeepAlive). The
    Producer bridges the production LAN and the audio network, so it reaches
    Smaart directly.
-6. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
+7. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
 
 ## Deferred tech debt (known, low-risk)
 
