@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2, Zap } from 'lucide-react';
+import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2 } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
+import { HelpTip } from '../components/HelpTip';
 import { SelectField } from '../components/SelectField';
 import { useChurch } from '../layout/church';
 import {
@@ -199,11 +200,10 @@ export function UserManagementPanel() {
     <section className="panel users">
       <div>
         <p className="section-label">Access control</p>
-        <h2 className="panel__title">Users &amp; permissions</h2>
+        <h2 className="panel__title">Users &amp; permissions
+          <HelpTip text="Access is the union of a user's groups. Administrators always have every permission." />
+        </h2>
       </div>
-      <p className="settings__muted">
-        Users authenticate at a named station. Their effective access is the union of every assigned group; Administrators always have all permissions.
-      </p>
 
       <div className="users__grid">
         <div className="users__editor">
@@ -316,11 +316,10 @@ export function StationsPanel() {
     <section className="panel stations">
       <div>
         <p className="section-label">Browser identity</p>
-        <h2 className="panel__title">Registered stations</h2>
+        <h2 className="panel__title">Registered stations
+          <HelpTip text="A station identifies which browser an action came from. Revoking one signs out its sessions and returns that browser to first-run registration." />
+        </h2>
       </div>
-      <p className="settings__muted">
-        Stations identify where actions originate. Revoking one removes its registration and signs out sessions created there.
-      </p>
 
       <div className="stations__list">
         {stations.length === 0 && <p className="settings__muted">No registered stations.</p>}
@@ -507,11 +506,6 @@ function ChecklistsPanel() {
   return (
     <section className="panel">
       <h2 className="panel__title">Checklists</h2>
-      <p className="settings__muted">
-        Startup checklist per event type — it runs on that event’s detail page in whichever room
-        hosts it. Automated items (<Zap size={11} />) set the room’s mode when checked; lockouts
-        still apply.
-      </p>
 
       <div className="tpl-types">
         {typeIds.map((id) => (
@@ -748,10 +742,7 @@ function SchedulesPanel() {
   return (
     <section className="panel">
       <h2 className="panel__title">Schedules &amp; Locks</h2>
-      <p className="settings__muted">
-        During a window, the listed modes require the Override PIN. (Locks are
-        inactive until an Override PIN is set.)
-      </p>
+
       {rooms.map((room) => (
         <div key={room.id} className="sched-room">
           <div className="sched-room__head">
@@ -920,13 +911,13 @@ function AuditTrail() {
       <div className="audittrail__head">
         <div>
           <p className="section-label">Accountability</p>
-          <h2 className="panel__title">Audit trail</h2>
+          <h2 className="panel__title">Audit trail
+            <HelpTip text="Every consequential action, who did it, and from which station. The most recent 200 entries." />
+          </h2>
         </div>
         <button className="btn" onClick={refresh}>Refresh</button>
       </div>
-      <p className="settings__muted">
-        Who did what, from which station. The most recent 200 entries.
-      </p>
+
 
       {error && <p className="settings__error">{error}</p>}
       {entries && entries.length === 0 && <p className="settings__muted">Nothing recorded yet.</p>}
@@ -1043,7 +1034,7 @@ function useChurchDraft() {
       const stored = await saveConfig(draft!);
       setDraft(stored);
       setBaseline(JSON.stringify(stored));
-      setMsg('Saved. All screens will pick this up.');
+      setMsg('Saved.');
       window.dispatchEvent(new Event('prodmesh:config-changed'));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -1087,16 +1078,15 @@ export function CampusesPanel() {
       <div className="campuses__head">
         <div>
           <p className="section-label">Topology</p>
-          <h2 className="panel__title">Campuses</h2>
+          <h2 className="panel__title">Campuses
+            <HelpTip text="Changes apply everywhere when you save — nothing is final until then." />
+          </h2>
         </div>
         <button className="btn btn--primary" onClick={save} disabled={!dirty}>
           {dirty ? 'Save changes' : 'Saved'}
         </button>
       </div>
-      <p className="settings__muted">
-        Sites and their rooms. Open a room to configure its Quick Access tiles.
-        Changes apply everywhere when you save — nothing is final until then.
-      </p>
+
 
       <label className="lfield campuses__institution">
         <span>Institution name</span>
@@ -1255,11 +1245,10 @@ export function RoomConfigPanel() {
       <section className="panel campuses">
         <div>
           <p className="section-label">Launcher</p>
-          <h2 className="panel__title">Quick Access tiles</h2>
+          <h2 className="panel__title">Quick Access tiles
+            <HelpTip text="The shortcuts this room shows on Home." />
+          </h2>
         </div>
-        <p className="settings__muted">
-          The shortcuts this room shows on Home: Companion, screen sharing, device web UIs.
-        </p>
 
         <div className="campuses__room">
           {room.tiles.map((tile, tileIdx) => (
@@ -1427,7 +1416,7 @@ function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: Pc
       const stored = await savePcServiceTypes(roomId, types);
       setTypes(stored.serviceTypes);
       setBaseline(JSON.stringify(stored.serviceTypes));
-      setMsg('Saved — events, checklists, and automation follow immediately.');
+      setMsg('Saved.');
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
@@ -1437,11 +1426,9 @@ function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: Pc
     <div className="pctypes">
       <div className="campuses__head">
         <div>
-          <h3 className="pctypes__title">Planning Center service types</h3>
-          <p className="settings__muted pctypes__hint">
-            Which Planning Center event types this room hosts. The ID is in the Planning
-            Center Services URL for that service type.
-          </p>
+          <h3 className="pctypes__title">Planning Center service types
+            <HelpTip text="The event types this room hosts. The ID is in the Planning Center Services URL for that service type." />
+          </h3>
         </div>
         <button className="btn btn--primary" onClick={save} disabled={!dirty}>
           {dirty ? 'Save service types' : 'Saved'}
