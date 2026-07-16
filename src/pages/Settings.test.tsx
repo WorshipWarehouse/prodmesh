@@ -17,6 +17,8 @@ const api = vi.hoisted(() => ({
   getAuditLog: vi.fn(),
   getConfig: vi.fn(),
   saveConfig: vi.fn(),
+  getRoomConnectivity: vi.fn(),
+  savePcServiceTypes: vi.fn(),
 }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -153,8 +155,14 @@ describe('Campuses', () => {
   beforeEach(() => {
     api.getConfig.mockReset();
     api.saveConfig.mockReset();
+    api.savePcServiceTypes.mockReset();
     api.getConfig.mockResolvedValue(structuredClone(church));
     api.saveConfig.mockImplementation(async (c: unknown) => c);
+    api.getRoomConnectivity.mockResolvedValue({
+      hasServerRoom: true,
+      planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] },
+    });
+    api.savePcServiceTypes.mockImplementation(async (_room: string, serviceTypes: unknown) => ({ serviceTypes }));
   });
 
   it('overview lists rooms with Configure links; new rooms need a save first', async () => {
@@ -193,6 +201,33 @@ describe('Campuses', () => {
     await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
     const sent = api.saveConfig.mock.calls[0][0];
     expect(sent.sites[0].auditoriums[0].tiles[0].host).toBe('192.0.2.99');
+  });
+
+  it('edits Planning Center service types independently of the topology save', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
+        <Routes>
+          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Planning Center service types')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Sunday')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '+ Add service type' }));
+    const names = screen.getAllByLabelText('Name');
+    const ids = screen.getAllByLabelText('Service type ID');
+    await user.type(names[names.length - 1], 'Second Service');
+    await user.type(ids[ids.length - 1], '500002');
+    await user.click(screen.getByRole('button', { name: 'Save service types' }));
+
+    await waitFor(() => expect(api.savePcServiceTypes).toHaveBeenCalledWith('north-main', [
+      { id: '500001', name: 'Sunday' },
+      { id: '500002', name: 'Second Service' },
+    ]));
+    expect(api.saveConfig).not.toHaveBeenCalled();
   });
 
   it('room page shows not-found for an unknown room id', async () => {

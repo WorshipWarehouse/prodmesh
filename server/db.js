@@ -97,6 +97,18 @@ function migrate(d) {
       position INTEGER NOT NULL
     );
 
+    -- Per-room integration connectivity (ADR 0009, migrating out of
+    -- rooms.config.js one integration at a time). config is a validated JSON
+    -- blob per integration; rooms.config.js becomes the first-boot seed for
+    -- integrations that have migrated.
+    CREATE TABLE IF NOT EXISTS room_connectivity (
+      room_id     TEXT NOT NULL,
+      integration TEXT NOT NULL,
+      config      TEXT NOT NULL,
+      updated_at  INTEGER NOT NULL,
+      PRIMARY KEY (room_id, integration)
+    );
+
     -- Browser installation identity. The token is stored as a SHA-256 hash;
     -- the browser keeps the secret token. A station says WHERE an action came
     -- from, while a user session says WHO authorized it.

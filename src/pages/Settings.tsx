@@ -27,6 +27,10 @@ import {
   getAuditLog,
   getConfig,
   saveConfig,
+  getRoomConnectivity,
+  savePcServiceTypes,
+  type PcServiceType,
+  type RoomConnectivity,
   type ServerLogTail,
   type AuditEntry,
   type RoomMeta,
@@ -1275,17 +1279,7 @@ export function RoomConfigPanel() {
         </div>
       </section>
 
-      <section className="panel campuses">
-        <div>
-          <p className="section-label">Connectivity</p>
-          <h2 className="panel__title">Integrations</h2>
-        </div>
-        <p className="settings__muted">
-          Companion, ProPresenter, Smaart, and Planning Center wiring for this room still
-          lives in <code>server/rooms.config.js</code> — it migrates here, one integration
-          at a time.
-        </p>
-      </section>
+      <ConnectivityPanel roomId={roomId!} />
     </>
   );
 }
@@ -1372,6 +1366,111 @@ function TileEditor({ tile, onChange, onMove, onRemove }: {
         <button className="iconbtn" title="Move tile down" aria-label="Move tile down" onClick={() => onMove(1)}><ArrowDown size={14} /></button>
         <button className="iconbtn iconbtn--danger" title="Remove tile" aria-label="Remove tile" onClick={onRemove}><Trash2 size={14} /></button>
       </div>
+    </div>
+  );
+}
+
+// Connectivity: per-room integration config served from SQLite. First
+// migrated integration: Planning Center service types. The rest still live in
+// server/rooms.config.js and move here one at a time.
+function ConnectivityPanel({ roomId }: { roomId: string }) {
+  const [conn, setConn] = useState<RoomConnectivity | null>(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    getRoomConnectivity(roomId)
+      .then(setConn)
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+  }, [roomId]);
+
+  return (
+    <section className="panel campuses">
+      <div>
+        <p className="section-label">Connectivity</p>
+        <h2 className="panel__title">Integrations</h2>
+      </div>
+
+      {err && <p className="settings__error">{err}</p>}
+      {!conn && !err && <p className="settings__muted">Loading…</p>}
+
+      {conn && !conn.hasServerRoom && (
+        <p className="settings__muted">
+          No server integration entry exists for room id <code>{roomId}</code> yet —
+          integrations are wired per room in <code>server/rooms.config.js</code>.
+        </p>
+      )}
+
+      {conn?.hasServerRoom && (
+        <>
+          <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} />
+          <p className="settings__muted">
+            Companion, ProPresenter, and Smaart wiring still lives in{' '}
+            <code>server/rooms.config.js</code> — each migrates here in turn.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: PcServiceType[] }) {
+  const [types, setTypes] = useState<PcServiceType[]>(initial);
+  const [baseline, setBaseline] = useState(JSON.stringify(initial));
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const dirty = JSON.stringify(types) !== baseline;
+
+  const save = async () => {
+    setErr(''); setMsg('');
+    try {
+      const stored = await savePcServiceTypes(roomId, types);
+      setTypes(stored.serviceTypes);
+      setBaseline(JSON.stringify(stored.serviceTypes));
+      setMsg('Saved — events, checklists, and automation follow immediately.');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <div className="pctypes">
+      <div className="campuses__head">
+        <div>
+          <h3 className="pctypes__title">Planning Center service types</h3>
+          <p className="settings__muted pctypes__hint">
+            Which Planning Center event types this room hosts. The ID is in the Planning
+            Center Services URL for that service type.
+          </p>
+        </div>
+        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
+          {dirty ? 'Save service types' : 'Saved'}
+        </button>
+      </div>
+
+      {types.length === 0 && <p className="settings__muted">None — this room shows no Planning Center events.</p>}
+      {types.map((st, i) => (
+        <div className="campuses__tile" key={i}>
+          <label className="lfield campuses__grow"><span>Name</span>
+            <input className="field" placeholder="e.g. Sunday" value={st.name}
+              onChange={(e) => setTypes((all) => all.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+          </label>
+          <label className="lfield"><span>Service type ID</span>
+            <input className="field" placeholder="e.g. 500001" inputMode="numeric" value={st.id}
+              onChange={(e) => setTypes((all) => all.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} />
+          </label>
+          <div className="campuses__rowactions">
+            <button className="iconbtn iconbtn--danger" title="Remove service type" aria-label="Remove service type"
+              onClick={() => setTypes((all) => all.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
+          </div>
+        </div>
+      ))}
+      <button className="btn campuses__addtile" onClick={() => setTypes((all) => [...all, { id: '', name: '' }])}>
+        + Add service type
+      </button>
+
+      {err && <p className="settings__error">{err}</p>}
+      {msg && <p className="settings__ok">{msg}</p>}
     </div>
   );
 }

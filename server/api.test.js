@@ -160,6 +160,39 @@ test('config is public to read, config.manage to write', async () => {
   assert.equal(bad.status, 400);
 });
 
+test('room connectivity: public read, config.manage write, live effect', async () => {
+  const read = await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`);
+  assert.equal(read.status, 200);
+  const before = await read.json();
+  assert.equal(before.hasServerRoom, true);
+  assert.ok(before.planningCenter.serviceTypes.length > 0);
+
+  const ghost = await (await fetch(`${base}/api/config/rooms/ghost-room/connectivity`)).json();
+  assert.equal(ghost.hasServerRoom, false);
+
+  const denied = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/planning-center`, {
+    method: 'PUT', body: { serviceTypes: [] }, token: operatorToken, stationToken: station.token,
+  });
+  assert.equal(denied.status, 403);
+
+  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const next = [{ id: '500005', name: 'Youth Service' }, { id: '424242', name: 'Youth Retreat' }];
+  const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/planning-center`, {
+    method: 'PUT', body: { serviceTypes: next }, token,
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await saved.json()).planningCenter.serviceTypes, next);
+
+  // Live effect: the checklist editor aggregates from the same room objects.
+  const agg = await (await fetch(`${base}/api/checklist-templates`)).json();
+  assert.ok(agg.serviceTypes.some((st) => st.name === 'Youth Retreat'));
+
+  const bad = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/planning-center`, {
+    method: 'PUT', body: { serviceTypes: [{ id: 'not-numeric', name: 'X' }] }, token,
+  });
+  assert.equal(bad.status, 400);
+});
+
 test('locked mode is blocked without override, allowed with it', async () => {
   const blocked = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby' }, operatorToken, station.token);
   assert.equal(blocked.status, 403);
