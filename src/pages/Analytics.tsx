@@ -46,7 +46,6 @@ export function Analytics() {
       <div className="pagehead">
         <div>
           <h1 className="pagehead__title">Analytics</h1>
-          <p className="pagehead__sub">Every show on record — timing and loudness per service</p>
         </div>
       </div>
 

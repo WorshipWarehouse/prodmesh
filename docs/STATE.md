@@ -91,7 +91,9 @@ Notes:
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
   combines **93 server tests** with **12 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
-  `docs/TESTING.md` for the required pattern as configuration moves into Admin.
+  `docs/TESTING.md` for the required pattern as configuration moves into Admin,
+  and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
+  supplementary info, no intro paragraphs).
 - **Station identity + named users** (feature branch): each browser registers a
   station name once, then remains a read-only dashboard until an operator signs
   in. Users inherit extensible permissions from groups; the Administrators system
