@@ -70,7 +70,6 @@ export function Services() {
       <div className="pagehead">
         <div>
           <h1 className="pagehead__title">Services</h1>
-          <p className="pagehead__sub">Upcoming events across the campus</p>
         </div>
         <div className="pagehead__right">
           <span className={`svc__badge svc__badge--${anyLive ? 'live' : 'mock'}`}>

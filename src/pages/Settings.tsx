@@ -62,13 +62,13 @@ export function Settings({ section = 'general' }: { section?: AdminSection }) {
   }, [refreshStatus]);
 
   const titles = {
-    general: ['General', 'Security, schedules, and system maintenance'],
-    users: ['Users & access', 'Operators, permission groups, and Planning Center identities'],
-    stations: ['Stations', 'Registered browsers, assignments, and recent activity'],
-    campuses: ['Campuses', 'Institution name, sites, rooms, and Quick Access tiles'],
-    room: ['Room configuration', 'Identity, Quick Access tiles, and connectivity'],
-    checklists: ['Checklists', 'Startup checklist templates by event type'],
-    logs: ['Logs', 'Server process log and the audit trail'],
+    general: 'General',
+    users: 'Users & access',
+    stations: 'Stations',
+    campuses: 'Campuses',
+    room: 'Room configuration',
+    checklists: 'Checklists',
+    logs: 'Logs',
   } as const;
 
   return (
@@ -76,8 +76,7 @@ export function Settings({ section = 'general' }: { section?: AdminSection }) {
       <div className="pagehead">
         <div>
           <p className="eyebrow">Administration</p>
-          <h1 className="pagehead__title">{titles[section][0]}</h1>
-          <p className="pagehead__sub">{titles[section][1]}</p>
+          <h1 className="pagehead__title">{titles[section]}</h1>
         </div>
       </div>
 

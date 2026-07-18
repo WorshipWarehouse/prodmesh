@@ -7,6 +7,8 @@ accumulated explanatory paragraphs that age badly.
    usable, the fix is a better label, not more prose.
 2. **No intro paragraphs under panel titles.** The section label + title carry
    the context. Screens should read like a control surface, not a manual.
+   Same for page-header subtitles: they carry data (campus name, service
+   dates), never a description of what the page shows.
 3. **Supplementary knowledge goes in a HelpTip** (`src/components/HelpTip.tsx`
    — the circular "?"). Good tooltip content: where to find an ID, what a term
    means, a non-obvious consequence. It must be *optional* reading.

@@ -32,7 +32,7 @@ export function Home() {
         <div>
           <p className="eyebrow">Operations overview</p>
           <h1 className="pagehead__title">Home</h1>
-          <p className="pagehead__sub">{campusName} · current room state and next activity</p>
+          <p className="pagehead__sub">{campusName}</p>
         </div>
       </div>
 
