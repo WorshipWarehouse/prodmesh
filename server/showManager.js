@@ -19,7 +19,7 @@ import { writeJsonAtomic } from './atomicFile.js';
 import { rooms } from './rooms.config.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as pco from './integrations/planningCenter.js';
-import * as smaart from './integrations/smaart.js';
+import * as analysis from './integrations/analysis.js';
 import * as timeline from './timeline.js';
 import * as splStore from './splStore.js';
 import * as showConfig from './showConfig.js';
@@ -127,11 +127,11 @@ function splNeeded(roomId) {
 
 function startSplWatcher(roomId) {
   if (splWatchers.has(roomId)) return;
-  const cfg = rooms[roomId]?.smaart;
-  if (!smaart.isConfigured(cfg)) return;
+  const cfg = rooms[roomId]?.analysis;
+  if (!analysis.isConfigured(cfg)) return;
   const ctl = new AbortController();
   splWatchers.set(roomId, ctl);
-  smaart.watchSpl(cfg, (s) => onSpl(roomId, s), ctl.signal).catch(() => {
+  analysis.watchSpl(cfg, (s) => onSpl(roomId, s), ctl.signal).catch(() => {
     if (!ctl.signal.aborted) {
       spls.set(roomId, null);
       broadcast(roomId);
@@ -147,7 +147,7 @@ function stopSplWatcher(roomId) {
 }
 
 function onSpl(roomId, sample) {
-  const cfg = rooms[roomId]?.smaart ?? {};
+  const cfg = rooms[roomId]?.analysis ?? {};
   const show = shows.get(roomId);
   let avg = null;
   let peak = null;
@@ -265,7 +265,7 @@ async function beginShow(roomId, planId, timeId, startedAt) {
   shows.set(roomId, show);
   timeline.reopen(instanceId(show)); // restarting an ended show un-completes it
   // Seed running SPL stats from any samples already recorded (reopened show).
-  if (smaart.isConfigured(room.smaart)) show.splStats = splStore.runningStats(instanceId(show));
+  if (analysis.isConfigured(room.analysis)) show.splStats = splStore.runningStats(instanceId(show));
   persistShow(show);
   broadcast(roomId);
   startPoller(show);

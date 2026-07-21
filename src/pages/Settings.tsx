@@ -30,7 +30,9 @@ import {
   saveConfig,
   getRoomConnectivity,
   savePcServiceTypes,
+  saveAnalysis,
   type PcServiceType,
+  type AnalysisConfig,
   type RoomConnectivity,
   type ServerLogTail,
   type AuditEntry,
@@ -1391,8 +1393,9 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
       {conn?.hasServerRoom && (
         <>
           <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} />
+          <AnalysisEditor roomId={roomId} initial={conn.analysis} />
           <p className="settings__muted">
-            Companion, ProPresenter, and Smaart wiring still lives in{' '}
+            Companion and ProPresenter wiring still lives in{' '}
             <code>server/rooms.config.js</code> — each migrates here in turn.
           </p>
         </>
@@ -1454,6 +1457,144 @@ function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: Pc
       <button className="btn campuses__addtile" onClick={() => setTypes((all) => [...all, { id: '', name: '' }])}>
         + Add service type
       </button>
+
+      {err && <p className="settings__error">{err}</p>}
+      {msg && <p className="settings__ok">{msg}</p>}
+    </div>
+  );
+}
+
+// Draft form state for the analysis source — everything as strings so the
+// inputs stay controlled; the server normalizes numbers on save.
+interface AnalysisDraft {
+  source: 'none' | 'smaart' | 'rta';
+  host: string;
+  port: string;
+  target: string;
+  limit: string;
+  metric: string;
+  password: string;
+}
+
+function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
+  return {
+    source: cfg ? cfg.source : 'none',
+    host: cfg?.host ?? '',
+    port: cfg?.port != null ? String(cfg.port) : '',
+    target: cfg?.target != null ? String(cfg.target) : '',
+    limit: cfg?.limit != null ? String(cfg.limit) : '',
+    metric: cfg?.metric ?? '',
+    password: '',
+  };
+}
+
+function AnalysisEditor({ roomId, initial }: { roomId: string; initial: AnalysisConfig | null }) {
+  const [draft, setDraft] = useState<AnalysisDraft>(() => toDraft(initial));
+  const [baseline, setBaseline] = useState(() => JSON.stringify(toDraft(initial)));
+  const [hasPassword, setHasPassword] = useState(Boolean(initial?.hasPassword));
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const dirty = JSON.stringify(draft) !== baseline;
+  const set = (patch: Partial<AnalysisDraft>) => setDraft((d) => ({ ...d, ...patch }));
+
+  if (initial?.mock) {
+    return (
+      <div className="pctypes">
+        <h3 className="pctypes__title">Analysis source
+          <HelpTip text="Where this room's SPL numbers come from." />
+        </h3>
+        <p className="settings__muted">Simulated meter (dev room).</p>
+      </div>
+    );
+  }
+
+  const save = async () => {
+    setErr(''); setMsg('');
+    try {
+      const stored = await saveAnalysis(
+        roomId,
+        draft.source === 'none'
+          ? null
+          : {
+              source: draft.source,
+              host: draft.host,
+              port: draft.port === '' ? undefined : Number(draft.port),
+              target: draft.target === '' ? undefined : Number(draft.target),
+              limit: draft.limit === '' ? undefined : Number(draft.limit),
+              metric: draft.metric || undefined,
+              // Omit password unless typed — omitted keeps the stored one.
+              ...(draft.password ? { password: draft.password } : {}),
+            },
+      );
+      const next = toDraft(stored);
+      setDraft(next);
+      setBaseline(JSON.stringify(next));
+      setHasPassword(Boolean(stored?.hasPassword));
+      setMsg('Saved.');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <div className="pctypes">
+      <div className="campuses__head">
+        <h3 className="pctypes__title">Analysis source
+          <HelpTip text="Where this room's SPL numbers come from — a Smaart rig or the free ProdMesh Remote RTA app. Target and limit set the dB goals on the live meter and show reports." />
+        </h3>
+        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
+          {dirty ? 'Save analysis source' : 'Saved'}
+        </button>
+      </div>
+
+      <div className="campuses__tile">
+        <label className="lfield"><span>Source</span>
+          <select className="field" value={draft.source}
+            onChange={(e) => set({ source: e.target.value as AnalysisDraft['source'] })}>
+            <option value="none">None</option>
+            <option value="smaart">Smaart</option>
+            <option value="rta">ProdMesh Remote RTA</option>
+          </select>
+        </label>
+        {draft.source !== 'none' && (
+          <>
+            <label className="lfield campuses__grow"><span>Host</span>
+              <input className="field" placeholder="e.g. 192.0.2.7" value={draft.host}
+                onChange={(e) => set({ host: e.target.value })} />
+            </label>
+            <label className="lfield"><span>Port</span>
+              <input className="field campuses__tileport" inputMode="numeric"
+                placeholder={draft.source === 'smaart' ? '26000' : '8517'} value={draft.port}
+                onChange={(e) => set({ port: e.target.value })} />
+            </label>
+          </>
+        )}
+      </div>
+
+      {draft.source !== 'none' && (
+        <div className="campuses__tile">
+          <label className="lfield"><span>Target dB</span>
+            <input className="field campuses__tileport" inputMode="numeric" placeholder="e.g. 90"
+              value={draft.target} onChange={(e) => set({ target: e.target.value })} />
+          </label>
+          <label className="lfield"><span>Limit dB</span>
+            <input className="field campuses__tileport" inputMode="numeric" placeholder="e.g. 95"
+              value={draft.limit} onChange={(e) => set({ limit: e.target.value })} />
+          </label>
+          <label className="lfield campuses__grow"><span>Metric</span>
+            <input className="field" placeholder={draft.source === 'smaart' ? 'SPL A Slow' : 'slow_db'}
+              value={draft.metric} onChange={(e) => set({ metric: e.target.value })} />
+          </label>
+          {draft.source === 'smaart' && (
+            <label className="lfield"><span>API password</span>
+              <input className="field" type="password" autoComplete="off"
+                placeholder={hasPassword ? 'unchanged' : 'none'} value={draft.password}
+                onChange={(e) => set({ password: e.target.value })} />
+            </label>
+          )}
+        </div>
+      )}
 
       {err && <p className="settings__error">{err}</p>}
       {msg && <p className="settings__ok">{msg}</p>}

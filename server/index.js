@@ -145,7 +145,7 @@ app.get('/api/history', async (_req, res) => {
         itemCount: tl.items.length,
         totals: { planned, actual, delta: actual - planned },
         spl: agg
-          ? { ...agg, target: room?.smaart?.target ?? null, limit: room?.smaart?.limit ?? null }
+          ? { ...agg, target: room?.analysis?.target ?? null, limit: room?.analysis?.limit ?? null }
           : null,
       };
     })
@@ -435,10 +435,10 @@ app.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   const instance = `${req.params.planId}__${timeId}`;
   const report =
     timeline.getReport(instance) ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } };
-  const smaartCfg = rooms[req.params.id]?.smaart;
+  const analysisCfg = rooms[req.params.id]?.analysis;
   const agg = splStore.aggregate(instance);
   report.spl = agg
-    ? { ...agg, target: smaartCfg?.target ?? null, limit: smaartCfg?.limit ?? null }
+    ? { ...agg, target: analysisCfg?.target ?? null, limit: analysisCfg?.limit ?? null }
     : null;
   res.json(report);
 });
@@ -730,13 +730,22 @@ app.put('/api/config', requirePermission('config.manage'), (req, res) => {
 
 // What integrations this room has. hasServerRoom=false means the topology
 // knows the room but the server integration map (rooms.config.js) doesn't.
+// The Smaart password never leaves the server: reads carry hasPassword only,
+// and writes without a `password` field keep the stored one.
+function redactAnalysis(cfg) {
+  if (!cfg) return null;
+  const { password, ...rest } = cfg;
+  return { ...rest, hasPassword: Boolean(password) };
+}
+
 app.get('/api/config/rooms/:roomId/connectivity', (req, res) => {
   if (!rooms[req.params.roomId]) {
-    return res.json({ hasServerRoom: false, planningCenter: null });
+    return res.json({ hasServerRoom: false, planningCenter: null, analysis: null });
   }
   res.json({
     hasServerRoom: true,
     planningCenter: connectivity.getPlanningCenter(req.params.roomId) ?? { serviceTypes: [] },
+    analysis: redactAnalysis(connectivity.getAnalysis(req.params.roomId)),
   });
 });
 
@@ -750,6 +759,26 @@ app.put('/api/config/rooms/:roomId/connectivity/planning-center', requirePermiss
       details: { integration: 'planningCenter', serviceTypes: stored.serviceTypes.length },
     });
     res.json({ planningCenter: stored });
+  } catch (err) {
+    res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.put('/api/config/rooms/:roomId/connectivity/analysis', requirePermission('config.manage'), (req, res) => {
+  try {
+    let input = req.body?.analysis ?? null;
+    if (input && input.password === undefined) {
+      const stored = connectivity.getAnalysis(req.params.roomId);
+      if (stored?.password) input = { ...input, password: stored.password };
+    }
+    const clean = connectivity.setAnalysis(req.params.roomId, input);
+    auditSuccess(req, 'config.manage', {
+      resourceType: 'room-connectivity',
+      resourceId: req.params.roomId,
+      roomId: req.params.roomId,
+      details: { integration: 'analysis', source: clean?.source ?? null },
+    });
+    res.json({ analysis: redactAnalysis(clean) });
   } catch (err) {
     res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
   }

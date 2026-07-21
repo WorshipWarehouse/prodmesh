@@ -53,9 +53,9 @@ const localTest = {
     // Optional `timer: '<name>'` picks the service-start countdown timer;
     // without it, the first count-down-to-time timer is used.
     proPresenter: { host: '127.0.0.1', port: 62202 },
-    // Smaart SPL — mock meter for dev (no Smaart on this machine).
+    // Analysis source (SPL) — mock meter for dev (no analyzer on this machine).
     // target/limit in dB: our Sundays target 90, not to exceed 95.
-    smaart: { mock: true, target: 90, limit: 95 },
+    analysis: { mock: true, target: 90, limit: 95 },
     modes: standardModes(),
   },
 };
@@ -83,11 +83,12 @@ export const rooms = {
       ],
     },
     proPresenter: { host: '192.0.2.74', port: 62202 }, // ProPresenter (confirm port on-site)
-    // Smaart SPL — FOH Mac ("FOH-Soundgrid"), Smaart v8 8.5.2.2, API v3 (the
-    // transport negotiates the path automatically; verified live 2026-07-14).
-    // Optional: password, device/channel (default: first logging input),
-    // metric (default 'SPL A Slow'), apiPath (to pin a specific API version).
-    smaart: { host: '192.0.2.7', port: 26000, target: 90, limit: 95 },
+    // Analysis source (SPL) — Smaart on the FOH Mac ("FOH-Soundgrid"), Smaart
+    // v8 8.5.2.2, API v3 (the transport negotiates the path automatically;
+    // verified live 2026-07-14). `source: 'rta'` points at a ProdMesh Remote
+    // RTA instead. Optional (Smaart): password, device/channel, metric,
+    // apiPath. Optional (RTA): metric (a metric id like 'leqS').
+    analysis: { source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95 },
     // Auditorium-specific modes. Button locations [page, row, column].
     modes: [
       mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),

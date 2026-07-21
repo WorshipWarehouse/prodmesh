@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   saveConfig: vi.fn(),
   getRoomConnectivity: vi.fn(),
   savePcServiceTypes: vi.fn(),
+  saveAnalysis: vi.fn(),
 }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -161,8 +162,11 @@ describe('Campuses', () => {
     api.getRoomConnectivity.mockResolvedValue({
       hasServerRoom: true,
       planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] },
+      analysis: { source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95, hasPassword: false },
     });
     api.savePcServiceTypes.mockImplementation(async (_room: string, serviceTypes: unknown) => ({ serviceTypes }));
+    api.saveAnalysis.mockReset();
+    api.saveAnalysis.mockImplementation(async (_room: string, analysis: unknown) => analysis);
   });
 
   it('overview lists rooms with Configure links; new rooms need a save first', async () => {
@@ -193,7 +197,8 @@ describe('Campuses', () => {
     );
 
     expect(await screen.findByText('Quick Access tiles')).toBeInTheDocument();
-    const host = screen.getByLabelText('Host');
+    // Two Host fields exist (Companion tile + analysis source) — take the tile's.
+    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.31')!;
     await user.clear(host);
     await user.type(host, '192.0.2.99');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -227,6 +232,34 @@ describe('Campuses', () => {
       { id: '500001', name: 'Sunday' },
       { id: '500002', name: 'Second Service' },
     ]));
+    expect(api.saveConfig).not.toHaveBeenCalled();
+  });
+
+  it('switches the analysis source to ProdMesh RTA and saves it', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
+        <Routes>
+          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Analysis source')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('192.0.2.7')).toBeInTheDocument();
+    // Smaart shows the password field; RTA must not.
+    expect(screen.getByLabelText('API password')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Source'), 'rta');
+    expect(screen.queryByLabelText('API password')).not.toBeInTheDocument();
+    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.7')!;
+    await user.clear(host);
+    await user.type(host, '192.0.2.50');
+    await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
+
+    await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
+      source: 'rta', host: '192.0.2.50', port: 26000, target: 90, limit: 95, metric: undefined,
+    }));
     expect(api.saveConfig).not.toHaveBeenCalled();
   });
 

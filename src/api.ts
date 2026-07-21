@@ -391,9 +391,26 @@ export interface PcServiceType {
   name: string;
 }
 
+export type AnalysisSource = 'smaart' | 'rta';
+
+// The room's SPL source. `password` is write-only (send to change, omit to
+// keep); reads report hasPassword instead. `mock` marks the dev fixture.
+export interface AnalysisConfig {
+  source: AnalysisSource;
+  host: string;
+  port?: number;
+  target?: number;
+  limit?: number;
+  metric?: string;
+  password?: string;
+  hasPassword?: boolean;
+  mock?: boolean;
+}
+
 export interface RoomConnectivity {
   hasServerRoom: boolean;
   planningCenter: { serviceTypes: PcServiceType[] } | null;
+  analysis: AnalysisConfig | null;
 }
 
 export const getRoomConnectivity = (roomId: string) =>
@@ -410,6 +427,19 @@ export async function savePcServiceTypes(
   });
   await requireOk(res);
   return (await res.json()).planningCenter;
+}
+
+export async function saveAnalysis(
+  roomId: string,
+  analysis: AnalysisConfig | null,
+): Promise<AnalysisConfig | null> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/analysis`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ analysis }),
+  });
+  await requireOk(res);
+  return (await res.json()).analysis;
 }
 
 export interface ServerLogTail {

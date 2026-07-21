@@ -193,6 +193,53 @@ test('room connectivity: public read, config.manage write, live effect', async (
   assert.equal(bad.status, 400);
 });
 
+test('analysis source: config.manage write, password never read back', async () => {
+  const denied = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/analysis`, {
+    method: 'PUT', body: { analysis: null }, token: operatorToken, stationToken: station.token,
+  });
+  assert.equal(denied.status, 403);
+
+  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/analysis`, {
+    method: 'PUT',
+    body: { analysis: { source: 'smaart', host: '10.0.0.5', target: 90, limit: 95, password: 'hunter2' } },
+    token,
+  });
+  assert.equal(saved.status, 200);
+  const stored = (await saved.json()).analysis;
+  assert.equal(stored.password, undefined);
+  assert.equal(stored.hasPassword, true);
+
+  // Public read is redacted the same way.
+  const read = await (await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`)).json();
+  assert.equal(read.analysis.host, '10.0.0.5');
+  assert.equal(read.analysis.password, undefined);
+  assert.equal(read.analysis.hasPassword, true);
+
+  // A later save without a password field keeps the stored one.
+  const kept = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/analysis`, {
+    method: 'PUT', body: { analysis: { source: 'smaart', host: '10.0.0.6' } }, token,
+  });
+  assert.equal((await kept.json()).analysis.hasPassword, true);
+
+  // Switching source drops the smaart-only password; clearing removes it all.
+  const rta = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/analysis`, {
+    method: 'PUT', body: { analysis: { source: 'rta', host: '10.0.0.7', port: 8517 } }, token,
+  });
+  assert.equal((await rta.json()).analysis.hasPassword, false);
+
+  const bad = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/analysis`, {
+    method: 'PUT', body: { analysis: { source: 'rta' } }, token,
+  });
+  assert.equal(bad.status, 400);
+
+  const cleared = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/analysis`, {
+    method: 'PUT', body: { analysis: null }, token,
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal((await cleared.json()).analysis, null);
+});
+
 test('locked mode is blocked without override, allowed with it', async () => {
   const blocked = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby' }, operatorToken, station.token);
   assert.equal(blocked.status, 403);

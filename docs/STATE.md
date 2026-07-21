@@ -30,7 +30,7 @@ Notes:
 | Bitfocus Companion (per room) | Live for Auditorium; Youth/Chapel mock pending real setup |
 | Planning Center **Services** | **Live** — plan display + order of service, PAT in `server/data/secrets.json` |
 | Planning Center **Calendar** | **Not started** — awaiting read-only access. High value (see below) |
-| **Smaart SPL** | **Transport implemented; v8 compat added 2026-07-14** — full pipeline (capture → SQLite → live meter + report) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream). FOH Mac probe (2026-07-14) found **Smaart v8 (8.5.2.2)**: its `/api/v4/` socket accepts connections but never answers RPCs; the same dialect lives at `/api/v3/`. Transport now negotiates v4 → v3 and caches the answering path (`smaart.apiPath` pins it). Remaining: with SPL metering running on a calibrated input (Sunday), re-run `server/tools/smaart-probe.js` to confirm the v3 stream frame shape, then flip the room off `mock` |
+| **Smaart SPL** | **Transport implemented; v8 compat added 2026-07-14** — full pipeline (capture → SQLite → live meter + report) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream). FOH Mac probe (2026-07-14) found **Smaart v8 (8.5.2.2)**: its `/api/v4/` socket accepts connections but never answers RPCs; the same dialect lives at `/api/v3/`. Transport now negotiates v4 → v3 and caches the answering path (`smaart.apiPath` pins it). Since 2026-07-18 Smaart is one of two interchangeable **analysis sources** (see `integrations/analysis.js`); ProdMesh Remote RTA is the free alternative. Remaining: with SPL metering running on a calibrated input (Sunday), re-run `server/tools/smaart-probe.js` to confirm the v3 stream frame shape |
 
 ## What's live right now
 
@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **93 server tests** with **12 frontend interaction/configuration tests**
+  combines **104 server tests** with **13 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -116,7 +116,19 @@ Notes:
   types** live in SQLite (`room_connectivity`, seeded from rooms.config.js
   on first boot) and are edited on the room page; saves apply to the live
   rooms map immediately (events, checklists, automation follow without a
-  restart). Companion/PP/Smaart wiring still in rooms.config.js.
+  restart). Companion/PP wiring still in rooms.config.js.
+- **Analysis source per room** (2026-07-18): the SPL provider is now a room
+  connectivity setting (`analysis`, second `room_connectivity` migration) with
+  interchangeable sources: **Smaart** (existing transport) or **ProdMesh
+  Remote RTA** (`github.com/jbeale/prodmesh-rta`, the free companion analyzer
+  — plain WebSocket at `ws://host:8517/api/stream`, `server/integrations/rta.js`).
+  `server/integrations/analysis.js` dispatches by `source`; both emit the same
+  `{ ts, spl }` samples so reports/meters/analytics are source-agnostic. Edited
+  on the room page (source, host/port, target/limit dB, metric, Smaart API
+  password — password is write-only, redacted to `hasPassword` on reads).
+  Seeding now writes a per-integration `connectivity_seeded:*` marker in
+  `app_config`, after which the database is authoritative (a cleared config
+  stays cleared even though rooms.config.js still declares a seed).
 - **Server-owned topology** (2026-07-15, ADR 0009 milestone): the institution
   name, sites, rooms, and Quick Access tiles now live in SQLite (`sites`,
   `site_rooms`, `tiles`) and are served by `GET /api/config`; the frontend's
@@ -146,11 +158,11 @@ Notes:
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
      port per machine); wire Youth (PP host TBD).
 2. **Connectivity migration into the room page** (page built 2026-07-15;
-   PC service types migrated 2026-07-15): remaining — Companion host + mode
-   buttons, ProPresenter host/port, Smaart. Pattern established in
-   `server/connectivity.js`: seed from rooms.config.js once, SQLite owns it,
-   applyConnectivity() assigns onto the live rooms map so consumers never
-   change.
+   PC service types 2026-07-15, analysis source 2026-07-18): remaining —
+   Companion host + mode buttons, ProPresenter host/port. Pattern established
+   in `server/connectivity.js`: seed from rooms.config.js once (marker in
+   `app_config`), SQLite owns it, applyConnectivity() assigns onto the live
+   rooms map so consumers never change.
 3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
