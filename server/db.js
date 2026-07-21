@@ -27,6 +27,12 @@ export function getDb() {
   return db;
 }
 
+// Add a column to an existing table if a migration introduced it later.
+function addColumn(d, table, column, decl) {
+  const has = d.prepare(`SELECT 1 FROM pragma_table_info(?) WHERE name = ?`).get(table, column);
+  if (!has) d.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+}
+
 function migrate(d) {
   d.exec(`
     CREATE TABLE IF NOT EXISTS spl_samples (
@@ -181,4 +187,8 @@ function migrate(d) {
     );
     CREATE INDEX IF NOT EXISTS audit_by_time ON audit_log (ts DESC);
   `);
+
+  // C-A ratio (dB) captured alongside SPL when the analysis source provides
+  // it (ProdMesh Remote RTA does; Smaart doesn't). High C-A = bass-heavy mix.
+  addColumn(d, 'spl_samples', 'ca', 'REAL');
 }

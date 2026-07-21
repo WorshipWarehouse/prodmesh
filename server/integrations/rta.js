@@ -38,7 +38,13 @@ function sleep(ms, signal) {
   });
 }
 
-/** Emit ≤1 sample/interval: onSample({ ts, spl }) until the signal aborts. */
+/**
+ * Emit ≤1 sample/interval until the signal aborts:
+ *   onSample({ ts, spl, ca?, caBand? })
+ * ca = the app's C-A ratio (C-weighted minus A-weighted energy, dB) — the
+ * bass-pressure indicator; caBand = its target range when one is configured
+ * in the app ({ lo, hi }). Both ride along only when the stream carries them.
+ */
 export async function watchSpl(cfg, onSample, signal, intervalMs = 1000) {
   let warned = false;
   const state = { announced: false };
@@ -80,22 +86,22 @@ function streamOnce(cfg, onSample, signal, intervalMs, state) {
     ws.on('open', bump);
     ws.on('message', (data) => {
       bump();
-      const spl = metricFrom(data, cfg, state);
+      const sample = sampleFrom(data, cfg, state);
       // The app pushes at its own rate (up to 20 Hz); keep our sampling rate.
       // The quarter-interval slack keeps a stream paced near intervalMs from
       // skipping every other frame over timing jitter.
-      if (spl != null && Date.now() - lastEmit >= intervalMs * 0.75) {
+      if (sample && Date.now() - lastEmit >= intervalMs * 0.75) {
         lastEmit = Date.now();
-        onSample({ ts: Date.now(), spl: Math.round(spl * 10) / 10 });
+        onSample(sample);
       }
     });
   });
 }
 
-// Pull the configured metric out of a levels frame. Levels are null until the
-// analyzer's input has audio — those frames keep the stream alive but yield
-// no sample (the meter simply stays dark, like Smaart before logging starts).
-function metricFrom(data, cfg, state) {
+// Build a sample from a levels frame. Levels are null until the analyzer's
+// input has audio — those frames keep the stream alive but yield no sample
+// (the meter simply stays dark, like Smaart before logging starts).
+function sampleFrom(data, cfg, state) {
   let frame;
   try {
     frame = JSON.parse(data);
@@ -107,6 +113,16 @@ function metricFrom(data, cfg, state) {
     console.log(`[rta] ${cfg.host}: ProdMesh Remote RTA (${frame.weighting ?? '?'}-weighted)`);
     state.announced = true;
   }
-  const v = cfg.metric ? frame.metrics?.[cfg.metric] : frame.slow_db;
-  return typeof v === 'number' ? v : null;
+  const spl = cfg.metric ? frame.metrics?.[cfg.metric] : frame.slow_db;
+  if (typeof spl !== 'number') return null;
+  const sample = { ts: Date.now(), spl: Math.round(spl * 10) / 10 };
+  const ca = frame.metrics?.ca;
+  if (typeof ca === 'number') {
+    sample.ca = Math.round(ca * 10) / 10;
+    const band = frame.targets?.ca;
+    if (typeof band?.lo_db === 'number' && typeof band?.hi_db === 'number') {
+      sample.caBand = { lo: band.lo_db, hi: band.hi_db };
+    }
+  }
+  return sample;
 }

@@ -129,6 +129,13 @@ Notes:
   Seeding now writes a per-integration `connectivity_seeded:*` marker in
   `app_config`, after which the database is authoritative (a cleared config
   stays cleared even though rooms.config.js still declares a seed).
+  **C-A ratio** (2026-07-18): RTA samples carry `ca` (C-weighted minus
+  A-weighted, the bass-pressure indicator behind "too much bass" complaints)
+  plus the app's configured target band (`targets.ca` in its API). Persisted
+  as a nullable `ca` column on `spl_samples`; live meter shows a band gauge
+  (dot on a 0–20 dB track, amber above the band), Show Report adds C-A
+  avg/max (plain mean — C-A is already a difference, so no energy math).
+  Smaart samples simply lack `ca` and every surface hides it.
 - **Server-owned topology** (2026-07-15, ADR 0009 milestone): the institution
   name, sites, rooms, and Quick Access tiles now live in SQLite (`sites`,
   `site_rooms`, `tiles`) and are served by `GET /api/config`; the frontend's

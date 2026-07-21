@@ -151,14 +151,25 @@ function onSpl(roomId, sample) {
   const show = shows.get(roomId);
   let avg = null;
   let peak = null;
+  let caAvg = null;
+  let caMax = null;
   if (show && show.splStats) {
-    splStore.record(roomId, instanceId(show), sample.ts, sample.spl);
+    splStore.record(roomId, instanceId(show), sample.ts, sample.spl, sample.ca ?? null);
     const st = show.splStats;
     st.n += 1;
     st.sumEnergy += 10 ** (sample.spl / 10);
     st.peak = st.peak == null ? sample.spl : Math.max(st.peak, sample.spl);
     avg = splStore.round1(10 * Math.log10(st.sumEnergy / st.n));
     peak = splStore.round1(st.peak);
+    if (sample.ca != null) {
+      st.caN = (st.caN ?? 0) + 1;
+      st.caSum = (st.caSum ?? 0) + sample.ca;
+      st.caMax = st.caMax == null ? sample.ca : Math.max(st.caMax, sample.ca);
+    }
+    if (st.caN) {
+      caAvg = splStore.round1(st.caSum / st.caN);
+      caMax = splStore.round1(st.caMax);
+    }
   }
   spls.set(roomId, {
     current: sample.spl,
@@ -166,6 +177,18 @@ function onSpl(roomId, sample) {
     peak,
     target: cfg.target ?? null,
     limit: cfg.limit ?? null,
+    // C-A ratio rides along when the analysis source provides it (RTA).
+    // Its target band comes from the analyzer app's own config.
+    ca:
+      sample.ca != null
+        ? {
+            current: sample.ca,
+            avg: caAvg,
+            max: caMax,
+            lo: sample.caBand?.lo ?? null,
+            hi: sample.caBand?.hi ?? null,
+          }
+        : null,
   });
   broadcast(roomId);
 }

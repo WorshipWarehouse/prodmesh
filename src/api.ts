@@ -620,6 +620,7 @@ export interface SplReport {
   to: number;
   target: number | null; // room's dB goal (e.g. 90)
   limit: number | null; // do-not-exceed (e.g. 95)
+  ca?: { avg: number | null; max: number | null } | null; // when captured
 }
 
 export interface TimingReport {
@@ -655,12 +656,24 @@ export interface PpTimer {
   countsDownToTime: boolean;
 }
 
+// C-A ratio (C-weighted minus A-weighted level, dB): how much low-frequency
+// energy rides under the mix. lo/hi = the target band configured in the
+// analyzer app. Only present when the analysis source provides it (RTA).
+export interface CaState {
+  current: number;
+  avg: number | null; // running mean — only while a show is live
+  max: number | null; // show max — only while a show is live
+  lo: number | null;
+  hi: number | null;
+}
+
 export interface SplState {
   current: number; // latest sample, dB
   avg: number | null; // running Leq — only while a show is live
   peak: number | null; // show peak — only while a show is live
   target: number | null;
   limit: number | null;
+  ca?: CaState | null;
 }
 
 export interface ShowState {

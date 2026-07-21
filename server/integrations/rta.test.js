@@ -19,8 +19,9 @@ function fakeRta({ intervalMs = 20, frame = {} } = {}) {
       leq_db: 84.1,
       centers_hz: [1000],
       bands_db: [60.1],
-      metrics: { laf: 86.2, las: 85.34, leqS: 84.9 },
+      metrics: { laf: 86.2, las: 85.34, leqS: 84.9, ca: 8.31 },
       alarm: { enabled: false, state: 0 },
+      targets: { ca: { lo_db: 8, hi_db: 12 } },
       ...frame,
     });
 
@@ -67,6 +68,8 @@ test('streams slow_db samples from /api/stream', async () => {
     for (const s of samples) {
       assert.equal(s.spl, 85.3);
       assert.ok(Number.isFinite(s.ts));
+      assert.equal(s.ca, 8.3);
+      assert.deepEqual(s.caBand, { lo: 8, hi: 12 });
     }
   } finally {
     await srv.close();
@@ -78,6 +81,18 @@ test('cfg.metric picks from the metrics map', async () => {
   try {
     const [s] = await collect({ host: '127.0.0.1', port: srv.port(), metric: 'leqS' }, 1);
     assert.equal(s.spl, 84.9);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('missing ca / targets just omit those fields', async () => {
+  const srv = fakeRta({ frame: { metrics: { las: 85.34 }, targets: {} } });
+  try {
+    const [s] = await collect({ host: '127.0.0.1', port: srv.port() }, 1);
+    assert.equal(s.spl, 85.3);
+    assert.equal(s.ca, undefined);
+    assert.equal(s.caBand, undefined);
   } finally {
     await srv.close();
   }

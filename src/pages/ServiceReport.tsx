@@ -114,6 +114,14 @@ export function ServiceReport() {
                   {report.spl.target ?? '—'} / {report.spl.limit ?? '—'}
                 </span>
               </div>
+              {report.spl.ca && (
+                <div className="report__stat">
+                  <span className="report__stat-label">C-A avg / max</span>
+                  <span className="report__stat-val">
+                    {db(report.spl.ca.avg)} / {db(report.spl.ca.max)}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

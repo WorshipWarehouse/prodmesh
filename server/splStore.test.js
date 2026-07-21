@@ -39,7 +39,26 @@ test('runningStats seeds continuation of a reopened show', () => {
   assert.equal(st.n, 2);
   assert.equal(st.peak, 92);
   assert.ok(st.sumEnergy > 0);
-  assert.deepEqual(spl.runningStats('fresh__t'), { n: 0, sumEnergy: 0, peak: null });
+  assert.deepEqual(spl.runningStats('fresh__t'), {
+    n: 0, sumEnergy: 0, peak: null, caN: 0, caSum: 0, caMax: null,
+  });
+});
+
+test('ca rides along when captured: plain mean, max, and null when absent', () => {
+  const inst = 'plan3__t1';
+  spl.record('room-a', inst, 1, 88, 8.0);
+  spl.record('room-a', inst, 2, 92, 12.0);
+  spl.record('room-a', inst, 3, 90); // a Smaart-style sample without ca
+  const agg = spl.aggregate(inst);
+  assert.deepEqual(agg.ca, { avg: 10, max: 12 });
+  const st = spl.runningStats(inst);
+  assert.equal(st.caN, 2);
+  assert.equal(st.caSum, 20);
+  assert.equal(st.caMax, 12);
+  // No ca captured at all → the aggregate says so instead of faking zeros.
+  const inst2 = 'plan3__t2';
+  spl.record('room-a', inst2, 1, 88);
+  assert.equal(spl.aggregate(inst2).ca, null);
 });
 
 test('mock smaart meter emits plausible samples until aborted', async () => {

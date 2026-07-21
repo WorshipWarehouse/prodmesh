@@ -9,10 +9,10 @@
 
 import { getDb } from './db.js';
 
-export function record(roomId, instanceId, ts, spl) {
+export function record(roomId, instanceId, ts, spl, ca = null) {
   getDb()
-    .prepare('INSERT INTO spl_samples (room_id, instance_id, ts, spl) VALUES (?, ?, ?, ?)')
-    .run(roomId, instanceId, ts, spl);
+    .prepare('INSERT INTO spl_samples (room_id, instance_id, ts, spl, ca) VALUES (?, ?, ?, ?, ?)')
+    .run(roomId, instanceId, ts, spl, ca);
 }
 
 // Average loudness is an energy average (Leq), not an arithmetic mean:
@@ -26,31 +26,43 @@ export function leq(values) {
 
 const round1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
-/** Aggregate a service instance's samples → { count, leq, peak, from, to }. */
+/**
+ * Aggregate a service instance's samples → { count, leq, peak, from, to, ca }.
+ * ca (when the analysis source captured it) = { avg, max } — a plain mean,
+ * not Leq: C-A is already a level *difference*, so energy math doesn't apply.
+ */
 export function aggregate(instanceId) {
   const rows = getDb()
-    .prepare('SELECT ts, spl FROM spl_samples WHERE instance_id = ? ORDER BY ts')
+    .prepare('SELECT ts, spl, ca FROM spl_samples WHERE instance_id = ? ORDER BY ts')
     .all(instanceId);
   if (rows.length === 0) return null;
   const values = rows.map((r) => r.spl);
+  const cas = rows.map((r) => r.ca).filter((v) => v != null);
   return {
     count: rows.length,
     leq: round1(leq(values)),
     peak: round1(Math.max(...values)),
     from: rows[0].ts,
     to: rows[rows.length - 1].ts,
+    ca: cas.length
+      ? { avg: round1(cas.reduce((s, v) => s + v, 0) / cas.length), max: round1(Math.max(...cas)) }
+      : null,
   };
 }
 
 /** Running stats seed for a (re)starting show — continues where it left off. */
 export function runningStats(instanceId) {
   const rows = getDb()
-    .prepare('SELECT spl FROM spl_samples WHERE instance_id = ?')
+    .prepare('SELECT spl, ca FROM spl_samples WHERE instance_id = ?')
     .all(instanceId);
+  const cas = rows.map((r) => r.ca).filter((v) => v != null);
   return {
     n: rows.length,
     sumEnergy: rows.reduce((s, r) => s + 10 ** (r.spl / 10), 0),
     peak: rows.length ? Math.max(...rows.map((r) => r.spl)) : null,
+    caN: cas.length,
+    caSum: cas.reduce((s, v) => s + v, 0),
+    caMax: cas.length ? Math.max(...cas) : null,
   };
 }
 
