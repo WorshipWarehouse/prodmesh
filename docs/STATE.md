@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **116 server tests** with **15 frontend interaction/configuration tests**
+  combines **120 server tests** with **16 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -176,21 +176,28 @@ Notes:
      `?chunked=true` does NOT push item changes, so we poll `/v1/playlist/active`.
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
      port per machine); wire Youth (PP host TBD).
-2. **Connectivity migration into the room page** (page built 2026-07-15;
-   PC service types 2026-07-15, analysis source 2026-07-18, ProPresenter
-   2026-07-21): remaining — Companion host + mode buttons (the meatiest).
-   Pattern established in `server/connectivity.js`: seed from rooms.config.js
-   once (marker in `app_config`), SQLite owns it, applyConnectivity() assigns
-   onto the live rooms map so consumers never change. ProPresenter (host/port,
-   optional countdown-timer name; blank host = room has none) also made
-   autostart eligibility per-cycle instead of per-boot: every room gets a
-   watcher and re-checks its PP + service types each minute, so connectivity
-   edits enable/disable autostart without a restart.
+2. ~~Connectivity migration into the room page~~ **Complete 2026-07-21** (page
+   built 2026-07-15; PC service types 2026-07-15, analysis source 2026-07-18,
+   ProPresenter + Companion 2026-07-21). Pattern in `server/connectivity.js`:
+   seed from rooms.config.js once (marker in `app_config`), SQLite owns it,
+   applyConnectivity() assigns onto the live rooms map so consumers never
+   change. ProPresenter (host/port, optional countdown-timer name; blank host
+   = room has none) also made autostart eligibility per-cycle instead of
+   per-boot, so connectivity edits enable/disable autostart without a restart.
+   Companion is the special one: stored as one blob (host/port, state
+   variable, mock, and the room's MODES — every Companion lays its buttons out
+   differently, so each mode's page/row/column is per-room) and decomposed
+   onto the four legacy room keys (`companion`/`state`/`mock`/`modes`).
+   It can never be cleared — a room always keeps modes; "no Companion" is
+   the Simulated (mock) checkbox. rooms.config.js is now entirely a
+   fresh-install seed for integrations; only room identity (id/name/site)
+   remains file-authoritative.
 3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
-4. **Youth/Chapel go live** — get their real modes + Companion button locations, flip
-   `mock: false`. (Auditorium is the template.)
+4. **Youth/Chapel go live** — get their real modes + Companion button locations,
+   enter them on the room page and untick Simulated. All in the browser now.
+   (Auditorium is the template.)
 5. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
 6. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
    `install-service.sh` run on Booth-Producer (launchd label `com.prodmesh.dashboard`,

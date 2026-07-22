@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
   savePcServiceTypes: vi.fn(),
   saveAnalysis: vi.fn(),
   saveProPresenter: vi.fn(),
+  saveCompanion: vi.fn(),
 }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -165,12 +166,21 @@ describe('Campuses', () => {
       planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] },
       analysis: { source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95, hasPassword: false },
       proPresenter: { host: '192.0.2.74', port: 62202 },
+      companion: {
+        mock: false, host: '192.0.2.33', port: 8000, variable: 'roomState',
+        modes: [
+          { id: 'sunday', label: 'Sunday', color: '#34c759', match: 'SUNDAY', press: { page: 1, row: 3, column: 1 } },
+          { id: 'standby', label: 'Standby', color: '#8b97a8', match: 'STANDBY', press: { page: 1, row: 3, column: 4 }, isStandby: true },
+        ],
+      },
     });
     api.savePcServiceTypes.mockImplementation(async (_room: string, serviceTypes: unknown) => ({ serviceTypes }));
     api.saveAnalysis.mockReset();
     api.saveAnalysis.mockImplementation(async (_room: string, analysis: unknown) => analysis);
     api.saveProPresenter.mockReset();
     api.saveProPresenter.mockImplementation(async (_room: string, proPresenter: unknown) => proPresenter);
+    api.saveCompanion.mockReset();
+    api.saveCompanion.mockImplementation(async (_room: string, companion: unknown) => companion);
   });
 
   it('overview lists rooms with Configure links; new rooms need a save first', async () => {
@@ -223,7 +233,10 @@ describe('Campuses', () => {
     );
 
     expect(await screen.findByText('Planning Center service types')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Sunday')).toBeInTheDocument();
+    // "Sunday" is also a mode label now — pick the service-type name field.
+    const pcName = screen.getAllByDisplayValue('Sunday')
+      .find((el) => (el as HTMLInputElement).placeholder === 'e.g. Sunday');
+    expect(pcName).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: '+ Add service type' }));
     const names = screen.getAllByLabelText('Name');
@@ -310,6 +323,44 @@ describe('Campuses', () => {
     await user.clear(host);
     await user.click(screen.getByRole('button', { name: 'Save ProPresenter' }));
     await waitFor(() => expect(api.saveProPresenter).toHaveBeenLastCalledWith('north-main', null));
+  });
+
+  it('moves a mode button to a different page/row/col and adds a new mode', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
+        <Routes>
+          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Companion & modes')).toBeInTheDocument();
+    // Re-point the Sunday mode's button (first mode row) to page 3, row 0.
+    const [page] = screen.getAllByLabelText('Page');
+    const [row] = screen.getAllByLabelText('Row');
+    await user.clear(page);
+    await user.type(page, '3');
+    await user.clear(row);
+    await user.type(row, '0');
+
+    await user.click(screen.getByRole('button', { name: '+ Add mode' }));
+    const labels = screen.getAllByLabelText('Label');
+    const ids = screen.getAllByLabelText('ID');
+    const matches = screen.getAllByLabelText('Match');
+    await user.type(labels[labels.length - 1], 'Second Service');
+    await user.type(ids[ids.length - 1], 'second');
+    await user.type(matches[matches.length - 1], 'SECOND');
+
+    await user.click(screen.getByRole('button', { name: 'Save Companion' }));
+    await waitFor(() => expect(api.saveCompanion).toHaveBeenCalledWith('north-main', {
+      mock: false, host: '192.0.2.33', port: 8000, variable: 'roomState',
+      modes: [
+        { id: 'sunday', label: 'Sunday', color: '#34c759', match: 'SUNDAY', press: { page: 3, row: 0, column: 1 } },
+        { id: 'standby', label: 'Standby', color: '#8b97a8', match: 'STANDBY', press: { page: 1, row: 3, column: 4 }, isStandby: true },
+        { id: 'second', label: 'Second Service', color: '#5b8def', match: 'SECOND' },
+      ],
+    }));
   });
 
   it('room page shows not-found for an unknown room id', async () => {

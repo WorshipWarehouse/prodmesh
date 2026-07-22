@@ -414,11 +414,29 @@ export interface ProPresenterConfig {
   timer?: string;
 }
 
+export interface ModeConfig {
+  id: string;
+  label: string;
+  color: string;
+  match: string;
+  press?: { page: number; row: number; column: number };
+  isStandby?: boolean;
+}
+
+export interface CompanionConfig {
+  mock: boolean;
+  host?: string;
+  port?: number;
+  variable?: string;
+  modes: ModeConfig[];
+}
+
 export interface RoomConnectivity {
   hasServerRoom: boolean;
   planningCenter: { serviceTypes: PcServiceType[] } | null;
   analysis: AnalysisConfig | null;
   proPresenter: ProPresenterConfig | null;
+  companion: CompanionConfig | null;
 }
 
 export const getRoomConnectivity = (roomId: string) =>
@@ -461,6 +479,19 @@ export async function saveProPresenter(
   });
   await requireOk(res);
   return (await res.json()).proPresenter;
+}
+
+export async function saveCompanion(
+  roomId: string,
+  companion: CompanionConfig,
+): Promise<CompanionConfig> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/companion`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ companion }),
+  });
+  await requireOk(res);
+  return (await res.json()).companion;
 }
 
 export interface ServerLogTail {
