@@ -198,6 +198,53 @@ function pickChannel(inputs, cfg) {
   return match;
 }
 
+// ── SPL logging control ──────────────────────────────────────────────────────
+//  The API has no logging start/stop target, but the command handler can
+//  invoke any UI command by its bound keypress ("Toggle SPL Logging", verified
+//  live on Suite 9.6.4). The keypress is looked up by description — bindings
+//  differ across versions/platforms. Because the command is a toggle, we read
+//  the actual state first (activeCalibratedInputs non-empty = logging) and
+//  only fire when it differs, then poll to confirm the flip took.
+
+const hasLoggingInputs = (inputs) =>
+  (inputs?.devices ?? []).some((d) => (d.activeCalibratedChannels ?? []).length > 0);
+
+/**
+ * Ensure Smaart's SPL logging is on/off. Returns { changed, logging }.
+ * Throws if Smaart is unreachable, exposes no toggle command, or the state
+ * doesn't flip (e.g. turning on with no calibrated input configured).
+ */
+export async function setLogging(cfg, on, signal = new AbortController().signal) {
+  const base = `ws://${cfg.host}:${cfg.port ?? 26000}`;
+  const state = { path: cfg.apiPath ?? null };
+  const { rpc, call, info } = await connectRpc(base, cfg, state, signal);
+  try {
+    if (info.authenticationRequired) {
+      if (!cfg.password) throw new Error('Smaart API requires a password (set analysis.password)');
+      await call({ action: 'set', properties: [{ password: cfg.password }] });
+    }
+    const logging = async () =>
+      hasLoggingInputs(await call({ action: 'get', target: 'activeCalibratedInputs' }));
+    if ((await logging()) === on) return { changed: false, logging: on };
+    const { commands = [] } = await call({ action: 'get', target: 'commands' });
+    const keypress = commands
+      .find((c) => /toggle spl logging/i.test(c.description ?? ''))
+      ?.keypresses?.find(Boolean);
+    if (!keypress) throw new Error('Smaart exposes no "Toggle SPL Logging" command');
+    await call({ action: 'issueCommand', properties: [{ keypress }] });
+    // The toggle lands on Smaart's UI thread — poll briefly for the flip.
+    for (let i = 0; i < 5; i++) {
+      await sleep(400, signal);
+      if ((await logging()) === on) return { changed: true, logging: on };
+    }
+    throw new Error(
+      `SPL logging did not turn ${on ? 'on' : 'off'}` + (on ? ' (no calibrated input in Smaart?)' : ''),
+    );
+  } finally {
+    rpc.close();
+  }
+}
+
 // Connect to whichever API path this Smaart answers on. The bare `get`
 // doubles as the liveness hello: a silent path (v8's /api/v4/) times out
 // quickly and we move on. The answering path is cached; if it later goes

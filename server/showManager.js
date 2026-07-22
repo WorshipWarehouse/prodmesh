@@ -146,6 +146,35 @@ function stopSplWatcher(roomId) {
   spls.delete(roomId);
 }
 
+// ── Smaart SPL logging control ───────────────────────────────────────────────
+//  With analysis.logControl set, a show turns Smaart's SPL logging on at start
+//  and back off at end — but off only when the dashboard was the one who
+//  started it, so an engineer's manually-running log session survives a show.
+//  Fire-and-forget: a show must never fail because Smaart is unreachable.
+
+function startShowLogging(show) {
+  const cfg = rooms[show.roomId]?.analysis;
+  if (!cfg?.logControl || !analysis.supportsLogControl(cfg)) return;
+  analysis
+    .setLogging(cfg, true)
+    .then(({ changed }) => {
+      if (!changed || !shows.has(show.roomId)) return;
+      show.startedLogging = true;
+      persistShow(show); // survive a mid-show server restart
+      console.log(`[smaart] ${cfg.host}: SPL logging started for show`);
+    })
+    .catch((err) => console.error(`[smaart] ${cfg.host}: could not start SPL logging — ${err.message}`));
+}
+
+function stopShowLogging(show) {
+  const cfg = rooms[show.roomId]?.analysis;
+  if (!show.startedLogging || !cfg?.logControl || !analysis.supportsLogControl(cfg)) return;
+  analysis
+    .setLogging(cfg, false)
+    .then(() => console.log(`[smaart] ${cfg.host}: SPL logging stopped after show`))
+    .catch((err) => console.error(`[smaart] ${cfg.host}: could not stop SPL logging — ${err.message}`));
+}
+
 function onSpl(roomId, sample) {
   const cfg = rooms[roomId]?.analysis ?? {};
   const show = shows.get(roomId);
@@ -221,6 +250,7 @@ function persistShow(show) {
     planId: show.planId,
     timeId: show.timeId,
     startedAt: show.startedAt,
+    startedLogging: show.startedLogging ?? false,
     status: 'active',
   });
 }
@@ -241,7 +271,7 @@ async function findPlan(room, planId) {
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
-async function beginShow(roomId, planId, timeId, startedAt) {
+async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = false } = {}) {
   const room = rooms[roomId];
   if (!room) throw new Error('Unknown room');
 
@@ -283,6 +313,7 @@ async function beginShow(roomId, planId, timeId, startedAt) {
     follow: true,
     ppConnected: null,
     config: showConfig.getConfig(roomId, planId), // per-event automation settings
+    startedLogging, // true when the dashboard turned Smaart's SPL logging on
     abort: new AbortController(),
   };
   shows.set(roomId, show);
@@ -293,6 +324,7 @@ async function beginShow(roomId, planId, timeId, startedAt) {
   broadcast(roomId);
   startPoller(show);
   startSplWatcher(roomId); // capture runs with the show, not the browsers
+  startShowLogging(show);
   return show;
 }
 
@@ -319,6 +351,7 @@ export function endShow(roomId) {
   shows.delete(roomId);
   removeShowFile(roomId);
   stopSplWatcher(roomId); // no-op if viewers still want the live meter
+  stopShowLogging(show);
   broadcast(roomId);
   return getState(roomId);
 }
@@ -524,7 +557,9 @@ export async function restoreShows() {
     try {
       const meta = JSON.parse(readFileSync(join(SHOWS_DIR, f), 'utf8'));
       if (meta.status === 'active' && meta.roomId && meta.planId && !shows.has(meta.roomId)) {
-        await beginShow(meta.roomId, meta.planId, meta.timeId ?? 'default', meta.startedAt ?? Date.now());
+        await beginShow(meta.roomId, meta.planId, meta.timeId ?? 'default', meta.startedAt ?? Date.now(), {
+          startedLogging: Boolean(meta.startedLogging),
+        });
       }
     } catch {
       /* skip bad file */

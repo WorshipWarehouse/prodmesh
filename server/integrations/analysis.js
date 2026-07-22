@@ -24,3 +24,9 @@ export function watchSpl(cfg, onSample, signal, intervalMs = 1000) {
   if (cfg?.mock || cfg?.source !== 'rta') return smaart.watchSpl(cfg, onSample, signal, intervalMs);
   return rta.watchSpl(cfg, onSample, signal, intervalMs);
 }
+
+// Only Smaart has controllable SPL logging — the RTA app always streams.
+export const supportsLogControl = (cfg) =>
+  Boolean(cfg?.host) && !cfg?.mock && (cfg?.source ?? 'smaart') === 'smaart';
+
+export const setLogging = (cfg, on, signal) => smaart.setLogging(cfg, on, signal);

@@ -78,6 +78,15 @@ test('the password survives storage but only for Smaart sources', () => {
   assert.equal(rta.password, undefined);
 });
 
+test('logControl is Smaart-only and stored as a clean boolean', () => {
+  const smaart = conn.validateAnalysis({ source: 'smaart', host: 'x', logControl: 1 });
+  assert.equal(smaart.logControl, true);
+  const off = conn.validateAnalysis({ source: 'smaart', host: 'x', logControl: false });
+  assert.equal(off.logControl, undefined);
+  const rta = conn.validateAnalysis({ source: 'rta', host: 'x', logControl: true });
+  assert.equal(rta.logControl, undefined);
+});
+
 test('setPlanningCenter rejects bad input without changing anything', () => {
   const before = conn.getPlanningCenter('north-chapel');
   assert.throws(() => conn.setPlanningCenter('north-chapel', [{ id: 'abc', name: 'X' }]), /must be numeric/);
