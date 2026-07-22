@@ -31,8 +31,10 @@ import {
   getRoomConnectivity,
   savePcServiceTypes,
   saveAnalysis,
+  saveProPresenter,
   type PcServiceType,
   type AnalysisConfig,
+  type ProPresenterConfig,
   type RoomConnectivity,
   type ServerLogTail,
   type AuditEntry,
@@ -1394,9 +1396,10 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
         <>
           <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} />
           <AnalysisEditor roomId={roomId} initial={conn.analysis} />
+          <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} />
           <p className="settings__muted">
-            Companion and ProPresenter wiring still lives in{' '}
-            <code>server/rooms.config.js</code> — each migrates here in turn.
+            Companion wiring still lives in{' '}
+            <code>server/rooms.config.js</code> — it migrates here too.
           </p>
         </>
       )}
@@ -1610,6 +1613,85 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
           />
         </div>
       )}
+
+      {err && <p className="settings__error">{err}</p>}
+      {msg && <p className="settings__ok">{msg}</p>}
+    </div>
+  );
+}
+
+// Draft form state for ProPresenter — an empty host means "not in this room"
+// and saves as a clear.
+interface PpDraft {
+  host: string;
+  port: string;
+  timer: string;
+}
+
+function toPpDraft(cfg: ProPresenterConfig | null): PpDraft {
+  return {
+    host: cfg?.host ?? '',
+    port: cfg?.port != null ? String(cfg.port) : '',
+    timer: cfg?.timer ?? '',
+  };
+}
+
+function ProPresenterEditor({ roomId, initial }: { roomId: string; initial: ProPresenterConfig | null }) {
+  const [draft, setDraft] = useState<PpDraft>(() => toPpDraft(initial));
+  const [baseline, setBaseline] = useState(() => JSON.stringify(toPpDraft(initial)));
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const dirty = JSON.stringify(draft) !== baseline;
+  const set = (patch: Partial<PpDraft>) => setDraft((d) => ({ ...d, ...patch }));
+
+  const save = async () => {
+    setErr(''); setMsg('');
+    try {
+      const stored = await saveProPresenter(
+        roomId,
+        draft.host.trim()
+          ? {
+              host: draft.host,
+              port: draft.port === '' ? undefined : Number(draft.port),
+              timer: draft.timer || undefined,
+            }
+          : null,
+      );
+      const next = toPpDraft(stored);
+      setDraft(next);
+      setBaseline(JSON.stringify(next));
+      setMsg('Saved.');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <div className="pctypes">
+      <div className="campuses__head">
+        <h3 className="pctypes__title">ProPresenter
+          <HelpTip text="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter." />
+        </h3>
+        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
+          {dirty ? 'Save ProPresenter' : 'Saved'}
+        </button>
+      </div>
+
+      <div className="campuses__tile">
+        <label className="lfield campuses__grow"><span>Host</span>
+          <input className="field" placeholder="e.g. 192.0.2.74" value={draft.host}
+            onChange={(e) => set({ host: e.target.value })} />
+        </label>
+        <label className="lfield"><span>Port</span>
+          <input className="field campuses__tileport" inputMode="numeric" placeholder="62202"
+            value={draft.port} onChange={(e) => set({ port: e.target.value })} />
+        </label>
+        <label className="lfield campuses__grow"><span>Countdown timer</span>
+          <input className="field" placeholder="First countdown timer" value={draft.timer}
+            onChange={(e) => set({ timer: e.target.value })} />
+        </label>
+      </div>
 
       {err && <p className="settings__error">{err}</p>}
       {msg && <p className="settings__ok">{msg}</p>}

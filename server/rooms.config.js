@@ -52,6 +52,8 @@ const localTest = {
     // ProPresenter API (official 7.9+). Port is per-machine (PP picks it).
     // Optional `timer: '<name>'` picks the service-start countdown timer;
     // without it, the first count-down-to-time timer is used.
+    // Fresh-install seed only — after first boot this lives in SQLite
+    // (room_connectivity) and is edited on the room configuration page.
     proPresenter: { host: '127.0.0.1', port: 62202 },
     // Analysis source (SPL) — mock meter for dev (no analyzer on this machine).
     // target/limit in dB: our Sundays target 90, not to exceed 95.
@@ -82,6 +84,7 @@ export const rooms = {
         // reliably in this room. Add once Calendar can confirm room (see ADR 0001).
       ],
     },
+    // Fresh-install seed only — after first boot the database owns this.
     proPresenter: { host: '192.0.2.74', port: 62202 }, // ProPresenter (confirm port on-site)
     // Analysis source (SPL) — Smaart on the FOH Mac ("FOH-Soundgrid"), Smaart
     // v8 8.5.2.2, API v3 (the transport negotiates the path automatically;

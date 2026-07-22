@@ -87,6 +87,39 @@ test('logControl is Smaart-only and stored as a clean boolean', () => {
   assert.equal(rta.logControl, undefined);
 });
 
+test('first boot seeds ProPresenter from rooms.config.js', () => {
+  assert.deepEqual(conn.getProPresenter('north-main'), { host: '192.0.2.74', port: 62202 });
+  assert.deepEqual(conn.getProPresenter('local-test'), { host: '127.0.0.1', port: 62202 });
+  assert.equal(conn.getProPresenter('north-youth'), null);
+});
+
+test('setProPresenter validates, persists, and applies to the live rooms map', () => {
+  const clean = conn.setProPresenter('north-youth', { host: '192.0.2.80', port: '62202', timer: ' Service Start ' });
+  assert.deepEqual(clean, { host: '192.0.2.80', port: 62202, timer: 'Service Start' });
+  assert.deepEqual(rooms['north-youth'].proPresenter, clean);
+  // Clearing removes it from the database AND the live room object.
+  conn.setProPresenter('north-youth', null);
+  assert.equal(conn.getProPresenter('north-youth'), null);
+  assert.equal(rooms['north-youth'].proPresenter, undefined);
+});
+
+test('a cleared ProPresenter stays cleared across applyConnectivity', () => {
+  const before = conn.getProPresenter('north-main');
+  conn.setProPresenter('north-main', null);
+  conn.applyConnectivity();
+  assert.equal(rooms['north-main'].proPresenter, undefined);
+  conn.setProPresenter('north-main', before);
+});
+
+test('setProPresenter rejects bad input without changing anything', () => {
+  const before = conn.getProPresenter('north-main');
+  assert.throws(() => conn.setProPresenter('north-main', {}), /needs a host/);
+  assert.throws(() => conn.setProPresenter('north-main', { host: 'x', port: 0 }), /Port must be/);
+  assert.throws(() => conn.setProPresenter('north-main', { host: 'x', timer: 'y'.repeat(61) }), /at most 60/);
+  assert.throws(() => conn.setProPresenter('nope', null), /Unknown room/);
+  assert.deepEqual(conn.getProPresenter('north-main'), before);
+});
+
 test('setPlanningCenter rejects bad input without changing anything', () => {
   const before = conn.getPlanningCenter('north-chapel');
   assert.throws(() => conn.setPlanningCenter('north-chapel', [{ id: 'abc', name: 'X' }]), /must be numeric/);

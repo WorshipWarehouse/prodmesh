@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   getRoomConnectivity: vi.fn(),
   savePcServiceTypes: vi.fn(),
   saveAnalysis: vi.fn(),
+  saveProPresenter: vi.fn(),
 }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -163,10 +164,13 @@ describe('Campuses', () => {
       hasServerRoom: true,
       planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] },
       analysis: { source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95, hasPassword: false },
+      proPresenter: { host: '192.0.2.74', port: 62202 },
     });
     api.savePcServiceTypes.mockImplementation(async (_room: string, serviceTypes: unknown) => ({ serviceTypes }));
     api.saveAnalysis.mockReset();
     api.saveAnalysis.mockImplementation(async (_room: string, analysis: unknown) => analysis);
+    api.saveProPresenter.mockReset();
+    api.saveProPresenter.mockImplementation(async (_room: string, proPresenter: unknown) => proPresenter);
   });
 
   it('overview lists rooms with Configure links; new rooms need a save first', async () => {
@@ -282,6 +286,30 @@ describe('Campuses', () => {
       source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95,
       metric: undefined, logControl: true,
     }));
+  });
+
+  it('edits ProPresenter connectivity and clears it by blanking the host', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
+        <Routes>
+          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('ProPresenter')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Countdown timer'), 'Service Start');
+    await user.click(screen.getByRole('button', { name: 'Save ProPresenter' }));
+    await waitFor(() => expect(api.saveProPresenter).toHaveBeenCalledWith('north-main', {
+      host: '192.0.2.74', port: 62202, timer: 'Service Start',
+    }));
+
+    // Blanking the host means "no ProPresenter in this room" — saves a clear.
+    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.74')!;
+    await user.clear(host);
+    await user.click(screen.getByRole('button', { name: 'Save ProPresenter' }));
+    await waitFor(() => expect(api.saveProPresenter).toHaveBeenLastCalledWith('north-main', null));
   });
 
   it('room page shows not-found for an unknown room id', async () => {

@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **111 server tests** with **14 frontend interaction/configuration tests**
+  combines **116 server tests** with **15 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -177,11 +177,15 @@ Notes:
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
      port per machine); wire Youth (PP host TBD).
 2. **Connectivity migration into the room page** (page built 2026-07-15;
-   PC service types 2026-07-15, analysis source 2026-07-18): remaining —
-   Companion host + mode buttons, ProPresenter host/port. Pattern established
-   in `server/connectivity.js`: seed from rooms.config.js once (marker in
-   `app_config`), SQLite owns it, applyConnectivity() assigns onto the live
-   rooms map so consumers never change.
+   PC service types 2026-07-15, analysis source 2026-07-18, ProPresenter
+   2026-07-21): remaining — Companion host + mode buttons (the meatiest).
+   Pattern established in `server/connectivity.js`: seed from rooms.config.js
+   once (marker in `app_config`), SQLite owns it, applyConnectivity() assigns
+   onto the live rooms map so consumers never change. ProPresenter (host/port,
+   optional countdown-timer name; blank host = room has none) also made
+   autostart eligibility per-cycle instead of per-boot: every room gets a
+   watcher and re-checks its PP + service types each minute, so connectivity
+   edits enable/disable autostart without a restart.
 3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
