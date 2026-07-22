@@ -404,6 +404,7 @@ export interface AnalysisConfig {
   metric?: string;
   password?: string;
   hasPassword?: boolean;
+  logControl?: boolean;
   mock?: boolean;
 }
 

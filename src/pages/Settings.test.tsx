@@ -252,6 +252,7 @@ describe('Campuses', () => {
 
     await user.selectOptions(screen.getByLabelText('Source'), 'rta');
     expect(screen.queryByLabelText('API password')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Start\/stop SPL logging/)).not.toBeInTheDocument();
     const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.7')!;
     await user.clear(host);
     await user.type(host, '192.0.2.50');
@@ -261,6 +262,26 @@ describe('Campuses', () => {
       source: 'rta', host: '192.0.2.50', port: 26000, target: 90, limit: 95, metric: undefined,
     }));
     expect(api.saveConfig).not.toHaveBeenCalled();
+  });
+
+  it('enables show-driven SPL log control for a Smaart source', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
+        <Routes>
+          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Analysis source')).toBeInTheDocument();
+    await user.click(screen.getByText(/Start\/stop SPL logging/));
+    await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
+
+    await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
+      source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95,
+      metric: undefined, logControl: true,
+    }));
   });
 
   it('room page shows not-found for an unknown room id', async () => {

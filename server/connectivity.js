@@ -76,6 +76,7 @@ export function validateAnalysis(input) {
       if (password.length > 100) throw new Error('password must be at most 100 characters');
       out.password = password;
     }
+    if (input.logControl) out.logControl = true;
   }
   return out;
 }

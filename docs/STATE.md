@@ -30,7 +30,7 @@ Notes:
 | Bitfocus Companion (per room) | Live for Auditorium; Youth/Chapel mock pending real setup |
 | Planning Center **Services** | **Live** — plan display + order of service, PAT in `server/data/secrets.json` |
 | Planning Center **Calendar** | **Not started** — awaiting read-only access. High value (see below) |
-| **Smaart SPL** | **Transport implemented; v8 compat added 2026-07-14** — full pipeline (capture → SQLite → live meter + report) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream). FOH Mac probe (2026-07-14) found **Smaart v8 (8.5.2.2)**: its `/api/v4/` socket accepts connections but never answers RPCs; the same dialect lives at `/api/v3/`. Transport now negotiates v4 → v3 and caches the answering path (`smaart.apiPath` pins it). Since 2026-07-18 Smaart is one of two interchangeable **analysis sources** (see `integrations/analysis.js`); ProdMesh Remote RTA is the free alternative. Remaining: with SPL metering running on a calibrated input (Sunday), re-run `server/tools/smaart-probe.js` to confirm the v3 stream frame shape |
+| **Smaart SPL** | **Transport implemented; v8 compat added 2026-07-14** — full pipeline (capture → SQLite → live meter + report) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream). FOH Mac probe (2026-07-14) found **Smaart v8 (8.5.2.2)**: its `/api/v4/` socket accepts connections but never answers RPCs; the same dialect lives at `/api/v3/`. Transport now negotiates v4 → v3 and caches the answering path (`smaart.apiPath` pins it). Since 2026-07-18 Smaart is one of two interchangeable **analysis sources** (see `integrations/analysis.js`); ProdMesh Remote RTA is the free alternative. **Live at FOH 2026-07-21**: starting SPL logging in Smaart lit the dashboard meter — metering alone isn't enough, inputs must be calibrated + logging; shows can now drive logging on/off via `analysis.logControl`. Remaining: enumerate `get commands` on the FOH v8 to confirm it exposes "Toggle SPL Logging" (verified on v9) |
 
 ## What's live right now
 
@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **104 server tests** with **13 frontend interaction/configuration tests**
+  combines **111 server tests** with **14 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -136,6 +136,18 @@ Notes:
   (dot on a 0–20 dB track, amber above the band), Show Report adds C-A
   avg/max (plain mean — C-A is already a difference, so no energy math).
   Smaart samples simply lack `ca` and every surface hides it.
+  **Show-driven Smaart log control** (2026-07-21): Smaart only serves SPL for
+  inputs that are calibrated **and actively logging** — real-time metering
+  alone reads as `activeCalibratedInputs: []` (diagnosed live at FOH; starting
+  logging lit the meter instantly). There is no logging RPC, but the keypress
+  command handler exposes "Toggle SPL Logging" (verified on Suite 9.6.4);
+  `smaart.setLogging(cfg, on)` looks the keypress up by description, checks
+  real state first (the command is a toggle), fires only on mismatch, then
+  polls to confirm. With `analysis.logControl` set (room-page checkbox,
+  Smaart-only), show start ensures logging on and show end turns it off —
+  only if the dashboard started it (flag persisted in the show file, so it
+  survives a mid-show server restart). Fire-and-forget: a show never fails
+  because Smaart is unreachable.
 - **Server-owned topology** (2026-07-15, ADR 0009 milestone): the institution
   name, sites, rooms, and Quick Access tiles now live in SQLite (`sites`,
   `site_rooms`, `tiles`) and are served by `GET /api/config`; the frontend's

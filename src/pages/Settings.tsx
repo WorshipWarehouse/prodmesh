@@ -1474,6 +1474,7 @@ interface AnalysisDraft {
   limit: string;
   metric: string;
   password: string;
+  logControl: boolean;
 }
 
 function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
@@ -1485,6 +1486,7 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
     limit: cfg?.limit != null ? String(cfg.limit) : '',
     metric: cfg?.metric ?? '',
     password: '',
+    logControl: Boolean(cfg?.logControl),
   };
 }
 
@@ -1523,6 +1525,7 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
               target: draft.target === '' ? undefined : Number(draft.target),
               limit: draft.limit === '' ? undefined : Number(draft.limit),
               metric: draft.metric || undefined,
+              logControl: draft.source === 'smaart' && draft.logControl ? true : undefined,
               // Omit password unless typed — omitted keeps the stored one.
               ...(draft.password ? { password: draft.password } : {}),
             },
@@ -1593,6 +1596,18 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
                 onChange={(e) => set({ password: e.target.value })} />
             </label>
           )}
+        </div>
+      )}
+
+      {draft.source === 'smaart' && (
+        <div className="campuses__tile">
+          <Checkbox
+            label={<>Start/stop SPL logging with shows
+              <HelpTip text="Show start turns Smaart's SPL logging on; show end turns it off (only if the show turned it on). Needs a calibrated input in Smaart." />
+            </>}
+            checked={draft.logControl}
+            onChange={(e) => set({ logControl: e.target.checked })}
+          />
         </div>
       )}
 

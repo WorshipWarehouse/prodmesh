@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocketServer } from 'ws';
-import { watchSpl } from './smaart.js';
+import { setLogging, watchSpl } from './smaart.js';
 
 // A fake Smaart API v4 server: password auth on the RPC socket, one device
-// with two logging inputs, and a metric stream that respects targetFPS.
-function fakeSmaart({ requireAuth = true } = {}) {
+// with two logging inputs, a metric stream that respects targetFPS, and the
+// keypress command handler that toggles SPL logging (like Suite 9.6.4).
+function fakeSmaart({ requireAuth = true, logging = true, hasToggleCommand = true } = {}) {
   const wss = new WebSocketServer({ port: 0 });
-  const seen = { authed: false, targetFPS: null, streamPath: null };
+  const seen = { authed: false, targetFPS: null, streamPath: null, logging, toggles: 0 };
 
   wss.on('connection', (ws, req) => {
     if (req.url === '/api/v4/') {
@@ -25,16 +26,31 @@ function fakeSmaart({ requireAuth = true } = {}) {
         if (action === 'get' && target === 'activeCalibratedInputs') {
           if (requireAuth && !seen.authed) return reply({ error: 'authentication required' });
           return reply({
-            devices: [
-              {
-                deviceName: 'OCTA-CAPTURE',
-                activeCalibratedChannels: [
-                  { channelIndex: 0, channelName: 'Booth', streamEndpoint: '/api/v4/devices/OCTA-CAPTURE/channels/Booth' },
-                  { channelIndex: 3, channelName: 'FOH Mic', streamEndpoint: '/api/v4/devices/OCTA-CAPTURE/channels/FOH%20Mic' },
-                ],
-              },
+            devices: seen.logging
+              ? [
+                  {
+                    deviceName: 'OCTA-CAPTURE',
+                    activeCalibratedChannels: [
+                      { channelIndex: 0, channelName: 'Booth', streamEndpoint: '/api/v4/devices/OCTA-CAPTURE/channels/Booth' },
+                      { channelIndex: 3, channelName: 'FOH Mic', streamEndpoint: '/api/v4/devices/OCTA-CAPTURE/channels/FOH%20Mic' },
+                    ],
+                  },
+                ]
+              : [],
+          });
+        }
+        if (action === 'get' && target === 'commands') {
+          return reply({
+            commands: [
+              { description: 'Cycle Skin', keypresses: ['ctrl + shift + X'] },
+              ...(hasToggleCommand ? [{ description: 'Toggle SPL Logging', keypresses: ['option + L'] }] : []),
             ],
           });
+        }
+        if (action === 'issueCommand' && properties?.[0]?.keypress === 'option + L') {
+          seen.logging = !seen.logging;
+          seen.toggles += 1;
+          return reply({ status: 'Toggle SPL Logging' });
         }
         reply({ error: 'unknown action' });
       });
@@ -179,4 +195,50 @@ test('mock transport still works (rooms without Smaart hardware)', async () => {
   const samples = await collectSamples({ mock: true }, 2);
   assert.equal(samples.length, 2);
   assert.ok(samples.every((s) => s.spl >= 76 && s.spl <= 98));
+});
+
+test('setLogging: toggles on via the command handler and verifies the flip', async () => {
+  const srv = fakeSmaart({ requireAuth: false, logging: false });
+  try {
+    const r = await setLogging({ host: '127.0.0.1', port: srv.port() }, true);
+    assert.deepEqual(r, { changed: true, logging: true });
+    assert.equal(srv.seen.toggles, 1);
+    assert.equal(srv.seen.logging, true);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('setLogging: no-op when the state already matches (toggle never fired)', async () => {
+  const srv = fakeSmaart({ requireAuth: false, logging: true });
+  try {
+    const r = await setLogging({ host: '127.0.0.1', port: srv.port() }, true);
+    assert.deepEqual(r, { changed: false, logging: true });
+    assert.equal(srv.seen.toggles, 0);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('setLogging: turns off, and authenticates first when required', async () => {
+  const srv = fakeSmaart({ requireAuth: true, logging: true });
+  try {
+    const r = await setLogging({ host: '127.0.0.1', port: srv.port(), password: 'hunter2' }, false);
+    assert.deepEqual(r, { changed: true, logging: false });
+    assert.equal(srv.seen.logging, false);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('setLogging: throws when Smaart exposes no toggle command', async () => {
+  const srv = fakeSmaart({ requireAuth: false, logging: false, hasToggleCommand: false });
+  try {
+    await assert.rejects(
+      setLogging({ host: '127.0.0.1', port: srv.port() }, true),
+      /no "Toggle SPL Logging" command/,
+    );
+  } finally {
+    await srv.close();
+  }
 });
