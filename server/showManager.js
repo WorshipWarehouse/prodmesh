@@ -475,10 +475,17 @@ export async function nextArmedEvent(room, now) {
 
 async function autostartLoop(roomId, signal) {
   const room = rooms[roomId];
-  const pp = room.proPresenter;
   let prevItemId = null; // last mapped PC item; null = no baseline (never trigger)
   let armedPlanId = null; // for state-change logging only
   while (!signal.aborted) {
+    // Connectivity is edited live, so eligibility is per-cycle, not per-boot:
+    // a room gains (or loses) autostart within a minute of a config save.
+    const pp = room.proPresenter;
+    if (!ppro.isConfigured(pp) || !(room.planningCenter?.serviceTypes ?? []).length) {
+      prevItemId = null;
+      await timerSleep(ARM_CHECK_MS, signal);
+      continue;
+    }
     let armed = null;
     if (!shows.has(roomId)) {
       try {
@@ -540,8 +547,9 @@ export function initAutomation() {
     console.warn('[autostart] PRODMESH_AUTOSTART_TEST=1 — arm window IGNORED (dev/testing only)');
   }
   for (const room of Object.values(rooms)) {
-    if (!ppro.isConfigured(room.proPresenter)) continue;
-    if (!(room.planningCenter?.serviceTypes ?? []).length) continue;
+    // Every room gets a watcher — the loop itself checks (each minute) whether
+    // the room currently has ProPresenter + service types, so connectivity
+    // edits enable/disable autostart without a restart.
     // A watcher must never die silently — it's the thing nobody is looking at.
     autostartLoop(room.id, new AbortController().signal).catch((err) => {
       console.error(`[autostart] ${room.id}: watcher crashed — ${err?.stack ?? err}`);

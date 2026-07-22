@@ -240,6 +240,36 @@ test('analysis source: config.manage write, password never read back', async () 
   assert.equal((await cleared.json()).analysis, null);
 });
 
+test('ProPresenter connectivity: config.manage write, public read, clear', async () => {
+  const denied = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/propresenter`, {
+    method: 'PUT', body: { proPresenter: null }, token: operatorToken, stationToken: station.token,
+  });
+  assert.equal(denied.status, 403);
+
+  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/propresenter`, {
+    method: 'PUT',
+    body: { proPresenter: { host: '10.0.0.9', port: '62202', timer: 'Service Start' } },
+    token,
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual((await saved.json()).proPresenter, { host: '10.0.0.9', port: 62202, timer: 'Service Start' });
+
+  const read = await (await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`)).json();
+  assert.deepEqual(read.proPresenter, { host: '10.0.0.9', port: 62202, timer: 'Service Start' });
+
+  const bad = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/propresenter`, {
+    method: 'PUT', body: { proPresenter: { port: 62202 } }, token,
+  });
+  assert.equal(bad.status, 400);
+
+  const cleared = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/propresenter`, {
+    method: 'PUT', body: { proPresenter: null }, token,
+  });
+  assert.equal(cleared.status, 200);
+  assert.equal((await cleared.json()).proPresenter, null);
+});
+
 test('locked mode is blocked without override, allowed with it', async () => {
   const blocked = await post(`/api/rooms/${ROOM}/mode`, { mode: 'standby' }, operatorToken, station.token);
   assert.equal(blocked.status, 403);

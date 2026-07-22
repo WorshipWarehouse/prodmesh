@@ -5,6 +5,7 @@
 //  Migrated so far:
 //    planningCenter — which PC service types feed the room
 //    analysis       — SPL source (Smaart or ProdMesh Remote RTA) + dB goals
+//    proPresenter   — the room's ProPresenter API (host/port, optional timer)
 //
 //  On first boot each integration seeds from what rooms.config.js declares;
 //  after that the database owns it and the file entry is only a fresh-install
@@ -23,7 +24,8 @@ import { SOURCES } from './integrations/analysis.js';
 
 const PC = 'planningCenter';
 const ANALYSIS = 'analysis';
-const INTEGRATIONS = [PC, ANALYSIS];
+const PP = 'proPresenter';
+const INTEGRATIONS = [PC, ANALYSIS, PP];
 
 export function validateServiceTypes(input) {
   if (!Array.isArray(input)) throw new Error('serviceTypes must be an array');
@@ -129,6 +131,43 @@ export function setAnalysis(roomId, config) {
   return clean;
 }
 
+// Normalize + validate a ProPresenter config; null clears it (no ProPresenter
+// in the room). `timer` names the service-start countdown timer; without it
+// the first count-down-to-time timer is used.
+export function validateProPresenter(input) {
+  if (input === null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('proPresenter must be an object');
+  const host = String(input.host ?? '').trim();
+  if (!host || host.length > 100) throw new Error('ProPresenter needs a host (max 100 characters)');
+  const out = { host };
+  const port = input.port === '' || input.port == null ? null : Number(input.port);
+  if (port != null) {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
+    out.port = port;
+  }
+  const timer = String(input.timer ?? '').trim();
+  if (timer) {
+    if (timer.length > 60) throw new Error('timer must be at most 60 characters');
+    out.timer = timer;
+  }
+  return out;
+}
+
+/** The stored ProPresenter config for a room (null if the room has none). */
+export function getProPresenter(roomId) {
+  return readRow(roomId, PP);
+}
+
+/** Validate + store a room's ProPresenter config (null clears it), apply live. */
+export function setProPresenter(roomId, config) {
+  if (!rooms[roomId]) throw new Error(`Unknown room "${roomId}"`);
+  const clean = validateProPresenter(config);
+  if (clean === null) deleteRow(roomId, PP);
+  else writeRow(roomId, PP, clean);
+  applyConnectivity();
+  return clean;
+}
+
 /**
  * Assign stored connectivity onto the live rooms map (boot + after saves).
  * Once an integration has been seeded the database is authoritative: a room
@@ -163,6 +202,7 @@ function seedIfEmpty() {
         ? { serviceTypes: room.planningCenter.serviceTypes }
         : null,
     [ANALYSIS]: (room) => room.analysis ?? null,
+    [PP]: (room) => room.proPresenter ?? null,
   };
   for (const integration of INTEGRATIONS) {
     const key = `connectivity_seeded:${integration}`;

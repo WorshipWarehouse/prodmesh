@@ -740,12 +740,13 @@ function redactAnalysis(cfg) {
 
 app.get('/api/config/rooms/:roomId/connectivity', (req, res) => {
   if (!rooms[req.params.roomId]) {
-    return res.json({ hasServerRoom: false, planningCenter: null, analysis: null });
+    return res.json({ hasServerRoom: false, planningCenter: null, analysis: null, proPresenter: null });
   }
   res.json({
     hasServerRoom: true,
     planningCenter: connectivity.getPlanningCenter(req.params.roomId) ?? { serviceTypes: [] },
     analysis: redactAnalysis(connectivity.getAnalysis(req.params.roomId)),
+    proPresenter: connectivity.getProPresenter(req.params.roomId),
   });
 });
 
@@ -779,6 +780,21 @@ app.put('/api/config/rooms/:roomId/connectivity/analysis', requirePermission('co
       details: { integration: 'analysis', source: clean?.source ?? null },
     });
     res.json({ analysis: redactAnalysis(clean) });
+  } catch (err) {
+    res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
+  }
+});
+
+app.put('/api/config/rooms/:roomId/connectivity/propresenter', requirePermission('config.manage'), (req, res) => {
+  try {
+    const clean = connectivity.setProPresenter(req.params.roomId, req.body?.proPresenter ?? null);
+    auditSuccess(req, 'config.manage', {
+      resourceType: 'room-connectivity',
+      resourceId: req.params.roomId,
+      roomId: req.params.roomId,
+      details: { integration: 'proPresenter', host: clean?.host ?? null },
+    });
+    res.json({ proPresenter: clean });
   } catch (err) {
     res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
   }

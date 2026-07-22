@@ -408,10 +408,17 @@ export interface AnalysisConfig {
   mock?: boolean;
 }
 
+export interface ProPresenterConfig {
+  host: string;
+  port?: number;
+  timer?: string;
+}
+
 export interface RoomConnectivity {
   hasServerRoom: boolean;
   planningCenter: { serviceTypes: PcServiceType[] } | null;
   analysis: AnalysisConfig | null;
+  proPresenter: ProPresenterConfig | null;
 }
 
 export const getRoomConnectivity = (roomId: string) =>
@@ -441,6 +448,19 @@ export async function saveAnalysis(
   });
   await requireOk(res);
   return (await res.json()).analysis;
+}
+
+export async function saveProPresenter(
+  roomId: string,
+  proPresenter: ProPresenterConfig | null,
+): Promise<ProPresenterConfig | null> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/propresenter`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ proPresenter }),
+  });
+  await requireOk(res);
+  return (await res.json()).proPresenter;
 }
 
 export interface ServerLogTail {
