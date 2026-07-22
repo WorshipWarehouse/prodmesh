@@ -654,6 +654,23 @@
   flex: 0 0 84px !important;
 }
 
+/* Mode color swatch — a compact native color input. */
+.campuses__modecolor {
+  min-width: 58px !important;
+  flex: 0 0 58px !important;
+}
+
+.campuses__modecolor input[type='color'] {
+  padding: 4px;
+  height: 36px;
+  cursor: pointer;
+}
+
+/* Checkboxes sit at the same baseline as the fields beside them. */
+.campuses__tile .checkbox {
+  padding-bottom: 9px;
+}
+
 .campuses__tile .campuses__rowactions {
   padding-bottom: 7px;
 }

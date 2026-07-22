@@ -240,6 +240,52 @@ test('analysis source: config.manage write, password never read back', async () 
   assert.equal((await cleared.json()).analysis, null);
 });
 
+test('Companion connectivity: config.manage write, decomposes live, never clears', async () => {
+  const denied = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/companion`, {
+    method: 'PUT', body: { companion: null }, token: operatorToken, stationToken: station.token,
+  });
+  assert.equal(denied.status, 403);
+
+  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const original = (await (await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`)).json()).companion;
+  assert.ok(original.modes.length >= 1);
+
+  const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/companion`, {
+    method: 'PUT',
+    body: {
+      companion: {
+        mock: true,
+        host: '10.0.0.20',
+        variable: 'hsmState',
+        modes: [
+          { id: 'service', label: 'Service', color: '#34c759', match: 'SERVICE', press: { page: 2, row: 0, column: 1 } },
+          { id: 'standby', label: 'Standby', color: '#8b97a8', match: 'STANDBY', isStandby: true },
+        ],
+      },
+    },
+    token,
+  });
+  assert.equal(saved.status, 200);
+  const stored = (await saved.json()).companion;
+  assert.equal(stored.modes.length, 2);
+
+  // The rooms listing reflects the new modes immediately.
+  const listed = (await (await fetch(`${base}/api/rooms`)).json()).find((r) => r.id === ROOM);
+  assert.deepEqual(listed.modes.map((m) => m.id), ['service', 'standby']);
+
+  // Clearing is not a thing — a room always keeps its modes.
+  const cleared = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/companion`, {
+    method: 'PUT', body: { companion: null }, token,
+  });
+  assert.equal(cleared.status, 400);
+
+  // Restore the original so later tests see the seeded modes.
+  const restored = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/companion`, {
+    method: 'PUT', body: { companion: original }, token,
+  });
+  assert.equal(restored.status, 200);
+});
+
 test('ProPresenter connectivity: config.manage write, public read, clear', async () => {
   const denied = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/propresenter`, {
     method: 'PUT', body: { proPresenter: null }, token: operatorToken, stationToken: station.token,

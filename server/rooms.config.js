@@ -12,9 +12,13 @@
 //    • the buttons set roomState to: SUNDAY / MIDWEEK / EVENT / STANDBY
 //
 //  TO GO LIVE for a room: confirm the variable name + button locations match that
-//  room's Companion, then set `mock: false`.
-//  While `mock: true`, the proxy ignores Companion and keeps state in memory so
-//  the screens are fully demoable.
+//  room's Companion, then untick "Simulated" on the room configuration page.
+//  While simulated (mock), the proxy ignores Companion and keeps state in memory
+//  so the screens are fully demoable.
+//
+//  NOTE: `companion`/`state`/`mock`/`modes` (like planningCenter, proPresenter,
+//  and analysis before them) are fresh-install seeds only — after first boot
+//  they live in SQLite (room_connectivity) and are edited on the room page.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Standard mode set. `match` = the roomState value that means this mode is active

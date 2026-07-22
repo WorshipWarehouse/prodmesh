@@ -32,9 +32,12 @@ import {
   savePcServiceTypes,
   saveAnalysis,
   saveProPresenter,
+  saveCompanion,
   type PcServiceType,
   type AnalysisConfig,
   type ProPresenterConfig,
+  type CompanionConfig,
+  type ModeConfig,
   type RoomConnectivity,
   type ServerLogTail,
   type AuditEntry,
@@ -1394,13 +1397,10 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
 
       {conn?.hasServerRoom && (
         <>
+          <CompanionEditor roomId={roomId} initial={conn.companion} />
           <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} />
           <AnalysisEditor roomId={roomId} initial={conn.analysis} />
           <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} />
-          <p className="settings__muted">
-            Companion wiring still lives in{' '}
-            <code>server/rooms.config.js</code> — it migrates here too.
-          </p>
         </>
       )}
     </section>
@@ -1613,6 +1613,191 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
           />
         </div>
       )}
+
+      {err && <p className="settings__error">{err}</p>}
+      {msg && <p className="settings__ok">{msg}</p>}
+    </div>
+  );
+}
+
+// Draft form state for Companion + modes — everything stringly for controlled
+// inputs; the server normalizes on save. A mode's button is optional: leaving
+// page/row/col empty saves a mode with no Companion button.
+interface ModeDraft {
+  id: string;
+  label: string;
+  color: string;
+  match: string;
+  page: string;
+  row: string;
+  column: string;
+  isStandby: boolean;
+}
+
+interface CompanionDraft {
+  mock: boolean;
+  host: string;
+  port: string;
+  variable: string;
+  modes: ModeDraft[];
+}
+
+function toModeDraft(m: ModeConfig): ModeDraft {
+  return {
+    id: m.id,
+    label: m.label,
+    color: m.color,
+    match: m.match,
+    page: m.press ? String(m.press.page) : '',
+    row: m.press ? String(m.press.row) : '',
+    column: m.press ? String(m.press.column) : '',
+    isStandby: Boolean(m.isStandby),
+  };
+}
+
+function toCompanionDraft(cfg: CompanionConfig | null): CompanionDraft {
+  return {
+    mock: cfg ? cfg.mock : true,
+    host: cfg?.host ?? '',
+    port: cfg?.port != null ? String(cfg.port) : '',
+    variable: cfg?.variable ?? '',
+    modes: (cfg?.modes ?? []).map(toModeDraft),
+  };
+}
+
+function CompanionEditor({ roomId, initial }: { roomId: string; initial: CompanionConfig | null }) {
+  const [draft, setDraft] = useState<CompanionDraft>(() => toCompanionDraft(initial));
+  const [baseline, setBaseline] = useState(() => JSON.stringify(toCompanionDraft(initial)));
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  const dirty = JSON.stringify(draft) !== baseline;
+  const set = (patch: Partial<CompanionDraft>) => setDraft((d) => ({ ...d, ...patch }));
+  const setMode = (i: number, patch: Partial<ModeDraft>) =>
+    setDraft((d) => ({ ...d, modes: d.modes.map((m, j) => (j === i ? { ...m, ...patch } : m)) }));
+  const moveMode = (i: number, dir: -1 | 1) =>
+    setDraft((d) => {
+      const j = i + dir;
+      if (j < 0 || j >= d.modes.length) return d;
+      const modes = [...d.modes];
+      [modes[i], modes[j]] = [modes[j], modes[i]];
+      return { ...d, modes };
+    });
+
+  const save = async () => {
+    setErr(''); setMsg('');
+    try {
+      const stored = await saveCompanion(roomId, {
+        mock: draft.mock,
+        host: draft.host || undefined,
+        port: draft.port === '' ? undefined : Number(draft.port),
+        variable: draft.variable || undefined,
+        modes: draft.modes.map((m) => ({
+          id: m.id,
+          label: m.label,
+          color: m.color,
+          match: m.match,
+          ...(m.page === '' && m.row === '' && m.column === ''
+            ? {}
+            : { press: { page: Number(m.page), row: Number(m.row), column: Number(m.column) } }),
+          ...(m.isStandby ? { isStandby: true } : {}),
+        })),
+      });
+      const next = toCompanionDraft(stored);
+      setDraft(next);
+      setBaseline(JSON.stringify(next));
+      setMsg('Saved.');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <div className="pctypes">
+      <div className="campuses__head">
+        <h3 className="pctypes__title">Companion &amp; modes
+          <HelpTip text="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches its value. Every Companion lays its buttons out differently — set each mode's location to match this room's." />
+        </h3>
+        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
+          {dirty ? 'Save Companion' : 'Saved'}
+        </button>
+      </div>
+
+      <div className="campuses__tile">
+        <Checkbox
+          label={<>Simulated
+            <HelpTip text="No Companion yet — room state is kept in memory so every screen still works. Untick when this room's Companion has the state variable and buttons set up." />
+          </>}
+          checked={draft.mock}
+          onChange={(e) => set({ mock: e.target.checked })}
+        />
+        <label className="lfield campuses__grow"><span>Host</span>
+          <input className="field" placeholder="e.g. 192.0.2.31" value={draft.host}
+            onChange={(e) => set({ host: e.target.value })} />
+        </label>
+        <label className="lfield"><span>Port</span>
+          <input className="field campuses__tileport" inputMode="numeric" placeholder="8000"
+            value={draft.port} onChange={(e) => set({ port: e.target.value })} />
+        </label>
+        <label className="lfield"><span>State variable</span>
+          <input className="field" placeholder="roomState" value={draft.variable}
+            onChange={(e) => set({ variable: e.target.value })} />
+        </label>
+      </div>
+
+      {draft.modes.map((m, i) => (
+        <div className="campuses__tile" key={i}>
+          <label className="lfield campuses__modecolor"><span>Color</span>
+            <input className="field" type="color" value={m.color}
+              onChange={(e) => setMode(i, { color: e.target.value })} />
+          </label>
+          <label className="lfield"><span>Label</span>
+            <input className="field" value={m.label}
+              onChange={(e) => setMode(i, { label: e.target.value })} />
+          </label>
+          <label className="lfield"><span>ID</span>
+            <input className="field" placeholder="e.g. sunday" value={m.id}
+              onChange={(e) => setMode(i, { id: e.target.value })} />
+          </label>
+          <label className="lfield"><span>Match</span>
+            <input className="field" placeholder="e.g. SUNDAY" value={m.match}
+              onChange={(e) => setMode(i, { match: e.target.value })} />
+          </label>
+          <label className="lfield campuses__tileport"><span>Page</span>
+            <input className="field" inputMode="numeric" value={m.page}
+              onChange={(e) => setMode(i, { page: e.target.value })} />
+          </label>
+          <label className="lfield campuses__tileport"><span>Row</span>
+            <input className="field" inputMode="numeric" value={m.row}
+              onChange={(e) => setMode(i, { row: e.target.value })} />
+          </label>
+          <label className="lfield campuses__tileport"><span>Col</span>
+            <input className="field" inputMode="numeric" value={m.column}
+              onChange={(e) => setMode(i, { column: e.target.value })} />
+          </label>
+          <Checkbox label="Standby" checked={m.isStandby}
+            onChange={(e) => setMode(i, { isStandby: e.target.checked })} />
+          <div className="campuses__rowactions">
+            <button className="iconbtn" title="Move mode up" aria-label="Move mode up"
+              onClick={() => moveMode(i, -1)}><ArrowUp size={14} /></button>
+            <button className="iconbtn" title="Move mode down" aria-label="Move mode down"
+              onClick={() => moveMode(i, 1)}><ArrowDown size={14} /></button>
+            <button className="iconbtn iconbtn--danger" title="Remove mode" aria-label="Remove mode"
+              onClick={() => setDraft((d) => ({ ...d, modes: d.modes.filter((_, j) => j !== i) }))}>
+              <Trash2 size={14} /></button>
+          </div>
+        </div>
+      ))}
+
+      <div>
+        <button className="btn" onClick={() => setDraft((d) => ({
+          ...d,
+          modes: [...d.modes, {
+            id: '', label: '', color: '#5b8def', match: '',
+            page: '', row: '', column: '', isStandby: false,
+          }],
+        }))}>+ Add mode</button>
+      </div>
 
       {err && <p className="settings__error">{err}</p>}
       {msg && <p className="settings__ok">{msg}</p>}

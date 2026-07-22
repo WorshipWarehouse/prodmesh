@@ -6,6 +6,10 @@
 //    planningCenter — which PC service types feed the room
 //    analysis       — SPL source (Smaart or ProdMesh Remote RTA) + dB goals
 //    proPresenter   — the room's ProPresenter API (host/port, optional timer)
+//    companion      — Companion host/port + state variable + the room's MODES
+//                     (stored as one blob; applied onto the legacy room keys
+//                     `companion`/`state`/`mock`/`modes` so consumers never
+//                     change; never cleared — "no Companion" is mock:true)
 //
 //  On first boot each integration seeds from what rooms.config.js declares;
 //  after that the database owns it and the file entry is only a fresh-install
@@ -25,7 +29,8 @@ import { SOURCES } from './integrations/analysis.js';
 const PC = 'planningCenter';
 const ANALYSIS = 'analysis';
 const PP = 'proPresenter';
-const INTEGRATIONS = [PC, ANALYSIS, PP];
+const COMPANION = 'companion';
+const INTEGRATIONS = [PC, ANALYSIS, PP, COMPANION];
 
 export function validateServiceTypes(input) {
   if (!Array.isArray(input)) throw new Error('serviceTypes must be an array');
@@ -153,6 +158,85 @@ export function validateProPresenter(input) {
   return out;
 }
 
+// Normalize + validate a Companion config. Never null — a room always has
+// modes (the rooms listing, mode buttons, and checklists depend on them);
+// "no Companion" is mock:true, which keeps state in memory instead.
+const MODE_ID = /^[a-z0-9][a-z0-9_-]{0,29}$/i;
+const COLOR = /^#[0-9a-f]{6}$/i;
+export function validateCompanion(input) {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('companion must be an object (rooms cannot clear it — use Simulated instead)');
+  }
+  const out = { mock: input.mock === true };
+  const host = String(input.host ?? '').trim();
+  if (host.length > 100) throw new Error('host must be at most 100 characters');
+  if (host) out.host = host;
+  const port = input.port === '' || input.port == null ? null : Number(input.port);
+  if (port != null) {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
+    out.port = port;
+  }
+  const variable = String(input.variable ?? '').trim();
+  if (variable.length > 60) throw new Error('variable must be at most 60 characters');
+  if (variable) out.variable = variable;
+  if (!out.mock) {
+    if (!out.host) throw new Error('A live (non-simulated) room needs a Companion host');
+    if (!out.variable) throw new Error('A live (non-simulated) room needs a state variable');
+  }
+  if (!Array.isArray(input.modes) || input.modes.length === 0) throw new Error('At least one mode is required');
+  if (input.modes.length > 12) throw new Error('Too many modes (max 12)');
+  const ids = new Set();
+  out.modes = input.modes.map((m) => {
+    const id = String(m?.id ?? '').trim();
+    if (!MODE_ID.test(id)) throw new Error(`Mode id "${id}" must be letters, digits, - and _ (max 30)`);
+    if (ids.has(id)) throw new Error(`Duplicate mode id "${id}"`);
+    ids.add(id);
+    const label = String(m.label ?? '').trim();
+    if (!label || label.length > 40) throw new Error(`Mode "${id}" needs a label (max 40 characters)`);
+    const color = String(m.color ?? '').trim();
+    if (!COLOR.test(color)) throw new Error(`Mode "${id}" color must be #rrggbb`);
+    const match = String(m.match ?? '').trim();
+    if (!match || match.length > 40) throw new Error(`Mode "${id}" needs a match value (max 40 characters)`);
+    const mode = { id, label, color, match };
+    const press = m.press ?? null;
+    if (press != null && press !== '') {
+      const nums = ['page', 'row', 'column'].map((f) => Number(press[f]));
+      if (nums.some((n) => !Number.isInteger(n) || n < 0 || n > 999)) {
+        throw new Error(`Mode "${id}" button needs integer page/row/column`);
+      }
+      if (nums[0] < 1) throw new Error(`Mode "${id}" button page must be at least 1`);
+      mode.press = { page: nums[0], row: nums[1], column: nums[2] };
+    }
+    if (m.isStandby) mode.isStandby = true;
+    return mode;
+  });
+  return out;
+}
+
+/** The stored Companion config for a room (null only pre-seed). */
+export function getCompanion(roomId) {
+  return readRow(roomId, COMPANION);
+}
+
+/** Validate + store a room's Companion config (never null), apply live. */
+export function setCompanion(roomId, config) {
+  if (!rooms[roomId]) throw new Error(`Unknown room "${roomId}"`);
+  const clean = validateCompanion(config);
+  writeRow(roomId, COMPANION, clean);
+  applyConnectivity();
+  return clean;
+}
+
+// Companion is stored as one blob but lives on four legacy room keys.
+function applyCompanion(room, stored) {
+  room.mock = stored.mock;
+  room.companion = stored.host
+    ? { host: stored.host, ...(stored.port != null ? { port: stored.port } : {}) }
+    : {};
+  room.state = { variable: stored.variable };
+  room.modes = stored.modes;
+}
+
 /** The stored ProPresenter config for a room (null if the room has none). */
 export function getProPresenter(roomId) {
   return readRow(roomId, PP);
@@ -180,8 +264,14 @@ export function applyConnectivity() {
     const seeded = Boolean(marker.get(`connectivity_seeded:${integration}`));
     for (const room of Object.values(rooms)) {
       const stored = readRow(room.id, integration);
-      if (stored) room[integration] = stored;
-      else if (seeded) delete room[integration];
+      if (stored) {
+        if (integration === COMPANION) applyCompanion(room, stored);
+        else room[integration] = stored;
+      } else if (seeded && integration !== COMPANION) {
+        // Companion rows are never deleted, so a missing row just means this
+        // room predates the migration — leave its file config in place.
+        delete room[integration];
+      }
     }
   }
 }
@@ -203,6 +293,13 @@ function seedIfEmpty() {
         : null,
     [ANALYSIS]: (room) => room.analysis ?? null,
     [PP]: (room) => room.proPresenter ?? null,
+    [COMPANION]: (room) => ({
+      mock: Boolean(room.mock),
+      ...(room.companion?.host ? { host: room.companion.host } : {}),
+      ...(room.companion?.port != null ? { port: room.companion.port } : {}),
+      ...(room.state?.variable ? { variable: room.state.variable } : {}),
+      modes: room.modes,
+    }),
   };
   for (const integration of INTEGRATIONS) {
     const key = `connectivity_seeded:${integration}`;
