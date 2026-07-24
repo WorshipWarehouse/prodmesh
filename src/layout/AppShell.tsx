@@ -20,7 +20,9 @@ import {
   PanelLeftOpen,
   Wrench,
 } from 'lucide-react';
-import { getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
+import { getAuthStatus, getConfig, logoutAdmin, requestAssistance, type AuthStatus, type Station } from '../api';
+import { invalidate } from '../lib/useQuery';
+import { AssistanceBar } from '../components/AssistanceBar';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { ChurchContext, EMPTY_CHURCH } from './church';
 import type { Church } from '../types';
@@ -64,6 +66,8 @@ export function AppShell() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [assistBusy, setAssistBusy] = useState(false);
+  const [assistErr, setAssistErr] = useState<string | null>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
 
@@ -206,15 +210,15 @@ export function AppShell() {
           </nav>
 
           <div className="sidebar__foot">
-            {/* Help lives at the bottom, above the clock. Both entries are
-                placeholders for now: docs are being written, and Request
-                Assistance will ping the team Slack via webhook (the Lowe's
-                aisle-button model) once that's configured. */}
+            {/* Help lives at the bottom, above the clock. */}
             <div className="sidebar__help" ref={helpRef}>
               <button
                 className="sidebar__toggle"
                 title="Help"
-                onClick={() => setHelpOpen((open) => !open)}
+                onClick={() => {
+                  setAssistErr(null);
+                  setHelpOpen((open) => !open);
+                }}
                 aria-expanded={helpOpen}
               >
                 <CircleHelp size={17} />
@@ -225,9 +229,31 @@ export function AppShell() {
                   <button disabled title="Documentation is being written">
                     <BookOpen size={14} /> Documentation <small>coming soon</small>
                   </button>
-                  <button disabled title="Will notify the tech team in Slack">
-                    <BellRing size={14} /> Request assistance <small>coming soon</small>
+                  <button
+                    disabled={!identity?.station || assistBusy}
+                    title={
+                      identity?.station
+                        ? 'Notify the tech team in Slack that this station needs help'
+                        : 'Register this station first'
+                    }
+                    onClick={async () => {
+                      setAssistBusy(true);
+                      setAssistErr(null);
+                      try {
+                        await requestAssistance();
+                        invalidate('assistance');
+                        setHelpOpen(false);
+                      } catch (e) {
+                        setAssistErr(e instanceof Error ? e.message : String(e));
+                      } finally {
+                        setAssistBusy(false);
+                      }
+                    }}
+                  >
+                    <BellRing size={14} /> {assistBusy ? 'Notifying…' : 'Request assistance'}
+                    {!identity?.station && <small>register first</small>}
                   </button>
+                  {assistErr && <p className="helpmenu__error">{assistErr}</p>}
                 </div>
               )}
             </div>
@@ -273,6 +299,7 @@ export function AppShell() {
         </aside>
 
         <main className="shell__main">
+          <AssistanceBar enabled={Boolean(identity?.station)} />
           <Outlet />
         </main>
         {identityOpen && (

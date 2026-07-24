@@ -21,12 +21,14 @@ import * as ppro from './integrations/proPresenter.js';
 import * as companion from './companion.js';
 import * as smaart from './integrations/smaart.js';
 import * as rta from './integrations/rta.js';
+import * as slack from './integrations/slack.js';
 
 export function declareConfiguredIntegrations() {
   if (pco.isConfigured()) {
     declare('planningCenter');
     declare('pcCalendar'); // same PAT; shows null until Calendar is contacted
   }
+  if (slack.isConfigured()) declare('slack');
   for (const room of Object.values(rooms)) {
     if (ppro.isConfigured(room.proPresenter)) declare(ppro.healthKey(room.proPresenter));
     if (room.companion?.host && !room.companion.mock) declare(companion.healthKey(room.companion));
