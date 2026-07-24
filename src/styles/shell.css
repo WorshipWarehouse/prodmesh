@@ -84,6 +84,7 @@
 }
 
 .sidebar__campus .selectfield__control {
+  height: auto; /* the compact sidebar select opts out of the 40px control height */
   padding: 0 18px 0 0;
   border: 0;
   background: transparent;
