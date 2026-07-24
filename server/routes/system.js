@@ -78,6 +78,7 @@ router.get('/api/history', async (_req, res) => {
       startedAt: row.startedAt,
       completedAt: row.completedAt,
       itemCount: row.itemCount,
+      rehearsal: Boolean(row.timeId?.startsWith('rehearsal-')),
       totals: {
         planned: row.plannedSeconds,
         actual: row.actualSeconds,

@@ -321,6 +321,11 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
   const room = rooms[roomId];
   if (!room) throw new Error('Unknown room');
 
+  // Base identity first, unconditionally — even if the plan can't be resolved
+  // (PC down, plan aged out), the timeline and its history row still know
+  // whose show this was. Labels are layered on below when the plan is found.
+  timeline.ensure(`${planId}__${timeId}`, { roomId, planId, timeId });
+
   let items = [];
   try {
     const plan = await findPlan(room, planId);

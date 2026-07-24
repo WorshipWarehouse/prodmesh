@@ -149,3 +149,17 @@ a.hist__row:hover {
     grid-column: 1 / -1;
   }
 }
+
+/* Practice runs — visually set apart from real services. */
+.hist__rehearsal {
+  margin-left: 7px;
+  color: var(--purple-text);
+  background: var(--purple-soft);
+  border: 1px solid var(--purple-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

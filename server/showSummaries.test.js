@@ -129,3 +129,40 @@ test('pruned SPL samples: report falls back to the summary aggregate', async () 
   // Recent samples survived the prune.
   assert.equal(splStore.aggregate(INST).count, 3);
 });
+
+test('rehearsal start records under a synthetic rehearsal timeId, flagged in history', async () => {
+  // A user with shows.operate, since /show/start is permission-gated.
+  const auth = await import('./authStore.js');
+  const group = auth.createGroup({ name: 'Show Runners', permissions: ['shows.operate'] });
+  auth.createUser({ username: 'runner', displayName: 'Runner', pin: '1357', groupIds: [group.id] });
+  const station = auth.registerStation({ name: 'Summaries Test Station' });
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Prodmesh-Station': station.token },
+    body: JSON.stringify({ username: 'runner', pin: '1357' }),
+  });
+  const { token } = await login.json();
+  const authed = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Prodmesh-Station': station.token };
+
+  const started = await fetch(`${base}/api/rooms/${ROOM}/show/start`, {
+    method: 'POST',
+    headers: authed,
+    body: JSON.stringify({ planId: 'plan-sum', timeId: 'time-1', rehearsal: true }),
+  });
+  assert.equal(started.status, 200);
+  const state = await started.json();
+  assert.match(state.timeId, /^rehearsal-\d+$/); // NOT the service's time-1
+  assert.equal(state.active, true);
+
+  const ended = await fetch(`${base}/api/rooms/${ROOM}/show/end`, { method: 'POST', headers: authed });
+  assert.equal(ended.status, 200);
+
+  const { shows } = await (await fetch(`${base}/api/history`)).json();
+  const rehearsalRow = shows.find((s) => s.timeId === state.timeId);
+  assert.equal(rehearsalRow.rehearsal, true);
+  assert.ok(rehearsalRow.completedAt, 'rehearsal completes like any show');
+  // The real service instance from the earlier tests is untouched and unflagged.
+  const serviceRow = shows.find((s) => s.instanceId === INST);
+  assert.equal(serviceRow.rehearsal, false);
+  assert.equal(serviceRow.totals.planned, 90);
+});

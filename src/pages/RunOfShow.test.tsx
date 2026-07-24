@@ -166,6 +166,22 @@ describe('start → live controls', () => {
   });
 });
 
+describe('start rehearsal', () => {
+  it('starts under the server-issued rehearsal timeId and shows the Rehearsal chip', async () => {
+    api.startShow.mockResolvedValue({ ...liveHere, timeId: 'rehearsal-1753000000000' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Start Rehearsal' }));
+
+    expect(api.startShow).toHaveBeenCalledWith('north-main', 'plan-1', 't-svc', { rehearsal: true });
+    // The page adopts the rehearsal instance: live controls + Rehearsal chip.
+    expect(await screen.findByRole('button', { name: 'End Show' })).toBeInTheDocument();
+    expect(screen.getByText('Rehearsal')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Show' })).not.toBeInTheDocument();
+  });
+});
+
 describe('Prev/Next header skipping', () => {
   it('Next and Prev jump to the adjacent NON-header item', async () => {
     api.setShowCurrent.mockImplementation(async (_room: string, body: { itemId?: string }) => ({

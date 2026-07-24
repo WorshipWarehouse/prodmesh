@@ -86,6 +86,7 @@ export function Analytics() {
                 <span className="hist__svc">
                   <span className="hist__title">
                     {label}
+                    {s.rehearsal && <span className="hist__rehearsal">Rehearsal</span>}
                     {s.completedAt && (
                       <CheckCircle2 size={13} className="hist__done" aria-label="Completed" />
                     )}
