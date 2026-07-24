@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeJsonAtomic } from './atomicFile.js';
 
-import { rooms } from './rooms.config.js';
+import { rooms } from './roomsStore.js';
 import { onConnectivityChange } from './connectivity.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as pco from './integrations/planningCenter.js';
@@ -113,6 +113,7 @@ function timerSleep(ms, signal) {
     // accumulate one listener per sleep, forever.
     const onAbort = () => { clearTimeout(t); resolve(); };
     const t = setTimeout(() => { signal.removeEventListener('abort', onAbort); resolve(); }, ms);
+    t.unref?.(); // idle watchers must not hold an otherwise-finished process open
     signal.addEventListener('abort', onAbort, { once: true });
   });
 }
@@ -518,14 +519,15 @@ export async function nextArmedEvent(room, now) {
 }
 
 async function autostartLoop(roomId, signal) {
-  const room = rooms[roomId];
   let prevItemId = null; // last mapped PC item; null = no baseline (never trigger)
   let armedPlanId = null; // for state-change logging only
   while (!signal.aborted) {
-    // Connectivity is edited live, so eligibility is per-cycle, not per-boot:
-    // a room gains (or loses) autostart within a minute of a config save.
-    const pp = room.proPresenter;
-    if (!ppro.isConfigured(pp) || !(room.planningCenter?.serviceTypes ?? []).length) {
+    // Connectivity AND the room itself are edited live, so eligibility is
+    // per-cycle, not per-boot: a room gains (or loses) autostart within a
+    // minute of a config save, and a topology rebuild swaps the room object.
+    const room = rooms[roomId];
+    const pp = room?.proPresenter;
+    if (!room || !ppro.isConfigured(pp) || !(room.planningCenter?.serviceTypes ?? []).length) {
       prevItemId = null;
       await timerSleep(ARM_CHECK_MS, signal);
       continue;
@@ -585,20 +587,48 @@ async function autostartLoop(roomId, signal) {
   }
 }
 
+const autostartWatchers = new Map(); // roomId -> AbortController
+
+function startAutostartWatcher(roomId) {
+  if (autostartWatchers.has(roomId)) return;
+  const ctl = new AbortController();
+  autostartWatchers.set(roomId, ctl);
+  // Every room gets a watcher — the loop itself checks (each minute) whether
+  // the room currently has ProPresenter + service types, so connectivity
+  // edits enable/disable autostart without a restart.
+  // A watcher must never die silently — it's the thing nobody is looking at.
+  autostartLoop(roomId, ctl.signal).catch((err) => {
+    console.error(`[autostart] ${roomId}: watcher crashed — ${err?.stack ?? err}`);
+  });
+}
+
 /** Start the per-room autostart watchers (called once at boot). */
 export function initAutomation() {
   if (IGNORE_WINDOW) {
     console.warn('[autostart] PRODMESH_AUTOSTART_TEST=1 — arm window IGNORED (dev/testing only)');
   }
-  for (const room of Object.values(rooms)) {
-    // Every room gets a watcher — the loop itself checks (each minute) whether
-    // the room currently has ProPresenter + service types, so connectivity
-    // edits enable/disable autostart without a restart.
-    // A watcher must never die silently — it's the thing nobody is looking at.
-    autostartLoop(room.id, new AbortController().signal).catch((err) => {
-      console.error(`[autostart] ${room.id}: watcher crashed — ${err?.stack ?? err}`);
-    });
+  syncAutomation();
+}
+
+/** Reconcile per-room work with the rooms map after a topology save: rooms
+ *  created in Admin → Campuses gain a watcher, deleted rooms lose all their
+ *  live work (watchers, streams, an active show). */
+export function syncAutomation() {
+  for (const [roomId, ctl] of autostartWatchers) {
+    if (rooms[roomId]) continue;
+    ctl.abort();
+    autostartWatchers.delete(roomId);
+    if (shows.has(roomId)) {
+      try { endShow(roomId); } catch { /* already gone */ }
+    }
+    timerWatchers.get(roomId)?.abort();
+    timerWatchers.delete(roomId);
+    timers.delete(roomId);
+    splWatchers.get(roomId)?.abort();
+    splWatchers.delete(roomId);
+    spls.delete(roomId);
   }
+  for (const room of Object.values(rooms)) startAutostartWatcher(room.id);
 }
 
 // ── Boot restore ────────────────────────────────────────────────────────────

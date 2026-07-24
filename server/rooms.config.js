@@ -1,30 +1,30 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  ROOM CONTROL CONFIG  (backend / proxy source of truth)
+//  ROOM SEEDS  (fresh-install defaults only — nothing here is live config)
+//
+//  The live rooms map is built by roomsStore.js from SQLite: identity comes
+//  from the site_rooms topology table (Admin → Campuses) and integration
+//  config from room_connectivity (the room configuration page). Entries here
+//  are consulted exactly twice:
+//    • first boot: connectivity.js seeds room_connectivity from the entry
+//      whose id matches a topology room, so upgrades keep behaving identically
+//    • the PRODMESH_LOCAL_TEST dev fixture (devFixture: true), which is a
+//      real room on dev machines without living in the DB topology
 //
 //  Each room maps to a Companion install and a set of MODES. Selecting a mode
 //  presses a Companion button (page/row/column). The room's current mode is read
 //  from a Companion CUSTOM VARIABLE and matched (case-insensitively) against each
 //  mode's `match` value.
 //
-//  Convention (from the test Companion), per room:
-//    • custom variable name:  roomState
-//    • buttons page 1, row 3:  col 1=Sunday, 2=Mid-Week, 3=Event, 4=Standby
-//    • the buttons set roomState to: SUNDAY / MIDWEEK / EVENT / STANDBY
-//
 //  TO GO LIVE for a room: confirm the variable name + button locations match that
 //  room's Companion, then untick "Simulated" on the room configuration page.
 //  While simulated (mock), the proxy ignores Companion and keeps state in memory
 //  so the screens are fully demoable.
-//
-//  NOTE: `companion`/`state`/`mock`/`modes` (like planningCenter, proPresenter,
-//  and analysis before them) are fresh-install seeds only — after first boot
-//  they live in SQLite (room_connectivity) and are edited on the room page.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Standard mode set. `match` = the roomState value that means this mode is active
 // (compared case-insensitively). `press` = the Companion button location.
-// Override `page` / `row` per room if a room's layout differs.
-function standardModes({ page = 1, row = 3 } = {}) {
+// Also the default mode set for rooms created in Admin → Campuses (roomsStore).
+export function standardModes({ page = 1, row = 3 } = {}) {
   return [
     { id: 'sunday', label: 'Sunday', color: '#34c759', match: 'SUNDAY', press: { page, row, column: 1 } },
     { id: 'midweek', label: 'Mid-Week', color: '#5b8def', match: 'MIDWEEK', press: { page, row, column: 2 } },
@@ -47,6 +47,7 @@ const localTest = {
     id: 'local-test',
     name: 'Local Test (this Mac)',
     site: 'north',
+    devFixture: true, // exists as a room without a site_rooms topology row
     mock: false, // live — talks to the Companion on 127.0.0.1:8000
     companion: { host: '127.0.0.1', port: 8000 },
     state: { variable: 'roomState' },

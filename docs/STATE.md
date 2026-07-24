@@ -171,9 +171,9 @@ Notes:
   edits the whole tree (draft + transactional whole-tree save, `config.manage`
   permission) — adding a site, room, or device tile is a browser action, no
   rebuild. The frontend is now purely an API client: every screen's topology
-  comes from the server, refreshed live after a save. Room *integration*
-  wiring (`rooms.config.js`) intentionally remains a dev-owned server file
-  until an Admin UI takes ownership of it.
+  comes from the server, refreshed live after a save. Since 2026-07-23 the
+  server's own rooms map is built from these same tables (`server/
+  roomsStore.js`), so a room created here is immediately a full server room.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is
@@ -204,9 +204,15 @@ Notes:
    differently, so each mode's page/row/column is per-room) and decomposed
    onto the four legacy room keys (`companion`/`state`/`mock`/`modes`).
    It can never be cleared — a room always keeps modes; "no Companion" is
-   the Simulated (mock) checkbox. rooms.config.js is now entirely a
-   fresh-install seed for integrations; only room identity (id/name/site)
-   remains file-authoritative.
+   the Simulated (mock) checkbox. **Rooms-from-SQLite (2026-07-23)** finished
+   the migration: the live rooms map is built from `site_rooms` +
+   `room_connectivity` (`server/roomsStore.js`, rebuilt in place on every
+   topology save; `show.syncAutomation()` reconciles watchers, deleted rooms
+   lose their streams/shows). rooms.config.js is now *entirely* a
+   fresh-install seed (plus the PRODMESH_LOCAL_TEST dev fixture) — creating a
+   room in Admin → Campuses yields a real server room with simulated standard
+   modes, ready to configure on its room page. New rooms with no stored
+   Companion row show their live defaults in the editor (`companionFromRoom`).
 3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
