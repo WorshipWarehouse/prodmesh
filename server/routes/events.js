@@ -7,6 +7,7 @@ import * as pco from '../integrations/planningCenter.js';
 import * as timeline from '../timeline.js';
 import * as show from '../showManager.js';
 import * as splStore from '../splStore.js';
+import * as summaries from '../showSummaries.js';
 import * as checklist from '../checklistStore.js';
 import * as chkTemplates from '../checklistTemplates.js';
 import * as showCfg from '../showConfig.js';
@@ -220,7 +221,9 @@ router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   const report =
     timeline.getReport(instance) ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } };
   const analysisCfg = rooms[req.params.id]?.analysis;
-  const agg = splStore.aggregate(instance);
+  // Raw samples are pruned after the retention window; the summary row keeps
+  // the aggregated block, so old reports still show their SPL numbers.
+  const agg = splStore.aggregate(instance) ?? summaries.get(instance)?.spl ?? null;
   report.spl = agg
     ? { ...agg, target: analysisCfg?.target ?? null, limit: analysisCfg?.limit ?? null }
     : null;

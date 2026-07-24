@@ -91,6 +91,11 @@ export function ensure(instanceId, ctx) {
   if (changed) persist(instanceId, tl);
 }
 
+/** A timeline if one exists (cached or on disk) — never creates one. */
+export function get(instanceId) {
+  return cache.get(instanceId) ?? (existsSync(fileFor(instanceId)) ? load(instanceId) : null);
+}
+
 /** Every recorded timeline, for the history/analytics view. Reads from disk
  *  (cached live timelines are persisted on every change, so files are current). */
 export function listAll() {

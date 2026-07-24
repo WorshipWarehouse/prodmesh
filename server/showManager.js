@@ -23,6 +23,7 @@ import * as pco from './integrations/planningCenter.js';
 import * as analysis from './integrations/analysis.js';
 import * as timeline from './timeline.js';
 import * as splStore from './splStore.js';
+import * as summaries from './showSummaries.js';
 import * as showConfig from './showConfig.js';
 import { armWindow, pickAutostartTime, shouldAutostart, shouldAutoComplete } from './autoShow.js';
 
@@ -363,6 +364,7 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
   };
   shows.set(roomId, show);
   timeline.reopen(instanceId(show)); // restarting an ended show un-completes it
+  summaries.refresh(instanceId(show)); // history reflects the (re)start immediately
   // Seed running SPL stats from any samples already recorded (reopened show).
   if (analysis.isConfigured(room.analysis)) show.splStats = splStore.runningStats(instanceId(show));
   persistShow(show);
@@ -371,6 +373,11 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
   startSplWatcher(roomId); // capture runs with the show, not the browsers
   startShowLogging(show);
   return show;
+}
+
+/** Instance ids of currently-live shows (their summary rows may be stale). */
+export function activeInstanceIds() {
+  return [...shows.values()].map(instanceId);
 }
 
 export async function startShow(roomId, planId, timeId = 'default') {
@@ -393,6 +400,7 @@ export function endShow(roomId) {
   }
   show.abort.abort();
   timeline.finalize(instanceId(show));
+  summaries.refresh(instanceId(show)); // the summary row is stamped at show end
   shows.delete(roomId);
   removeShowFile(roomId);
   stopSplWatcher(roomId); // no-op if viewers still want the live meter
