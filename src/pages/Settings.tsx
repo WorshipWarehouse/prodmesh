@@ -161,6 +161,21 @@ function AdminPanels({ section }: { section: AdminSection }) {
   );
 }
 
+// ── Save/action feedback ─────────────────────────────────────────────────────
+//  Success is green, errors are red — a panel must never announce a failure in
+//  the success color, so panels carry the kind alongside the text.
+type Feedback = { kind: 'ok' | 'err'; text: string } | null;
+const ok = (text: string): Feedback => ({ kind: 'ok', text });
+const fail = (err: unknown): Feedback => ({
+  kind: 'err',
+  text: err instanceof Error ? err.message : String(err),
+});
+function Msg({ msg, inline = false }: { msg: Feedback; inline?: boolean }) {
+  if (!msg) return null;
+  const cls = msg.kind === 'ok' ? 'settings__ok' : 'settings__error';
+  return inline ? <span className={cls}>{msg.text}</span> : <p className={cls}>{msg.text}</p>;
+}
+
 // ── Users, permission groups, and ACLs ───────────────────────────────────────
 export function UserManagementPanel() {
   const [directory, setDirectory] = useState<UserDirectory | null>(null);
@@ -168,15 +183,15 @@ export function UserManagementPanel() {
   const [userGroups, setUserGroupsDraft] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupPermissions, setGroupPermissions] = useState<string[]>([]);
-  const [msg, setMsg] = useState('');
+  const [msg, setMsg] = useState<Feedback>(null);
 
-  const refresh = () => getUserDirectory().then(setDirectory).catch((err) => setMsg(String(err)));
+  const refresh = () => getUserDirectory().then(setDirectory).catch((err) => setMsg(fail(err)));
   useEffect(() => { refresh(); }, []);
 
   if (!directory) return null;
 
   const addUser = async () => {
-    setMsg('');
+    setMsg(null);
     try {
       await createUser({
         ...user,
@@ -185,18 +200,18 @@ export function UserManagementPanel() {
       });
       setUser({ displayName: '', username: '', pin: '', planningCenterPersonId: '' });
       setUserGroupsDraft([]);
-      setMsg('User created.');
+      setMsg(ok('User created.'));
       refresh();
-    } catch (err) { setMsg(err instanceof Error ? err.message : String(err)); }
+    } catch (err) { setMsg(fail(err)); }
   };
 
   const addGroup = async () => {
-    setMsg('');
+    setMsg(null);
     try {
       await createGroup(groupName, groupPermissions);
-      setGroupName(''); setGroupPermissions([]); setMsg('Permission group created.');
+      setGroupName(''); setGroupPermissions([]); setMsg(ok('Permission group created.'));
       refresh();
-    } catch (err) { setMsg(err instanceof Error ? err.message : String(err)); }
+    } catch (err) { setMsg(fail(err)); }
   };
 
   const toggle = (values: string[], value: string) =>
@@ -264,7 +279,7 @@ export function UserManagementPanel() {
           </div>
         ))}
       </div>
-      {msg && <p className={msg.includes('created') ? 'settings__ok' : 'settings__muted'}>{msg}</p>}
+      <Msg msg={msg} />
     </section>
   );
 }
@@ -284,7 +299,7 @@ export function StationsPanel() {
   const [stations, setStations] = useState<ManagedStation[]>([]);
   const [rooms, setRooms] = useState<RoomMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<Feedback>(null);
   const [revokeTarget, setRevokeTarget] = useState<ManagedStation | null>(null);
 
   const refresh = useCallback(async () => {
@@ -293,7 +308,7 @@ export function StationsPanel() {
       setStations(stationResult.stations);
       setRooms(roomResult);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : String(err));
+      setMessage(fail(err));
     } finally {
       setLoading(false);
     }
@@ -303,16 +318,16 @@ export function StationsPanel() {
 
   const remove = async () => {
     if (!revokeTarget) return;
-    setMessage('');
+    setMessage(null);
     try {
       const result = await revokeStation(revokeTarget.id);
       setRevokeTarget(null);
       if (!result.current) {
-        setMessage('Station revoked. Its browser will be asked to register again.');
+        setMessage(ok('Station revoked. Its browser will be asked to register again.'));
         refresh();
       }
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : String(err));
+      setMessage(fail(err));
     }
   };
 
@@ -336,13 +351,13 @@ export function StationsPanel() {
             rooms={rooms}
             onSaved={(updated) => {
               setStations((all) => all.map((entry) => entry.id === updated.id ? { ...updated, current: station.current } : entry));
-              setMessage('Station updated.');
+              setMessage(ok('Station updated.'));
             }}
             onRevoke={() => setRevokeTarget(station)}
           />
         ))}
       </div>
-      {message && <p className="settings__muted">{message}</p>}
+      <Msg msg={message} />
 
       {revokeTarget && (
         <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="revoke-station-title">
@@ -443,7 +458,7 @@ function ChecklistsPanel() {
   const [info, setInfo] = useState<ChecklistTemplatesInfo | null>(null);
   const [selected, setSelected] = useState(DEFAULT_KEY);
   const [draft, setDraft] = useState<TemplateItem[] | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<Feedback>(null);
 
   useEffect(() => {
     getChecklistTemplates()
@@ -494,17 +509,22 @@ function ChecklistsPanel() {
       const templates = await saveChecklistTemplate(selected, draft ?? []);
       setInfo((x) => x && { ...x, templates });
       setDraft(templates[selected] ?? []);
-      setMsg('Template saved.');
+      setMsg(ok('Template saved.'));
     } catch (err) {
-      setMsg(`Couldn’t save: ${err instanceof Error ? err.message : err}`);
+      setMsg(fail(err));
     }
   };
 
   const removeTemplate = async () => {
-    const templates = await deleteChecklistTemplate(selected);
-    setInfo((x) => x && { ...x, templates });
-    setDraft(templates[selected] ?? null);
-    setMsg(selected === DEFAULT_KEY ? 'Default template removed.' : 'Now using the Default template.');
+    setMsg(null);
+    try {
+      const templates = await deleteChecklistTemplate(selected);
+      setInfo((x) => x && { ...x, templates });
+      setDraft(templates[selected] ?? null);
+      setMsg(ok(selected === DEFAULT_KEY ? 'Default template removed.' : 'Now using the Default template.'));
+    } catch (err) {
+      setMsg(fail(err));
+    }
   };
 
   const hasOwn = Boolean(info.templates[selected]);
@@ -597,7 +617,7 @@ function ChecklistsPanel() {
                 Remove (use Default)
               </button>
             )}
-            {msg && <span className="settings__ok">{msg}</span>}
+            <Msg msg={msg} inline />
           </div>
         </>
       )}
@@ -609,25 +629,31 @@ function SecurityPanel() {
   const [overrideSet, setOverrideSet] = useState(false);
   const [adminPin, setAdminPin] = useState('');
   const [overridePin, setOverridePin] = useState('');
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<Feedback>(null);
 
   useEffect(() => {
     getSettings().then((s) => setOverrideSet(s.pins.overrideSet)).catch(() => {});
   }, []);
 
   const saveAdmin = async () => {
-    if (adminPin.length < 4) return setMsg('Admin PIN must be ≥ 4 digits.');
-    await setPins({ admin: adminPin });
-    setAdminPin(''); setMsg('Admin PIN updated.');
+    if (adminPin.length < 4) return setMsg(fail('Admin PIN must be ≥ 4 digits.'));
+    try {
+      await setPins({ admin: adminPin });
+      setAdminPin(''); setMsg(ok('Admin PIN updated.'));
+    } catch (err) { setMsg(fail(err)); }
   };
   const saveOverride = async () => {
-    if (overridePin.length < 4) return setMsg('Override PIN must be ≥ 4 digits.');
-    await setPins({ override: overridePin });
-    setOverridePin(''); setOverrideSet(true); setMsg('Override PIN updated.');
+    if (overridePin.length < 4) return setMsg(fail('Override PIN must be ≥ 4 digits.'));
+    try {
+      await setPins({ override: overridePin });
+      setOverridePin(''); setOverrideSet(true); setMsg(ok('Override PIN updated.'));
+    } catch (err) { setMsg(fail(err)); }
   };
   const clearOverride = async () => {
-    await setPins({ override: '' });
-    setOverrideSet(false); setMsg('Override PIN cleared — mode locks are now inactive.');
+    try {
+      await setPins({ override: '' });
+      setOverrideSet(false); setMsg(ok('Override PIN cleared — mode locks are now inactive.'));
+    } catch (err) { setMsg(fail(err)); }
   };
 
   return (
@@ -658,37 +684,37 @@ function SecurityPanel() {
           {overrideSet && <button className="btn btn--ghost" onClick={clearOverride}>Clear</button>}
         </div>
       </div>
-      {msg && <p className="settings__ok">{msg}</p>}
+      <Msg msg={msg} />
     </section>
   );
 }
 
 function SystemPanel() {
   const [version, setVersion] = useState<{ commit: string; subject: string } | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<Feedback>(null);
 
   const load = useCallback(() => getVersion().then(setVersion).catch(() => {}), []);
   useEffect(() => { load(); }, [load]);
 
   const update = async () => {
-    setStatus('Starting update…');
+    setStatus(ok('Starting update…'));
     const before = version?.commit;
     try {
       await triggerUpdate();
     } catch {
-      return setStatus('Could not start update.');
+      return setStatus(fail('Could not start update.'));
     }
-    setStatus('Updating & restarting… (this page may briefly disconnect)');
+    setStatus(ok('Updating & restarting… (this page may briefly disconnect)'));
     let tries = 0;
     const iv = setInterval(async () => {
       tries += 1;
       try {
         const v = await getVersion();
         if (v.commit !== before && v.commit !== 'unknown') {
-          setVersion(v); setStatus(`Updated to ${v.commit}.`); clearInterval(iv);
+          setVersion(v); setStatus(ok(`Updated to ${v.commit}.`)); clearInterval(iv);
         }
       } catch { /* server restarting */ }
-      if (tries > 40) { setStatus('Update taking longer than expected — check the box.'); clearInterval(iv); }
+      if (tries > 40) { setStatus(fail('Update taking longer than expected — check the box.')); clearInterval(iv); }
     }, 3000);
   };
 
@@ -706,7 +732,7 @@ function SystemPanel() {
           <button className="btn btn--primary" onClick={update}>Update now</button>
         </div>
       </div>
-      {status && <p className="settings__ok">{status}</p>}
+      <Msg msg={status} />
     </section>
   );
 }
@@ -714,7 +740,7 @@ function SystemPanel() {
 function SchedulesPanel() {
   const [rooms, setRooms] = useState<RoomMeta[]>([]);
   const [schedules, setSchedules] = useState<Record<string, ScheduleWindow[]>>({});
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<Feedback>(null);
 
   useEffect(() => {
     Promise.all([getRooms(), getSettings()])
@@ -741,8 +767,11 @@ function SchedulesPanel() {
     update(roomId, windowsFor(roomId).filter((_, j) => j !== i));
 
   const save = async () => {
-    await saveSchedules(schedules);
-    setMsg('Schedules saved.');
+    setMsg(null);
+    try {
+      await saveSchedules(schedules);
+      setMsg(ok('Schedules saved.'));
+    } catch (err) { setMsg(fail(err)); }
   };
 
   return (
@@ -791,7 +820,7 @@ function SchedulesPanel() {
       ))}
       <div className="settings__toolbar">
         <button className="btn btn--primary" onClick={save}>Save schedules</button>
-        {msg && <span className="settings__ok">{msg}</span>}
+        <Msg msg={msg} inline />
       </div>
     </section>
   );
@@ -1412,11 +1441,12 @@ function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: Pc
   const [baseline, setBaseline] = useState(JSON.stringify(initial));
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const dirty = JSON.stringify(types) !== baseline;
 
   const save = async () => {
-    setErr(''); setMsg('');
+    setErr(''); setMsg(''); setBusy(true);
     try {
       const stored = await savePcServiceTypes(roomId, types);
       setTypes(stored.serviceTypes);
@@ -1424,7 +1454,7 @@ function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: Pc
       setMsg('Saved.');
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-    }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -1435,8 +1465,8 @@ function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: Pc
             <HelpTip text="The event types this room hosts. The ID is in the Planning Center Services URL for that service type." />
           </h3>
         </div>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
-          {dirty ? 'Save service types' : 'Saved'}
+        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
+          {busy ? 'Saving…' : dirty ? 'Save service types' : 'Saved'}
         </button>
       </div>
 
@@ -1499,6 +1529,7 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
   const [hasPassword, setHasPassword] = useState(Boolean(initial?.hasPassword));
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const dirty = JSON.stringify(draft) !== baseline;
   const set = (patch: Partial<AnalysisDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -1515,7 +1546,7 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
   }
 
   const save = async () => {
-    setErr(''); setMsg('');
+    setErr(''); setMsg(''); setBusy(true);
     try {
       const stored = await saveAnalysis(
         roomId,
@@ -1540,7 +1571,7 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
       setMsg('Saved.');
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-    }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -1549,19 +1580,19 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
         <h3 className="pctypes__title">Analysis source
           <HelpTip text="Where this room's SPL numbers come from — a Smaart rig or the free ProdMesh Remote RTA app. Target and limit set the dB goals on the live meter and show reports." />
         </h3>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
-          {dirty ? 'Save analysis source' : 'Saved'}
+        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
+          {busy ? 'Saving…' : dirty ? 'Save analysis source' : 'Saved'}
         </button>
       </div>
 
       <div className="campuses__tile">
         <label className="lfield"><span>Source</span>
-          <select className="field" value={draft.source}
+          <SelectField value={draft.source}
             onChange={(e) => set({ source: e.target.value as AnalysisDraft['source'] })}>
             <option value="none">None</option>
             <option value="smaart">Smaart</option>
             <option value="rta">ProdMesh Remote RTA</option>
-          </select>
+          </SelectField>
         </label>
         {draft.source !== 'none' && (
           <>
@@ -1670,6 +1701,7 @@ function CompanionEditor({ roomId, initial }: { roomId: string; initial: Compani
   const [baseline, setBaseline] = useState(() => JSON.stringify(toCompanionDraft(initial)));
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const dirty = JSON.stringify(draft) !== baseline;
   const set = (patch: Partial<CompanionDraft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -1685,7 +1717,7 @@ function CompanionEditor({ roomId, initial }: { roomId: string; initial: Compani
     });
 
   const save = async () => {
-    setErr(''); setMsg('');
+    setErr(''); setMsg(''); setBusy(true);
     try {
       const stored = await saveCompanion(roomId, {
         mock: draft.mock,
@@ -1709,7 +1741,7 @@ function CompanionEditor({ roomId, initial }: { roomId: string; initial: Compani
       setMsg('Saved.');
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-    }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -1718,8 +1750,8 @@ function CompanionEditor({ roomId, initial }: { roomId: string; initial: Compani
         <h3 className="pctypes__title">Companion &amp; modes
           <HelpTip text="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches its value. Every Companion lays its buttons out differently — set each mode's location to match this room's." />
         </h3>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
-          {dirty ? 'Save Companion' : 'Saved'}
+        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
+          {busy ? 'Saving…' : dirty ? 'Save Companion' : 'Saved'}
         </button>
       </div>
 
@@ -1826,12 +1858,13 @@ function ProPresenterEditor({ roomId, initial }: { roomId: string; initial: ProP
   const [baseline, setBaseline] = useState(() => JSON.stringify(toPpDraft(initial)));
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const dirty = JSON.stringify(draft) !== baseline;
   const set = (patch: Partial<PpDraft>) => setDraft((d) => ({ ...d, ...patch }));
 
   const save = async () => {
-    setErr(''); setMsg('');
+    setErr(''); setMsg(''); setBusy(true);
     try {
       const stored = await saveProPresenter(
         roomId,
@@ -1849,7 +1882,7 @@ function ProPresenterEditor({ roomId, initial }: { roomId: string; initial: ProP
       setMsg('Saved.');
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-    }
+    } finally { setBusy(false); }
   };
 
   return (
@@ -1858,8 +1891,8 @@ function ProPresenterEditor({ roomId, initial }: { roomId: string; initial: ProP
         <h3 className="pctypes__title">ProPresenter
           <HelpTip text="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter." />
         </h3>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty}>
-          {dirty ? 'Save ProPresenter' : 'Saved'}
+        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
+          {busy ? 'Saving…' : dirty ? 'Save ProPresenter' : 'Saved'}
         </button>
       </div>
 

@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **120 server tests** with **16 frontend interaction/configuration tests**
+  combines **125 server tests** with **16 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -148,6 +148,21 @@ Notes:
   only if the dashboard started it (flag persisted in the show file, so it
   survives a mid-show server restart). Fire-and-forget: a show never fails
   because Smaart is unreachable.
+- **Code-review Tier 1 fixes** (2026-07-23, from the full architecture/tests/UI
+  review): (1) connectivity saves now fire `onConnectivityChange`, and the show
+  manager restarts the affected live watchers (SPL, PP timer, an active show's
+  poller) — previously they held the config object captured at start, so edits
+  didn't reach a running watcher until reconnect/show end; a save can also
+  *start* a watcher the room couldn't run before (and begins recording SPL
+  stats mid-show if analysis appears). (2) Settings panels report save results
+  through one `Feedback` helper — errors are always red (several panels showed
+  failures in green/muted), Schedules saves surface errors, connectivity save
+  buttons disable while in flight. (3) UI polish: `.field` hover/disabled/
+  placeholder + time-picker styling, keyboard focus ring on all buttons,
+  `--accent-hover` token, themed color-swatch input, Analysis source uses
+  SelectField. (4) `server/apiSecurity.test.js`: admin-PIN bootstrap boundary,
+  login lockout (429), `shows.operate` gates, checklist mode-action permission
+  matrix (nested `rooms.mode.change` + lockout override).
 - **Server-owned topology** (2026-07-15, ADR 0009 milestone): the institution
   name, sites, rooms, and Quick Access tiles now live in SQLite (`sites`,
   `site_rooms`, `tiles`) and are served by `GET /api/config`; the frontend's

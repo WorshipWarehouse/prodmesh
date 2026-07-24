@@ -19,8 +19,10 @@
 //  Live propagation: every consumer (event endpoints, show manager, autostart)
 //  reads `room.<integration>` off the shared in-memory rooms map, so
 //  applyConnectivity() assigns the stored values onto those room objects —
-//  edits take effect immediately, no restart, no consumer changes. SPL
-//  watchers pick up an edit on their next reconnect cycle.
+//  edits take effect immediately, no restart, no consumer changes. The
+//  exception is long-lived watchers (SPL, PP timer, an active show's poller):
+//  they capture the config object when they start, so the setters also notify
+//  onConnectivityChange listeners, which restart any affected watcher.
 // ─────────────────────────────────────────────────────────────────────────────
 import { getDb } from './db.js';
 import { rooms } from './rooms.config.js';
@@ -31,6 +33,17 @@ const ANALYSIS = 'analysis';
 const PP = 'proPresenter';
 const COMPANION = 'companion';
 const INTEGRATIONS = [PC, ANALYSIS, PP, COMPANION];
+
+// Long-lived per-room work (the show manager's watchers) registers here to be
+// restarted when a room's config changes — applyConnectivity() alone can't
+// reach config objects captured at watcher start.
+const changeListeners = new Set();
+export function onConnectivityChange(fn) {
+  changeListeners.add(fn);
+}
+function notifyChange(roomId, integration) {
+  for (const fn of changeListeners) fn(roomId, integration);
+}
 
 export function validateServiceTypes(input) {
   if (!Array.isArray(input)) throw new Error('serviceTypes must be an array');
@@ -118,6 +131,7 @@ export function setPlanningCenter(roomId, serviceTypes) {
   const clean = { serviceTypes: validateServiceTypes(serviceTypes) };
   writeRow(roomId, PC, clean);
   applyConnectivity();
+  notifyChange(roomId, PC);
   return clean;
 }
 
@@ -133,6 +147,7 @@ export function setAnalysis(roomId, config) {
   if (clean === null) deleteRow(roomId, ANALYSIS);
   else writeRow(roomId, ANALYSIS, clean);
   applyConnectivity();
+  notifyChange(roomId, ANALYSIS);
   return clean;
 }
 
@@ -224,6 +239,7 @@ export function setCompanion(roomId, config) {
   const clean = validateCompanion(config);
   writeRow(roomId, COMPANION, clean);
   applyConnectivity();
+  notifyChange(roomId, COMPANION);
   return clean;
 }
 
@@ -249,6 +265,7 @@ export function setProPresenter(roomId, config) {
   if (clean === null) deleteRow(roomId, PP);
   else writeRow(roomId, PP, clean);
   applyConnectivity();
+  notifyChange(roomId, PP);
   return clean;
 }
 

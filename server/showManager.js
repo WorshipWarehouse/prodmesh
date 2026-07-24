@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 import { writeJsonAtomic } from './atomicFile.js';
 
 import { rooms } from './rooms.config.js';
+import { onConnectivityChange } from './connectivity.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as pco from './integrations/planningCenter.js';
 import * as analysis from './integrations/analysis.js';
@@ -145,6 +146,49 @@ function stopSplWatcher(roomId) {
   splWatchers.delete(roomId);
   spls.delete(roomId);
 }
+
+// ── Live config edits ────────────────────────────────────────────────────────
+//  Watchers capture the room's config object when they start, so a
+//  connectivity save must restart any that are running — including starting
+//  one that couldn't run before (the room just gained a host).
+
+function restartSplWatcher(roomId) {
+  splWatchers.get(roomId)?.abort();
+  splWatchers.delete(roomId);
+  spls.delete(roomId);
+  const show = shows.get(roomId);
+  if (show && !show.splStats && analysis.isConfigured(rooms[roomId]?.analysis)) {
+    show.splStats = splStore.runningStats(instanceId(show)); // start recording mid-show
+  }
+  if (splNeeded(roomId)) startSplWatcher(roomId);
+  broadcast(roomId);
+}
+
+function restartTimerWatcher(roomId) {
+  timerWatchers.get(roomId)?.abort();
+  timerWatchers.delete(roomId);
+  timers.delete(roomId);
+  if (subs(roomId).size > 0) startTimerWatcher(roomId);
+  broadcast(roomId);
+}
+
+function restartPoller(show) {
+  show.abort.abort();
+  show.abort = new AbortController();
+  show.ppConnected = null;
+  startPoller(show);
+}
+
+onConnectivityChange((roomId, integration) => {
+  if (integration === 'analysis') restartSplWatcher(roomId);
+  if (integration === 'proPresenter') {
+    restartTimerWatcher(roomId);
+    const show = shows.get(roomId);
+    if (show) restartPoller(show);
+  }
+  // planningCenter/companion need nothing: their consumers (plan lookups, mode
+  // reads, the autostart loop) re-read the rooms map on every use.
+});
 
 // ── Smaart SPL logging control ───────────────────────────────────────────────
 //  With analysis.logControl set, a show turns Smaart's SPL logging on at start
