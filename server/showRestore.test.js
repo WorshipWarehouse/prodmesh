@@ -57,3 +57,31 @@ test('restoreShows resumes the persisted show and skips the corrupt file', async
   assert.equal(sm.getState(ROOM).active, false);
   assert.equal(existsSync(join(showsDir, `${ROOM}.json`)), false, 'ending removes the show file');
 });
+
+test('restore falls back to the persisted order of service when the plan is unavailable', async () => {
+  const ROOM2 = 'north-chapel';
+  // A plan id nothing can resolve (PCO outage / plan aged out), but the show
+  // file carries the items hydrated when the show originally started.
+  const items = [
+    { id: 'i-a', sequence: 1, title: 'Walk In', type: 'item', length: 300, key: null, leader: null, description: null },
+    { id: 'i-b', sequence: 2, title: 'Message', type: 'item', length: 1800, key: null, leader: null, description: null },
+  ];
+  writeFileSync(
+    join(showsDir, `${ROOM2}.json`),
+    JSON.stringify({ roomId: ROOM2, planId: 'gone-plan-999', timeId: 'default', startedAt: Date.now() - 60_000, status: 'active', items }),
+  );
+
+  await sm.restoreShows();
+  assert.equal(sm.getState(ROOM2).active, true);
+
+  // The item list is live — manual tracking still resolves names/indexes.
+  sm.setCurrent(ROOM2, { itemId: 'i-b' });
+  assert.equal(sm.getState(ROOM2).current.itemName, 'Message');
+
+  // And it re-persisted, so the NEXT restart during the outage works too.
+  const persisted = JSON.parse(readFileSync(join(showsDir, `${ROOM2}.json`), 'utf8'));
+  assert.equal(persisted.items.length, 2);
+  assert.equal(persisted.items[1].title, 'Message');
+
+  sm.endShow(ROOM2);
+});
