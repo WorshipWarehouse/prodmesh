@@ -282,6 +282,31 @@
 
 .accountmenu > button:hover { background: var(--bg-tile-hover); color: var(--text); }
 
+/* Help popup — accountmenu chrome, anchored to the Help button instead. */
+.sidebar__help {
+  position: relative;
+}
+
+.helpmenu {
+  bottom: calc(100% + 6px);
+}
+
+.helpmenu > button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.helpmenu > button:disabled:hover {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.helpmenu > button small {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 0.65rem;
+}
+
 @media (max-width: 860px) {
   .accountmenu {
     left: calc(var(--sidebar-rail) - 2px);
