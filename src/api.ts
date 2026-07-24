@@ -800,6 +800,15 @@ export interface HistoryShow {
 
 export const getHistory = () => getJson<{ shows: HistoryShow[] }>('/api/history');
 
+/** Erase a recorded run (timing + loudness). Irreversible; requires history.delete. */
+export async function deleteHistoryShow(instanceId: string): Promise<void> {
+  const res = await fetch(`/api/history/${encodeURIComponent(instanceId)}`, {
+    method: 'DELETE',
+    headers: requestHeaders(),
+  });
+  await requireOk(res);
+}
+
 // ── Planning Center Calendar (room bookings) ─────────────────────────────────
 
 export interface CalendarEvent {

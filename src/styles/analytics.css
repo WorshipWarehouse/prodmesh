@@ -163,3 +163,21 @@ a.hist__row:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/* Row delete — quiet until hovered; the row itself remains the report link. */
+.hist__delete {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px;
+  margin-right: 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.hist__delete:hover {
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.12);
+}

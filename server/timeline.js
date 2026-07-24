@@ -12,7 +12,7 @@
 //  with no double-recording (Node is single-threaded — no interleave mid-call).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeJsonAtomic } from './atomicFile.js';
@@ -123,6 +123,13 @@ export function finalize(instanceId, nowMs = Date.now()) {
   }
   tl.endedAt = nowMs;
   persist(instanceId, tl);
+}
+
+/** Erase a recorded timeline (accidental/invalid run). Irreversible. */
+export function remove(instanceId) {
+  cache.delete(instanceId);
+  const f = fileFor(instanceId);
+  if (existsSync(f)) unlinkSync(f);
 }
 
 /** Re-opening a show clears the completed stamp so state stays truthful. */

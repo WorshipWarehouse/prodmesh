@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, CheckCircle2, Volume2 } from 'lucide-react';
-import { getHistory, type HistoryShow } from '../api';
+import { BarChart3, CheckCircle2, Trash2, Volume2 } from 'lucide-react';
+import { deleteHistoryShow, getHistory, type HistoryShow } from '../api';
 import { inCampus, useCampus } from '../layout/campus';
 import { roomLabel, useChurch } from '../layout/church';
 
@@ -36,10 +36,28 @@ export function Analytics() {
   const church = useChurch();
   const [shows, setShows] = useState<HistoryShow[] | null>(null);
   const [error, setError] = useState(false);
+  const [toDelete, setToDelete] = useState<HistoryShow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   useEffect(() => {
     getHistory().then((h) => setShows(h.shows)).catch(() => setError(true));
   }, []);
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    setDeleteBusy(true);
+    setDeleteErr(null);
+    try {
+      await deleteHistoryShow(toDelete.instanceId);
+      setShows((list) => (list ?? []).filter((s) => s.instanceId !== toDelete.instanceId));
+      setToDelete(null);
+    } catch (e) {
+      setDeleteErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const visible = (shows ?? []).filter((s) => inCampus(campusId, s.site));
 
@@ -120,7 +138,23 @@ export function Analytics() {
                     <span className="svc__muted">—</span>
                   )}
                 </span>
-                <span className="hist__go">{href ? '→' : ''}</span>
+                <span className="hist__go">
+                  <button
+                    type="button"
+                    className="hist__delete"
+                    title="Delete this recorded run"
+                    aria-label={`Delete ${label}`}
+                    onClick={(e) => {
+                      e.preventDefault(); // the row is a link into the report
+                      e.stopPropagation();
+                      setDeleteErr(null);
+                      setToDelete(s);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  {href ? '→' : ''}
+                </span>
               </>
             );
             return href ? (
@@ -133,6 +167,27 @@ export function Analytics() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {toDelete && (
+        <div className="confirm" role="dialog" aria-modal="true">
+          <div className="confirm__card">
+            <p className="confirm__text">
+              Delete <strong>{toDelete.planTitle ?? 'this run'}</strong>
+              {toDelete.rehearsal ? ' (rehearsal)' : ''}? Its timing report and loudness data are
+              erased permanently.
+            </p>
+            {deleteErr && <p className="confirm__error">{deleteErr}</p>}
+            <div className="confirm__buttons">
+              <button type="button" className="confirm__cancel" onClick={() => setToDelete(null)} disabled={deleteBusy}>
+                Cancel
+              </button>
+              <button type="button" className="confirm__ok confirm__ok--danger" onClick={confirmDelete} disabled={deleteBusy}>
+                {deleteBusy ? 'Deleting…' : 'Delete run'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
