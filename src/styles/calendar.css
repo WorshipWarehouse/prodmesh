@@ -1,0 +1,161 @@
+/* Calendar — week view of Planning Center Calendar room bookings. */
+
+.cal__nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal__range {
+  margin-left: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.cal__demo {
+  color: var(--warn-text);
+}
+
+.cal__error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.cal-day {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 120px;
+}
+
+.cal-day--today {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.cal-day__head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 6px;
+}
+
+.cal-day__dow {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.cal-day--today .cal-day__dow {
+  color: var(--accent-text);
+}
+
+.cal-day__date {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.cal-day__empty {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.cal-ev {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 7px 9px;
+}
+
+.cal-ev--pending {
+  border-left-color: var(--warn);
+}
+
+.cal-ev__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.cal-ev__pending {
+  color: var(--warn-text);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cal-ev__name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.cal-ev__rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cal-ev__room {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  text-decoration: none;
+}
+
+a.cal-ev__room:hover {
+  background: var(--bg-tile-hover);
+}
+
+.cal-ev__room--unmapped {
+  color: var(--text-dim);
+  background: none;
+  border-color: var(--border);
+}
+
+/* Tablets: two rows of days beat seven unreadable slivers. */
+@media (max-width: 1100px) {
+  .cal__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Phones: one day per row, agenda style. */
+@media (max-width: 640px) {
+  .cal__grid {
+    grid-template-columns: 1fr;
+  }
+  .cal-day {
+    min-height: 0;
+  }
+}

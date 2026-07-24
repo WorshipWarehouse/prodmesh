@@ -147,9 +147,10 @@ export interface AuthStatus {
 }
 
 export const getAuthStatus = () =>
-  fetch('/api/auth/status', { headers: requestHeaders() }).then(
-    (r) => r.json() as Promise<AuthStatus>,
-  );
+  fetch('/api/auth/status', { headers: requestHeaders() }).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json() as Promise<AuthStatus>;
+  });
 
 export async function loginAdmin(pin: string): Promise<boolean> {
   const res = await fetch('/api/auth/admin', {
@@ -787,6 +788,32 @@ export interface HistoryShow {
 }
 
 export const getHistory = () => getJson<{ shows: HistoryShow[] }>('/api/history');
+
+// ── Planning Center Calendar (room bookings) ─────────────────────────────────
+
+export interface CalendarEvent {
+  id: string;
+  eventId: string | null;
+  name: string;
+  startsAt: string;
+  endsAt: string | null;
+  allDay: boolean;
+  location: string | null;
+  approval: string | null; // 'A' approved · 'P' pending · 'R' rejected
+  roomIds: string[]; // matched against the live rooms map; [] = unmapped
+}
+
+export interface CalendarRange {
+  live: boolean;
+  start: string;
+  end: string;
+  events: CalendarEvent[];
+}
+
+export const getCalendar = (start: string, end: string) =>
+  getJson<CalendarRange>(
+    `/api/calendar?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+  );
 
 export const getAbout = () => getJson<{ name: string; version: string }>('/api/about');
 

@@ -21,6 +21,7 @@ import { resolveIdentity } from './httpAuth.js';
 import roomsRouter from './routes/rooms.js';
 import showsRouter from './routes/shows.js';
 import eventsRouter from './routes/events.js';
+import calendarRouter from './routes/calendar.js';
 import authRouter from './routes/auth.js';
 import adminConfigRouter from './routes/adminConfig.js';
 import systemRouter from './routes/system.js';
@@ -39,6 +40,7 @@ app.use(resolveIdentity);
 // ── API (routers declare full /api/... paths) ─────────────────────────────────
 app.use(roomsRouter);
 app.use(eventsRouter);
+app.use(calendarRouter);
 app.use(showsRouter);
 app.use(authRouter);
 app.use(adminConfigRouter);
