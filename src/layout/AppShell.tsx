@@ -17,7 +17,7 @@ import {
   PanelLeftOpen,
   Wrench,
 } from 'lucide-react';
-import { getAbout, getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
+import { getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { ChurchContext, EMPTY_CHURCH } from './church';
 import type { Church } from '../types';
@@ -55,7 +55,6 @@ export function AppShell() {
   const [campusId, setCampusId] = useState(
     () => localStorage.getItem('prodmesh.campus') ?? ALL_CAMPUSES,
   );
-  const [version, setVersion] = useState('');
   const [church, setChurch] = useState<Church>(EMPTY_CHURCH);
   const [identity, setIdentity] = useState<AuthStatus | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
@@ -64,7 +63,6 @@ export function AppShell() {
   const accountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getAbout().then((a) => setVersion(a.version)).catch(() => {});
     getAuthStatus().then((s) => {
       setIdentity(s);
       if (!s.station) setIdentityOpen(true);
@@ -215,7 +213,7 @@ export function AppShell() {
                 )}
                 <div className="sidebar__label rail-hide">
                   <span className="sidebar__username">{operatorName}</span>
-                  <span className="sidebar__version">{stationName}{version ? ` · v${version}` : ''}</span>
+                  <span className="sidebar__version">{stationName}</span>
                 </div>
               </button>
               {accountOpen && identity?.authenticated && (
