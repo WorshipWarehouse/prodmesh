@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Clock3, MapPin } from 'lucide-react';
 import { getCalendar, getRooms, type CalendarEvent, type RoomMeta } from '../api';
 import { useQuery } from '../lib/useQuery';
 import { inCampus, useCampus } from '../layout/campus';
+import { roomLabel, useChurch } from '../layout/church';
 
 const DAY_MS = 86_400_000;
 
@@ -28,7 +29,15 @@ function weekLabel(start: Date) {
   return `${fmt(start, false)} – ${fmt(end, true)}`;
 }
 
-function EventChip({ ev, rooms }: { ev: CalendarEvent; rooms: RoomMeta[] }) {
+function EventChip({
+  ev,
+  rooms,
+  label,
+}: {
+  ev: CalendarEvent;
+  rooms: RoomMeta[];
+  label: (room: RoomMeta) => string;
+}) {
   const pending = ev.approval != null && ev.approval !== 'A' && ev.approval.toLowerCase() !== 'approved';
   const matched = ev.roomIds
     .map((id) => rooms.find((r) => r.id === id))
@@ -45,7 +54,7 @@ function EventChip({ ev, rooms }: { ev: CalendarEvent; rooms: RoomMeta[] }) {
         {matched.length > 0 ? (
           matched.map((r) => (
             <Link key={r.id} className="cal-ev__room" to={`/room/${r.id}`}>
-              {r.name}
+              {label(r)}
             </Link>
           ))
         ) : ev.location ? (
@@ -63,7 +72,9 @@ function EventChip({ ev, rooms }: { ev: CalendarEvent; rooms: RoomMeta[] }) {
 // room link to it; anything else shows its raw location.
 export function Calendar() {
   const { campusId } = useCampus();
+  const church = useChurch();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const label = (room: RoomMeta) => roomLabel(room.name, room.site, church, campusId);
 
   const startISO = weekStart.toISOString();
   const endISO = new Date(weekStart.getTime() + 7 * DAY_MS).toISOString();
@@ -136,7 +147,7 @@ export function Calendar() {
               {dayEvents.length === 0 ? (
                 <p className="cal-day__empty">No bookings</p>
               ) : (
-                dayEvents.map((ev) => <EventChip key={ev.id} ev={ev} rooms={rooms} />)
+                dayEvents.map((ev) => <EventChip key={ev.id} ev={ev} rooms={rooms} label={label} />)
               )}
             </section>
           );

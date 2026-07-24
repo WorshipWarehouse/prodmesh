@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { Calendar } from './Calendar';
 import { CampusContext } from '../layout/campus';
+import { ChurchContext } from '../layout/church';
 import { clearQueryCache } from '../lib/useQuery';
 import type { CalendarEvent } from '../api';
+import type { Church } from '../types';
 
 const api = vi.hoisted(() => ({
   getCalendar: vi.fn(),
@@ -17,9 +19,10 @@ vi.mock('../api', async (importOriginal) => ({
   ...api,
 }));
 
+// Both campuses have a "Main Auditorium" — labels must disambiguate.
 const rooms = [
   { id: 'north-main', name: 'Main Auditorium', site: 'north', hasCompanion: true, modes: [] },
-  { id: 'south-main', name: 'SE Auditorium', site: 'south-everett', hasCompanion: false, modes: [] },
+  { id: 'south-main', name: 'Main Auditorium', site: 'south-everett', hasCompanion: false, modes: [] },
 ];
 
 // Events pinned to "today" so they land inside the initially-rendered week.
@@ -36,7 +39,7 @@ const events: CalendarEvent[] = [
   },
   {
     id: 'e2', eventId: null, name: 'SE Setup', startsAt: todayAt(9), endsAt: todayAt(11),
-    allDay: false, location: 'SE Auditorium', approval: 'A', roomIds: ['south-main'],
+    allDay: false, location: 'Main Auditorium', approval: 'A', roomIds: ['south-main'],
   },
   {
     id: 'e3', eventId: null, name: 'Memorial Service', startsAt: todayAt(10), endsAt: todayAt(12),
@@ -44,13 +47,23 @@ const events: CalendarEvent[] = [
   },
 ];
 
+const church: Church = {
+  name: 'Test Church',
+  sites: [
+    { id: 'north', name: 'North', status: 'active', auditoriums: [] },
+    { id: 'south-everett', name: 'South Campus', status: 'active', auditoriums: [] },
+  ],
+};
+
 function renderPage(campusId = 'all') {
   return render(
-    <CampusContext.Provider value={{ campusId, setCampusId: vi.fn() }}>
-      <MemoryRouter>
-        <Calendar />
-      </MemoryRouter>
-    </CampusContext.Provider>,
+    <ChurchContext.Provider value={church}>
+      <CampusContext.Provider value={{ campusId, setCampusId: vi.fn() }}>
+        <MemoryRouter>
+          <Calendar />
+        </MemoryRouter>
+      </CampusContext.Provider>
+    </ChurchContext.Provider>,
   );
 }
 
@@ -73,8 +86,12 @@ describe('Calendar', () => {
 
     expect(await screen.findByText('Worship Rehearsal')).toBeInTheDocument();
     expect(screen.getByText('· demo data')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Main Auditorium' }))
+    // Same-named rooms across campuses get campus-qualified labels in the
+    // All Campuses view — you can tell which "Main Auditorium" is which.
+    expect(screen.getByRole('link', { name: 'North · Main Auditorium' }))
       .toHaveAttribute('href', '/room/north-main');
+    expect(screen.getByRole('link', { name: 'South Campus · Main Auditorium' }))
+      .toHaveAttribute('href', '/room/south-main');
 
     // Unmapped location: no link, raw location text with the pending badge.
     const memorial = screen.getByText('Memorial Service').closest('.cal-ev')!;
@@ -89,6 +106,9 @@ describe('Calendar', () => {
     expect(await screen.findByText('Worship Rehearsal')).toBeInTheDocument();
     expect(screen.queryByText('SE Setup')).not.toBeInTheDocument();
     expect(screen.getByText('Memorial Service')).toBeInTheDocument();
+    // Single-campus view: no prefix needed, labels stay short.
+    expect(screen.getByRole('link', { name: 'Main Auditorium' }))
+      .toHaveAttribute('href', '/room/north-main');
   });
 
   it('week navigation requests the next range', async () => {

@@ -18,11 +18,13 @@
 }
 
 .cal__error {
+  margin-top: 18px;
   color: var(--danger);
   font-size: 0.9rem;
 }
 
 .cal__grid {
+  margin-top: 18px; /* breathe below the pagehead rule */
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 10px;

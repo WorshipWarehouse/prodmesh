@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BarChart3, CheckCircle2, Volume2 } from 'lucide-react';
 import { getHistory, type HistoryShow } from '../api';
 import { inCampus, useCampus } from '../layout/campus';
+import { roomLabel, useChurch } from '../layout/church';
 
 function fmtClock(ms: number | null) {
   if (!ms) return '—';
@@ -32,6 +33,7 @@ function DeltaChip({ delta }: { delta: number }) {
 // real SPL data has accumulated (VISION: 30/60/90-day trends).
 export function Analytics() {
   const { campusId } = useCampus();
+  const church = useChurch();
   const [shows, setShows] = useState<HistoryShow[] | null>(null);
   const [error, setError] = useState(false);
 
@@ -94,7 +96,9 @@ export function Analytics() {
                     {s.timeName ? ` · ${s.timeName}` : ''}
                   </span>
                 </span>
-                <span className="hist__room">{s.roomName ?? '—'}</span>
+                <span className="hist__room">
+                  {s.roomName ? roomLabel(s.roomName, s.site, church, campusId) : '—'}
+                </span>
                 <span className="hist__runtime">
                   {s.totals.actual > 0 ? (
                     <>
