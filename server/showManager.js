@@ -490,13 +490,19 @@ export function refreshConfig(roomId, planId) {
 //  ProPresenter, and only a TRANSITION onto the start item begins the show —
 //  "Pre-Service Slides" can loop all it wants between services.
 
-const ARM_CHECK_MS = 60 * 1000;
-const PP_POLL_MS = 3000;
-
 // Dev-only: PRODMESH_AUTOSTART_TEST=1 arms configured events regardless of
 // the clock, so autostart can be exercised outside the Sunday window. Never
 // set this in production — it would let a Tuesday rehearsal start a show.
+// PRODMESH_AUTOSTART_ARM_MS / PRODMESH_AUTOSTART_POLL_MS override the loop
+// cadences so tests can run in milliseconds; unset (production) they default
+// to the real values and are inert.
 const IGNORE_WINDOW = process.env.PRODMESH_AUTOSTART_TEST === '1';
+const envMs = (name, fallback) => {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+const ARM_CHECK_MS = envMs('PRODMESH_AUTOSTART_ARM_MS', 60 * 1000);
+const PP_POLL_MS = envMs('PRODMESH_AUTOSTART_POLL_MS', 3000);
 
 export async function nextArmedEvent(room, now) {
   const plans = [];
