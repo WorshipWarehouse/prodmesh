@@ -6,6 +6,13 @@
 //
 //   node art/make-icon.mjs
 //
+// PNG render (transparent outside the rounded tile — qlmanage flattens alpha,
+// headless Chrome doesn't):
+//   cd art && "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+//     --headless=new --disable-gpu --screenshot=prodmesh-icon.png \
+//     --window-size=1024,1024 --default-background-color=00000000 \
+//     "file://$PWD/prodmesh-icon.svg"
+//
 // Pure shapes, no SVG filters (glows are concentric translucent circles), so
 // every renderer — Slack's uploader included — draws it identically.
 
