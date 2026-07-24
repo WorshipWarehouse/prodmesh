@@ -805,6 +805,8 @@ export interface CalendarEvent {
 
 export interface CalendarRange {
   live: boolean;
+  /** Why we're not live: 'no-token' | 'not-granted' (Calendar not enabled for the PAT). */
+  reason?: string;
   start: string;
   end: string;
   events: CalendarEvent[];

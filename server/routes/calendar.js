@@ -19,12 +19,11 @@ router.get('/api/calendar', async (req, res) => {
     return res.status(400).json({ error: 'Range too large (max 62 days)' });
   }
   try {
-    const events = await cal.getEventInstances(start, end);
+    const data = await cal.getCalendarData(start, end);
     res.json({
-      live: cal.isConfigured(),
+      ...data,
       start: new Date(start).toISOString(),
       end: new Date(end).toISOString(),
-      events,
     });
   } catch (err) {
     res.status(502).json({ error: String(err.message ?? err) });

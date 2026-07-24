@@ -94,7 +94,18 @@ export function Calendar() {
           <h1 className="pagehead__title">Calendar</h1>
           <p className="pagehead__sub">
             Room bookings · Planning Center Calendar
-            {cal.data && !cal.data.live && <span className="cal__demo"> · demo data</span>}
+            {cal.data && !cal.data.live && (
+              <span
+                className="cal__demo"
+                title={
+                  cal.data.reason === 'not-granted'
+                    ? 'The Planning Center token doesn’t have Calendar access yet — showing sample bookings.'
+                    : 'No Planning Center token configured — showing sample bookings.'
+                }
+              >
+                {' '}· demo data
+              </span>
+            )}
           </p>
         </div>
         <div className="pagehead__right cal__nav">

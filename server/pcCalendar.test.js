@@ -27,7 +27,9 @@ function weekOf(dateStr) {
 
 test('mock instances cover the weekly pattern and match seeded rooms', async () => {
   const { start, end } = weekOf('2026-08-05'); // Sun Aug 2 – Sat Aug 8
-  const events = await cal.getEventInstances(start, end);
+  const { live, reason, events } = await cal.getCalendarData(start, end);
+  assert.equal(live, false);
+  assert.equal(reason, 'no-token');
 
   const sunday = events.find((e) => e.name === 'Sunday Services');
   assert.ok(sunday, 'Sunday Services present');
@@ -53,8 +55,34 @@ test('mock instances cover the weekly pattern and match seeded rooms', async () 
 test('mock ids are deterministic (stable across refetches)', async () => {
   cal.clearCache();
   const { start, end } = weekOf('2026-08-05');
-  const again = await cal.getEventInstances(start, end);
-  assert.ok(again.some((e) => e.id === 'mock-sunday-services-2026-08-02'));
+  const { events } = await cal.getCalendarData(start, end);
+  assert.ok(events.some((e) => e.id === 'mock-sunday-services-2026-08-02'));
+});
+
+test('a token without Calendar access (401) falls back to labeled demo data', async (t) => {
+  // Env-override secrets make isConfigured() true; a stubbed fetch plays the
+  // not-yet-granted Calendar API. Real transport errors must still throw.
+  process.env.PRODMESH_SECRET_PLANNINGCENTER_APPID = 'app';
+  process.env.PRODMESH_SECRET_PLANNINGCENTER_SECRET = 'shh';
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    delete process.env.PRODMESH_SECRET_PLANNINGCENTER_APPID;
+    delete process.env.PRODMESH_SECRET_PLANNINGCENTER_SECRET;
+    globalThis.fetch = realFetch;
+    cal.clearCache();
+  });
+
+  globalThis.fetch = async () => ({ ok: false, status: 401, json: async () => ({}) });
+  cal.clearCache();
+  const { start, end } = weekOf('2026-08-05');
+  const denied = await cal.getCalendarData(start, end);
+  assert.equal(denied.live, false);
+  assert.equal(denied.reason, 'not-granted');
+  assert.ok(denied.events.some((e) => e.name === 'Sunday Services')); // demo, labeled
+
+  globalThis.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
+  cal.clearCache();
+  await assert.rejects(() => cal.getCalendarData(start, end), /HTTP 500/);
 });
 
 test('normalizeInstance reads name/approval from the included Event', () => {

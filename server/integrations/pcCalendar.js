@@ -52,7 +52,11 @@ async function calGet(path) {
       headers: { Authorization: `Basic ${auth}` },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!res.ok) throw new Error(`PC Calendar ${path} → HTTP ${res.status}`);
+    if (!res.ok) {
+      const err = new Error(`PC Calendar ${path} → HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
     const body = await res.json();
     report('pcCalendar', true);
     return body;
@@ -146,11 +150,31 @@ function mockInstances(startMs, endMs) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** Event instances overlapping [startMs, endMs), sorted by start time. */
+/**
+ * Bookings in [startMs, endMs) → { live, reason?, events }.
+ * Mock (labeled live:false) when there's no token OR the token exists but the
+ * Calendar product isn't granted to it yet (401/403) — that's a setup state,
+ * not an outage, and the UI stays demoable through it. Real transport/server
+ * failures still throw so outages read as outages.
+ */
+export async function getCalendarData(startMs, endMs) {
+  if (!isConfigured()) {
+    return { live: false, reason: 'no-token', events: mockInstances(startMs, endMs) };
+  }
+  try {
+    return { live: true, events: await getEventInstances(startMs, endMs) };
+  } catch (err) {
+    if (err.status === 401 || err.status === 403) {
+      return { live: false, reason: 'not-granted', events: mockInstances(startMs, endMs) };
+    }
+    throw err;
+  }
+}
+
+/** Real-API event instances overlapping [startMs, endMs), sorted by start. */
 export function getEventInstances(startMs, endMs) {
   const key = `instances:${startMs}:${endMs}`;
   return cached(key, async () => {
-    if (!isConfigured()) return mockInstances(startMs, endMs);
     const instances = [];
     const eventsById = new Map();
     // ⓘ where[…] comparison params + pagination links verified against live
