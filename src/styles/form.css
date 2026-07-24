@@ -28,7 +28,14 @@
   width: 100%;
 }
 
+/* Block-level controls: inline-level boxes carry a descender gap below the
+   control that varies between inputs and select wrappers (see .lfield). */
+.ffield .field {
+  display: block;
+}
+
 .ffield .selectfield {
+  display: flex;
   width: 100%;
 }
 
