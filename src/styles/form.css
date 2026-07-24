@@ -1,0 +1,145 @@
+/* Shared form primitives — Field, FormRow, ColorInput, EditorSection
+   (src/components/form/). First used by the room connectivity editors;
+   built to spread to the other admin panels. Design tokens only. */
+
+/* ── Field: 0.64rem uppercase label above a 40px control ─────────────────── */
+.ffield {
+  display: block;
+  min-width: 0;
+}
+
+.ffield__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 4px;
+  color: var(--text-faint);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ffield .field,
+.ffield .selectfield__control {
+  height: 40px;
+  box-sizing: border-box;
+  font-size: 0.88rem;
+  margin: 0;
+  width: 100%;
+}
+
+.ffield .selectfield {
+  width: 100%;
+}
+
+/* ── FormRow: a grid of fields on a shared baseline ──────────────────────────
+   Uniform tracks; fields span 1–3 of them by width variant. Rows reflow by
+   wrapping whole fields instead of collapsing into a flex jumble. */
+.formrow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(58px, 1fr));
+  gap: 10px 8px;
+  align-items: end;
+}
+
+.formrow > * {
+  grid-column: span 2;
+  min-width: 0;
+}
+
+.formrow > .ffield--grow { grid-column: span 3; }
+.formrow > .ffield--md { grid-column: span 2; }
+.formrow > .ffield--sm { grid-column: span 1; }
+.formrow > .ffield--xs { grid-column: span 1; }
+
+/* Checkboxes and icon-button clusters sit on the controls' baseline. */
+.formrow > .checkbox {
+  padding-bottom: 11px;
+}
+
+.formrow > .formrow__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  grid-column: span 2 / -1;
+  justify-self: end;
+  padding-bottom: 7px;
+}
+
+/* Card rows (one per Companion mode) keep reading as one unit when the
+   fields inside wrap. */
+.formrow--card {
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+@media (max-width: 720px) {
+  .formrow--card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .formrow--card > *,
+  .formrow--card > [class] {
+    grid-column: auto;
+  }
+
+  .formrow--card > .formrow__actions {
+    justify-self: end;
+  }
+}
+
+/* ── ColorInput: themed native color input ───────────────────────────────── */
+.colorinput {
+  height: 40px;
+  box-sizing: border-box;
+  padding: 4px;
+  cursor: pointer;
+}
+
+/* Style the native swatch so the OS default border doesn't show inside. */
+.colorinput::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.colorinput::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+/* ── EditorSection: title + one primary save action ──────────────────────── */
+.fsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fsection__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fsection__title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.fsection__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.fsection__ok {
+  margin: 0;
+  color: var(--ok);
+  font-size: 0.9rem;
+}
+
+/* "+ Add" buttons under a section hug the left edge instead of stretching. */
+.fsection > .btn {
+  align-self: flex-start;
+}
