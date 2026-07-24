@@ -13,7 +13,49 @@
 
 import * as slack from './integrations/slack.js';
 
-const requests = new Map(); // stationId → { stationId, stationName, userName, requestedAt, slack }
+const requests = new Map(); // stationId → { stationId, stationName, userName, requestedAt, slack, ack }
+
+// A tech reacting 👀 to the Slack message = "seen it, on my way". While any
+// un-acked request is open we poll that message's reactions; the first 👀
+// becomes the acknowledgment shown on the station's bar. Polling stops when
+// nothing is waiting.
+const ACK_EMOJI = 'eyes';
+const ACK_POLL_MS = Number(process.env.PRODMESH_ASSIST_POLL_MS ?? 10_000);
+let ackTimer = null;
+
+async function pollAcks() {
+  for (const entry of requests.values()) {
+    if (!entry.slack || entry.ack) continue;
+    try {
+      const reactions = await slack.getMessageReactions(entry.slack.channel, entry.slack.ts);
+      const eyes = reactions.find((r) => r.name === ACK_EMOJI);
+      if (eyes?.users?.length) {
+        entry.ack = {
+          userId: eyes.users[0],
+          name: await slack.userName(eyes.users[0]),
+          at: Date.now(),
+        };
+        console.log(
+          `[assistance] ${entry.stationName}: acknowledged by ${entry.ack.name ?? entry.ack.userId}`,
+        );
+      }
+    } catch {
+      /* recorded in health by the slack client; retry next tick */
+    }
+  }
+  if (![...requests.values()].some((e) => e.slack && !e.ack)) stopAckPolling();
+}
+
+function startAckPolling() {
+  if (ackTimer) return;
+  ackTimer = setInterval(pollAcks, ACK_POLL_MS);
+  ackTimer.unref?.();
+}
+
+function stopAckPolling() {
+  if (ackTimer) clearInterval(ackTimer);
+  ackTimer = null;
+}
 
 export function getForStation(stationId) {
   return requests.get(stationId) ?? null;
@@ -46,8 +88,10 @@ export async function request(station, userName = null) {
     userName,
     requestedAt: Date.now(),
     slack: posted,
+    ack: null,
   };
   requests.set(station.id, entry);
+  if (posted) startAckPolling();
   return entry;
 }
 
@@ -69,4 +113,5 @@ export async function dismiss(stationId) {
 /** Tests only. */
 export function reset() {
   requests.clear();
+  stopAckPolling();
 }

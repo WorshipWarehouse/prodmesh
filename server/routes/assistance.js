@@ -10,7 +10,12 @@ const router = express.Router();
 
 const toState = (entry) =>
   entry
-    ? { active: true, requestedAt: entry.requestedAt, userName: entry.userName }
+    ? {
+        active: true,
+        requestedAt: entry.requestedAt,
+        userName: entry.userName,
+        ack: entry.ack ? { name: entry.ack.name, at: entry.ack.at } : null,
+      }
     : { active: false };
 
 router.get('/api/assistance', (req, res) => {

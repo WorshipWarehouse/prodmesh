@@ -52,4 +52,26 @@ describe('AssistanceBar', () => {
     expect(api.dismissAssistance).toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByText('Assistance requested')).not.toBeInTheDocument());
   });
+
+  it('shows who acknowledged (👀) — or a generic label when the name is unknown', async () => {
+    api.getAssistance.mockResolvedValue({
+      active: true,
+      requestedAt: Date.now(),
+      userName: null,
+      ack: { name: 'Pastor Tech', at: new Date('2026-07-26T17:44:00Z').getTime() },
+    });
+    const { unmount } = render(<AssistanceBar enabled />);
+    expect(await screen.findByText('Pastor Tech')).toBeInTheDocument();
+    expect(screen.getByText(/has seen this and is on the way/)).toBeInTheDocument();
+    expect(screen.queryByText('Assistance requested')).not.toBeInTheDocument();
+    unmount();
+
+    clearQueryCache();
+    api.getAssistance.mockResolvedValue({
+      active: true, requestedAt: Date.now(), userName: null,
+      ack: { name: null, at: Date.now() }, // users:read scope missing
+    });
+    render(<AssistanceBar enabled />);
+    expect(await screen.findByText('A tech team member')).toBeInTheDocument();
+  });
 });

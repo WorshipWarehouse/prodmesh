@@ -61,3 +61,42 @@ export async function postMessage(text) {
 export function addReaction(channel, ts, name = 'white_check_mark') {
   return slackApi('reactions.add', { channel, timestamp: ts, name });
 }
+
+// Read methods use GET + query params (Slack rejects JSON bodies on these).
+async function slackGetApi(method, params) {
+  try {
+    const res = await fetch(`${BASE}/${method}?${new URLSearchParams(params)}`, {
+      headers: { Authorization: `Bearer ${cfg('botOauthToken')}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const body = await res.json();
+    if (!body.ok) throw new Error(`Slack ${method}: ${body.error}`);
+    report('slack', true);
+    return body;
+  } catch (err) {
+    report('slack', false, String(err.message ?? err));
+    throw err;
+  }
+}
+
+/** Reactions currently on a message: [{ name, users: [], count }]. */
+export async function getMessageReactions(channel, ts) {
+  const body = await slackGetApi('reactions.get', { channel, timestamp: ts, full: 'true' });
+  return body.message?.reactions ?? [];
+}
+
+// Slack user id → display name, cached per boot. Needs users:read; without
+// it (or on error) resolves null and callers fall back to a generic label.
+const userNames = new Map();
+export async function userName(userId) {
+  if (userNames.has(userId)) return userNames.get(userId);
+  let name = null;
+  try {
+    const body = await slackGetApi('users.info', { user: userId });
+    name = body.user?.profile?.display_name || body.user?.real_name || null;
+  } catch {
+    /* missing users:read scope or transient — generic label is fine */
+  }
+  userNames.set(userId, name);
+  return name;
+}

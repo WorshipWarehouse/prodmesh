@@ -845,6 +845,8 @@ export interface AssistanceState {
   active: boolean;
   requestedAt?: number;
   userName?: string | null;
+  /** Set when a tech 👀-reacted the Slack message: they've seen it and are coming. */
+  ack?: { name: string | null; at: number } | null;
 }
 
 export const getAssistance = () => getJson<AssistanceState>('/api/assistance');

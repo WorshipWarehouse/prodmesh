@@ -541,3 +541,15 @@
 .assistbar__dismiss {
   white-space: nowrap;
 }
+
+/* Acknowledged: a tech 👀'd the Slack message — anticipation, not alarm. */
+.assistbar--ack {
+  background: var(--warn-soft);
+  border-color: var(--warn-border);
+  border-left-color: var(--warn);
+}
+
+.assistbar--ack .assistbar__pulse {
+  color: var(--warn-text);
+  animation: none;
+}
