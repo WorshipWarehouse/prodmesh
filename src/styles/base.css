@@ -132,11 +132,14 @@ svg.lucide {
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: #78bbff;
-  border-color: #78bbff;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
   color: var(--text-on-accent);
 }
 
+/* Every button gets a visible keyboard focus ring — including the small
+   icon/day/type buttons that never adopted .btn. */
+button:focus-visible,
 .btn:focus-visible,
 .field:focus-visible {
   outline: 2px solid var(--accent);
@@ -176,6 +179,26 @@ svg.lucide {
 
 .field--time {
   width: 120px;
+}
+
+/* Inputs signal interactivity like selects do (see .selectfield__control). */
+.field:hover:not(:disabled):not(:focus-visible) {
+  border-color: var(--border-strong);
+}
+
+.field:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.field::placeholder {
+  color: var(--text-faint);
+}
+
+/* Native time pickers draw their own icon — tone it for the dark theme. */
+input[type='time']::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
 }
 
 /* ── Selects ─────────────────────────────────────────────────────────────── */

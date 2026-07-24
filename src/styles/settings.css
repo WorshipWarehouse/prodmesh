@@ -662,8 +662,18 @@
 
 .campuses__modecolor input[type='color'] {
   padding: 4px;
-  height: 36px;
+  height: 40px; /* same height the row's other .field inputs are forced to */
   cursor: pointer;
+}
+
+/* Style the native swatch so the OS default border doesn't show inside. */
+.campuses__modecolor input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.campuses__modecolor input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
 }
 
 /* Checkboxes sit at the same baseline as the fields beside them. */
