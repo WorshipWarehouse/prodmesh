@@ -503,3 +503,74 @@
   flex-direction: column;
   gap: 24px;
 }
+
+.helpmenu__error {
+  margin: 6px 7px 2px;
+  color: var(--danger);
+  font-size: 0.72rem;
+}
+
+/* ── Assistance bar (this station has called for help) ───────────────────── */
+.assistbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid var(--danger-soft);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-lg);
+}
+
+.assistbar__pulse {
+  display: inline-flex;
+  color: var(--danger);
+  animation: live-pulse 1.6s ease-in-out infinite; /* keyframes in home.css */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistbar__pulse { animation: none; }
+}
+
+.assistbar__text {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.assistbar__dismiss {
+  white-space: nowrap;
+}
+
+/* Acknowledged: a tech 👀'd the Slack message — anticipation, not alarm. */
+.assistbar--ack {
+  background: var(--warn-soft);
+  border-color: var(--warn-border);
+  border-left-color: var(--warn);
+}
+
+.assistbar--ack .assistbar__pulse {
+  color: var(--warn-text);
+  animation: none;
+}
+
+/* The assistance dialog's note box — a textarea opting out of the 40px
+   single-line control height. */
+.assistdlg__msg {
+  height: auto;
+  min-height: 84px;
+  padding: 10px 12px;
+  resize: vertical;
+  font: inherit;
+  font-size: 0.95rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.assistbar__note {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-style: italic;
+}

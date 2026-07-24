@@ -21,6 +21,8 @@ import {
   Wrench,
 } from 'lucide-react';
 import { getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
+import { AssistanceBar } from '../components/AssistanceBar';
+import { AssistanceDialog } from '../components/AssistanceDialog';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { ChurchContext, EMPTY_CHURCH } from './church';
 import type { Church } from '../types';
@@ -64,6 +66,7 @@ export function AppShell() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [assistOpen, setAssistOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
 
@@ -206,10 +209,7 @@ export function AppShell() {
           </nav>
 
           <div className="sidebar__foot">
-            {/* Help lives at the bottom, above the clock. Both entries are
-                placeholders for now: docs are being written, and Request
-                Assistance will ping the team Slack via webhook (the Lowe's
-                aisle-button model) once that's configured. */}
+            {/* Help lives at the bottom, above the clock. */}
             <div className="sidebar__help" ref={helpRef}>
               <button
                 className="sidebar__toggle"
@@ -225,8 +225,20 @@ export function AppShell() {
                   <button disabled title="Documentation is being written">
                     <BookOpen size={14} /> Documentation <small>coming soon</small>
                   </button>
-                  <button disabled title="Will notify the tech team in Slack">
-                    <BellRing size={14} /> Request assistance <small>coming soon</small>
+                  <button
+                    disabled={!identity?.station}
+                    title={
+                      identity?.station
+                        ? 'Notify the tech team in Slack that this station needs help'
+                        : 'Register this station first'
+                    }
+                    onClick={() => {
+                      setHelpOpen(false);
+                      setAssistOpen(true);
+                    }}
+                  >
+                    <BellRing size={14} /> Request assistance
+                    {!identity?.station && <small>register first</small>}
                   </button>
                 </div>
               )}
@@ -273,8 +285,10 @@ export function AppShell() {
         </aside>
 
         <main className="shell__main">
+          <AssistanceBar enabled={Boolean(identity?.station)} />
           <Outlet />
         </main>
+        {assistOpen && <AssistanceDialog onClose={() => setAssistOpen(false)} />}
         {identityOpen && (
           <IdentityDialog
             stationRequired={!identity?.station}

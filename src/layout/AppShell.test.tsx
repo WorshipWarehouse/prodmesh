@@ -12,6 +12,9 @@ const api = vi.hoisted(() => ({
   logoutAdmin: vi.fn(),
   registerStation: vi.fn(),
   loginUser: vi.fn(),
+  getAssistance: vi.fn(async () => ({ active: false })),
+  requestAssistance: vi.fn(),
+  dismissAssistance: vi.fn(),
 }));
 
 vi.mock('../api', () => api);

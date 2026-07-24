@@ -839,6 +839,28 @@ export const getCalendar = (start: string, end: string) =>
 
 export const getAbout = () => getJson<{ name: string; version: string }>('/api/about');
 
+// ── Assistance requests (the Lowe's aisle button) ────────────────────────────
+
+export interface AssistanceState {
+  active: boolean;
+  requestedAt?: number;
+  userName?: string | null;
+  /** The reported problem, relayed to Slack so the right person responds. */
+  message?: string | null;
+  /** Set when a tech 👀-reacted the Slack message: they've seen it and are coming. */
+  ack?: { name: string | null; at: number } | null;
+}
+
+export const getAssistance = () => getJson<AssistanceState>('/api/assistance');
+
+export const requestAssistance = (message?: string) =>
+  postJson<AssistanceState>('/api/assistance', message ? { message } : {});
+
+export async function dismissAssistance(): Promise<void> {
+  const res = await fetch('/api/assistance', { method: 'DELETE', headers: requestHeaders() });
+  await requireOk(res);
+}
+
 export const triggerUpdate = () =>
   fetch('/api/system/update', { method: 'POST', headers: requestHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
