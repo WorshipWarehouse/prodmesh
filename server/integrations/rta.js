@@ -22,8 +22,12 @@
 //  services, machine asleep) and resolves only when aborted.
 // ─────────────────────────────────────────────────────────────────────────────
 import WebSocket from 'ws';
+import { report } from '../health.js';
 
 export const isConfigured = (cfg) => Boolean(cfg && cfg.host);
+
+// Health key shared with smaart.js — both are the room's "analysis" source.
+const healthKey = (cfg) => `analysis@${cfg.host}:${cfg.port ?? 8517}`;
 
 const RETRY_MS = 5000;
 const CONNECT_TIMEOUT_MS = 8000;
@@ -53,9 +57,12 @@ export async function watchSpl(cfg, onSample, signal, intervalMs = 1000) {
       await streamOnce(cfg, onSample, signal, intervalMs, state);
       warned = false;
     } catch (err) {
-      if (!signal.aborted && !warned) {
-        console.error(`[rta] ${cfg.host}:${cfg.port ?? 8517}: ${err.message} — retrying`);
-        warned = true; // one line per outage, not one per retry
+      if (!signal.aborted) {
+        report(healthKey(cfg), false, err.message);
+        if (!warned) {
+          console.error(`[rta] ${cfg.host}:${cfg.port ?? 8517}: ${err.message} — retrying`);
+          warned = true; // one line per outage, not one per retry
+        }
       }
       state.announced = false;
     }
@@ -110,6 +117,7 @@ function sampleFrom(data, cfg, state) {
   }
   if (frame?.type !== 'levels') return null;
   if (!state.announced) {
+    report(healthKey(cfg), true); // first levels frame — the app is streaming
     console.log(`[rta] ${cfg.host}: ProdMesh Remote RTA (${frame.weighting ?? '?'}-weighted)`);
     state.announced = true;
   }

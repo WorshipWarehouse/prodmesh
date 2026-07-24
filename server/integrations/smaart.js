@@ -35,8 +35,12 @@
 //  logging starts late, FOH Mac reboots) and resolves only when aborted.
 // ─────────────────────────────────────────────────────────────────────────────
 import WebSocket from 'ws';
+import { report } from '../health.js';
 
 export const isConfigured = (cfg) => Boolean(cfg && (cfg.mock || cfg.host));
+
+// Health key shared with rta.js — both are the room's "analysis" source.
+const healthKey = (cfg) => `analysis@${cfg.host}:${cfg.port ?? 26000}`;
 
 const RETRY_MS = 5000;
 const RPC_TIMEOUT_MS = 8000;
@@ -86,9 +90,12 @@ async function realLoop(cfg, onSample, signal, intervalMs) {
       await streamOnce(cfg, onSample, signal, intervalMs, state);
       warned = false; // stream worked at some point; re-warn if it breaks again
     } catch (err) {
-      if (!signal.aborted && !warned) {
-        console.error(`[smaart] ${cfg.host}:${cfg.port ?? 26000}: ${err.message} — retrying`);
-        warned = true; // one line per outage, not one per retry
+      if (!signal.aborted) {
+        report(healthKey(cfg), false, err.message);
+        if (!warned) {
+          console.error(`[smaart] ${cfg.host}:${cfg.port ?? 26000}: ${err.message} — retrying`);
+          warned = true; // one line per outage, not one per retry
+        }
       }
     }
     await sleep(RETRY_MS, signal);
@@ -106,6 +113,7 @@ async function streamOnce(cfg, onSample, signal, intervalMs, state) {
       if (!cfg.password) throw new Error('Smaart API requires a password (set smaart.password)');
       await call({ action: 'set', properties: [{ password: cfg.password }] });
     }
+    report(healthKey(cfg), true); // connected + answering RPCs (auth done)
     if (state.announced !== state.path) {
       console.log(
         `[smaart] ${cfg.host}: ${info.applicationName ?? 'Smaart'} ${info.applicationVersion ?? ''} via ${state.path}`.replace(/\s+/g, ' '),

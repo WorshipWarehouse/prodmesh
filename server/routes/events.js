@@ -33,19 +33,22 @@ async function upcomingForRoom(pc, limit) {
     .slice(0, limit);
 }
 
-// Overview: next service per configured room (for Quick Access).
+// Overview: next service per configured room (for Quick Access). Rooms are
+// fetched in parallel (Promise.all keeps map order) so a slow Planning Center
+// costs one room's latency, not rooms × timeout.
 router.get('/api/services', async (_req, res) => {
-  const out = [];
-  for (const room of Object.values(rooms)) {
-    if (!room.planningCenter?.serviceTypes?.length) continue;
-    try {
-      const [next] = await upcomingForRoom(room.planningCenter, 1);
-      if (next) next.times = await pco.getPlanTimes(stOf(next), next.id);
-      out.push({ roomId: room.id, roomName: room.name, serviceType: next?.serviceTypeName ?? null, next: next ?? null });
-    } catch (err) {
-      out.push({ roomId: room.id, roomName: room.name, serviceType: null, next: null, error: String(err.message ?? err) });
-    }
-  }
+  const configured = Object.values(rooms).filter((room) => room.planningCenter?.serviceTypes?.length);
+  const out = await Promise.all(
+    configured.map(async (room) => {
+      try {
+        const [next] = await upcomingForRoom(room.planningCenter, 1);
+        if (next) next.times = await pco.getPlanTimes(stOf(next), next.id);
+        return { roomId: room.id, roomName: room.name, serviceType: next?.serviceTypeName ?? null, next: next ?? null };
+      } catch (err) {
+        return { roomId: room.id, roomName: room.name, serviceType: null, next: null, error: String(err.message ?? err) };
+      }
+    }),
+  );
   res.json({ live: pco.isConfigured(), services: out });
 });
 

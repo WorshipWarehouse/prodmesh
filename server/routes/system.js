@@ -12,6 +12,7 @@ import * as timeline from '../timeline.js';
 import * as splStore from '../splStore.js';
 import * as settings from '../settings.js';
 import * as auth from '../authStore.js';
+import * as health from '../health.js';
 import { requirePermission } from '../httpAuth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -91,6 +92,12 @@ router.get('/api/history', async (_req, res) => {
 
 router.get('/api/system/version', (_req, res) => {
   res.json(settings.getVersion());
+});
+
+// Per-integration transport health (recorded by the integration clients).
+// Public read like the connectivity GET — keys carry hostnames, nothing secret.
+router.get('/api/system/health', (_req, res) => {
+  res.json({ integrations: health.snapshot(), now: Date.now() });
 });
 
 // Trigger a self-update (git pull + build + service restart). Runs detached so

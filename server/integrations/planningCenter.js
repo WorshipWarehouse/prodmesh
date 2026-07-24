@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getSecret } from '../secrets.js';
+import { report } from '../health.js';
 
 const BASE = 'https://api.planningcenteronline.com/services/v2';
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -36,14 +37,24 @@ export function clearCache() {
 }
 
 // ── HTTP (real API) ───────────────────────────────────────────────────────────
+//  The single place real requests happen — every caller guards with
+//  isConfigured() and the TTL cache sits above, so health reflects actual
+//  fetches only: mock mode and cache hits never report.
 async function pcGet(path) {
   const auth = Buffer.from(`${getSecret('planningCenter.appId')}:${getSecret('planningCenter.secret')}`).toString('base64');
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { Authorization: `Basic ${auth}` },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!res.ok) throw new Error(`Planning Center ${path} → HTTP ${res.status}`);
-  return res.json();
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { Authorization: `Basic ${auth}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`Planning Center ${path} → HTTP ${res.status}`);
+    const body = await res.json();
+    report('planningCenter', true);
+    return body;
+  } catch (err) {
+    report('planningCenter', false, String(err.message ?? err));
+    throw err;
+  }
 }
 
 // ── Normalizers (JSON:API → our clean shapes) — field names verified live ─────

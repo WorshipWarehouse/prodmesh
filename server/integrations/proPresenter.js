@@ -8,6 +8,8 @@
 //  Per-room host/port (ProPresenter picks an ephemeral API port). No auth (LAN).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { report } from '../health.js';
+
 const DEFAULT_PORT = 62202;
 
 export const isConfigured = (pp) => Boolean(pp?.host);
@@ -97,10 +99,22 @@ function withTimeout(signal, ms = 3000) {
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
 
+// All reads funnel through here; the room isn't known at this depth, so health
+// is keyed by the machine we actually talked to.
 async function ppGet(pp, path, signal) {
-  const res = await fetch(`${baseUrl(pp)}${path}`, { signal: withTimeout(signal) });
-  if (!res.ok) throw new Error(`ProPresenter ${res.status}`);
-  return res.json();
+  const key = `proPresenter@${pp.host}:${pp.port ?? DEFAULT_PORT}`;
+  try {
+    const res = await fetch(`${baseUrl(pp)}${path}`, { signal: withTimeout(signal) });
+    if (!res.ok) throw new Error(`ProPresenter ${res.status}`);
+    const body = await res.json();
+    report(key, true);
+    return body;
+  } catch (err) {
+    // A caller abort (show ended, view closed) is not an integration failure;
+    // an unresponsive PP surfaces as TimeoutError and is.
+    if (err?.name !== 'AbortError') report(key, false, String(err.message ?? err));
+    throw err;
+  }
 }
 
 /** One-shot read of the current active playlist item. */
