@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs';
 import { rooms } from '../roomsStore.js';
 import * as pco from '../integrations/planningCenter.js';
 import * as timeline from '../timeline.js';
-import * as splStore from '../splStore.js';
+import * as summaries from '../showSummaries.js';
+import * as show from '../showManager.js';
 import * as settings from '../settings.js';
 import * as auth from '../authStore.js';
 import * as health from '../health.js';
@@ -29,62 +30,64 @@ router.get('/api/about', (_req, res) => res.json({ name: 'prodmesh', version: pk
 // serves past plans fine, they just fall out of the "upcoming" list — and
 // stamp the result into the timeline so it's a one-time repair per show.
 const backfillDone = new Set(); // instanceIds tried this boot (hit or miss)
-async function backfillLabels(tl) {
-  if (tl.planTitle != null || !tl.roomId || !tl.planId) return;
-  if (backfillDone.has(tl.instanceId)) return;
-  backfillDone.add(tl.instanceId);
-  for (const st of rooms[tl.roomId]?.planningCenter?.serviceTypes ?? []) {
-    const plan = await pco.getPlan(st, tl.planId);
+async function backfillLabels(row) {
+  if (row.planTitle != null || !row.roomId || !row.planId) return;
+  if (backfillDone.has(row.instanceId)) return;
+  backfillDone.add(row.instanceId);
+  for (const st of rooms[row.roomId]?.planningCenter?.serviceTypes ?? []) {
+    const plan = await pco.getPlan(st, row.planId);
     if (!plan) continue; // not this service type (or PC not live)
     const time = await pco
-      .getPlanTimes(st, tl.planId)
-      .then((ts) => ts.find((t) => t.id === tl.timeId) ?? null)
+      .getPlanTimes(st, row.planId)
+      .then((ts) => ts.find((t) => t.id === row.timeId) ?? null)
       .catch(() => null);
-    timeline.ensure(tl.instanceId, {
+    timeline.ensure(row.instanceId, {
       planTitle: plan.title,
       serviceTypeName: plan.serviceTypeName,
       dates: plan.dates,
       timeName: time?.name ?? null,
       timeStartsAt: time?.startsAt ?? null,
     });
+    summaries.refresh(row.instanceId); // the repaired labels reach the summary
     return;
   }
 }
 
 // Every recorded show, newest first — powers the Analytics history view.
-// Labels (planTitle etc.) are stamped at show start; unlabeled rows get a
-// backfill attempt above before the response is built.
+// Served from show_summaries (one indexed query); live shows get their row
+// refreshed first so mid-show history stays current. Labels (planTitle etc.)
+// are stamped at show start; unlabeled rows get a backfill attempt above.
 router.get('/api/history', async (_req, res) => {
-  await Promise.all(timeline.listAll().map(backfillLabels));
-  const shows = timeline
-    .listAll()
-    .map((tl) => {
-      const room = rooms[tl.roomId] ?? null;
-      const planned = tl.items.reduce((s, i) => s + (i.plannedLength || 0), 0);
-      const actual = tl.items.reduce((s, i) => s + (i.actualSeconds || 0), 0);
-      const agg = splStore.aggregate(tl.instanceId);
-      return {
-        instanceId: tl.instanceId,
-        roomId: tl.roomId ?? null,
-        roomName: room?.name ?? tl.roomId ?? null,
-        site: room?.site ?? null,
-        planId: tl.planId ?? null,
-        timeId: tl.timeId ?? null,
-        planTitle: tl.planTitle ?? null,
-        serviceTypeName: tl.serviceTypeName ?? null,
-        dates: tl.dates ?? null,
-        timeName: tl.timeName ?? null,
-        timeStartsAt: tl.timeStartsAt ?? null,
-        startedAt: tl.items[0]?.startedAt ?? null,
-        completedAt: tl.endedAt ?? null,
-        itemCount: tl.items.length,
-        totals: { planned, actual, delta: actual - planned },
-        spl: agg
-          ? { ...agg, target: room?.analysis?.target ?? null, limit: room?.analysis?.limit ?? null }
-          : null,
-      };
-    })
-    .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+  summaries.syncFromTimelines(); // once per boot: legacy timelines → rows
+  for (const id of show.activeInstanceIds()) summaries.refresh(id);
+  await Promise.all(summaries.listAll().map(backfillLabels));
+  const shows = summaries.listAll().map((row) => {
+    const room = rooms[row.roomId] ?? null;
+    return {
+      instanceId: row.instanceId,
+      roomId: row.roomId,
+      roomName: room?.name ?? row.roomId ?? null,
+      site: room?.site ?? null,
+      planId: row.planId,
+      timeId: row.timeId,
+      planTitle: row.planTitle,
+      serviceTypeName: row.serviceTypeName,
+      dates: row.dates,
+      timeName: row.timeName,
+      timeStartsAt: row.timeStartsAt,
+      startedAt: row.startedAt,
+      completedAt: row.completedAt,
+      itemCount: row.itemCount,
+      totals: {
+        planned: row.plannedSeconds,
+        actual: row.actualSeconds,
+        delta: row.actualSeconds - row.plannedSeconds,
+      },
+      spl: row.spl
+        ? { ...row.spl, target: room?.analysis?.target ?? null, limit: room?.analysis?.limit ?? null }
+        : null,
+    };
+  });
   res.json({ shows });
 });
 

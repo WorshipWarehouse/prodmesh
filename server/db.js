@@ -212,6 +212,38 @@ const MIGRATIONS = [
       addColumn(d, 'spl_samples', 'ca', 'REAL');
     },
   },
+  {
+    // One row per recorded show: the pre-aggregated facts the Analytics
+    // history view needs, written when a show ends (and backfilled from the
+    // JSON timelines at boot). The per-item timeline JSON stays authoritative
+    // for the detailed report; this is its indexed summary. `spl` is the
+    // aggregated JSON block ({count, leq, peak, from, to, ca}) — the room's
+    // target/limit are applied at read time so they track current settings.
+    name: 'show-summaries',
+    up(d) {
+      d.exec(`
+        CREATE TABLE IF NOT EXISTS show_summaries (
+          instance_id       TEXT PRIMARY KEY, -- planId__timeId
+          room_id           TEXT,
+          plan_id           TEXT,
+          time_id           TEXT,
+          plan_title        TEXT,
+          service_type_name TEXT,
+          dates             TEXT,
+          time_name         TEXT,
+          time_starts_at    TEXT,
+          started_at        INTEGER,
+          completed_at      INTEGER,
+          item_count        INTEGER NOT NULL DEFAULT 0,
+          planned_seconds   INTEGER NOT NULL DEFAULT 0,
+          actual_seconds    INTEGER NOT NULL DEFAULT 0,
+          spl               TEXT,
+          updated_at        INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS summaries_by_start ON show_summaries (started_at DESC);
+      `);
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

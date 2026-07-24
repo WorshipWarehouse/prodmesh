@@ -66,4 +66,25 @@ export function runningStats(instanceId) {
   };
 }
 
+// ── Retention ─────────────────────────────────────────────────────────────────
+// Raw samples only serve the detailed report and reopen-seeding; the show's
+// aggregate (leq/peak/ca) survives in show_summaries. Prune samples older than
+// PRODMESH_SPL_RETENTION_DAYS (default 90; 0 or negative disables).
+
+export function prune(days = Number(process.env.PRODMESH_SPL_RETENTION_DAYS ?? 90)) {
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  const cutoff = Date.now() - days * 86_400_000;
+  const { changes } = getDb().prepare('DELETE FROM spl_samples WHERE ts < ?').run(cutoff);
+  if (changes) console.log(`[spl] pruned ${changes} samples older than ${days} days`);
+  return changes;
+}
+
+/** Prune now and then daily — the Producer runs for weeks between restarts. */
+export function startRetention() {
+  prune();
+  const t = setInterval(prune, 86_400_000);
+  t.unref?.();
+  return t;
+}
+
 export { round1 };
