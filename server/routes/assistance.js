@@ -14,6 +14,7 @@ const toState = (entry) =>
         active: true,
         requestedAt: entry.requestedAt,
         userName: entry.userName,
+        message: entry.message,
         ack: entry.ack ? { name: entry.ack.name, at: entry.ack.at } : null,
       }
     : { active: false };
@@ -28,7 +29,8 @@ router.post('/api/assistance', async (req, res) => {
     return res.status(400).json({ error: 'Register this station before requesting assistance' });
   }
   try {
-    const entry = await assistance.request(req.station, req.auth?.user?.displayName ?? null);
+    const message = String(req.body?.message ?? '').trim().slice(0, 300) || null;
+    const entry = await assistance.request(req.station, req.auth?.user?.displayName ?? null, message);
     auditSuccess(req, 'assistance.request', {
       resourceType: 'station',
       resourceId: req.station.id,

@@ -114,6 +114,23 @@ test('a Slack failure surfaces as an error and opens NO local request', async ()
   slackMode = 'ok';
 });
 
+test('a reported problem rides along as a Slack blockquote (mrkdwn-escaped)', async () => {
+  const res = await fetch(`${base}/api/assistance`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Prodmesh-Station': station.token },
+    body: JSON.stringify({ message: 'No sound from pulpit mic <urgent> & loud buzz' }),
+  });
+  assert.equal(res.status, 200);
+  const state = await res.json();
+  assert.equal(state.message, 'No sound from pulpit mic <urgent> & loud buzz');
+
+  const post = slackCalls.filter((c) => c.method === 'chat.postMessage').at(-1);
+  assert.match(post.payload.text, /technical assistance at \*FOH – Test Booth\*/);
+  assert.match(post.payload.text, /\n> No sound from pulpit mic &lt;urgent&gt; &amp; loud buzz/);
+
+  await call('DELETE', station.token);
+});
+
 test('a 👀 reaction on the Slack message becomes an acknowledgment with the tech name', async () => {
   fakeReactions = [];
   await call('POST', station.token);

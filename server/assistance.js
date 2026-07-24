@@ -67,13 +67,19 @@ export function getForStation(stationId) {
  * Slack is configured but unreachable: a silent failure would leave the
  * volunteer believing help was coming.
  */
-export async function request(station, userName = null) {
+export async function request(station, userName = null, message = null) {
   const existing = requests.get(station.id);
   if (existing) return existing;
 
-  const text = `:red_circle: ${
-    userName ? `*${userName}* has requested` : 'Someone has requested'
-  } technical assistance at *${station.name}*`;
+  // Slack's mrkdwn control characters; user text passes through otherwise.
+  const escaped = message
+    ? message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    : null;
+  const text =
+    `:red_circle: ${
+      userName ? `*${userName}* has requested` : 'Someone has requested'
+    } technical assistance at *${station.name}*` +
+    (escaped ? `\n${escaped.split('\n').map((l) => `> ${l}`).join('\n')}` : '');
 
   let posted = null;
   if (slack.isConfigured()) {
@@ -86,6 +92,7 @@ export async function request(station, userName = null) {
     stationId: station.id,
     stationName: station.name,
     userName,
+    message,
     requestedAt: Date.now(),
     slack: posted,
     ack: null,

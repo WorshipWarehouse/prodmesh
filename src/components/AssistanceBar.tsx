@@ -46,6 +46,9 @@ export function AssistanceBar({ enabled }: { enabled: boolean }) {
             way.
           </>
         )}
+        {state.data.message && (
+          <span className="assistbar__note">“{state.data.message}”</span>
+        )}
       </span>
       <button className="btn btn--sm assistbar__dismiss" onClick={dismiss} disabled={busy}>
         <CheckCircle2 size={14} /> {busy ? 'Dismissing…' : 'Dismiss'}

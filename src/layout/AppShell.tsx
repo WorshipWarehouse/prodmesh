@@ -20,9 +20,9 @@ import {
   PanelLeftOpen,
   Wrench,
 } from 'lucide-react';
-import { getAuthStatus, getConfig, logoutAdmin, requestAssistance, type AuthStatus, type Station } from '../api';
-import { invalidate } from '../lib/useQuery';
+import { getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
 import { AssistanceBar } from '../components/AssistanceBar';
+import { AssistanceDialog } from '../components/AssistanceDialog';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { ChurchContext, EMPTY_CHURCH } from './church';
 import type { Church } from '../types';
@@ -66,8 +66,7 @@ export function AppShell() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [assistBusy, setAssistBusy] = useState(false);
-  const [assistErr, setAssistErr] = useState<string | null>(null);
+  const [assistOpen, setAssistOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
 
@@ -215,10 +214,7 @@ export function AppShell() {
               <button
                 className="sidebar__toggle"
                 title="Help"
-                onClick={() => {
-                  setAssistErr(null);
-                  setHelpOpen((open) => !open);
-                }}
+                onClick={() => setHelpOpen((open) => !open)}
                 aria-expanded={helpOpen}
               >
                 <CircleHelp size={17} />
@@ -230,30 +226,20 @@ export function AppShell() {
                     <BookOpen size={14} /> Documentation <small>coming soon</small>
                   </button>
                   <button
-                    disabled={!identity?.station || assistBusy}
+                    disabled={!identity?.station}
                     title={
                       identity?.station
                         ? 'Notify the tech team in Slack that this station needs help'
                         : 'Register this station first'
                     }
-                    onClick={async () => {
-                      setAssistBusy(true);
-                      setAssistErr(null);
-                      try {
-                        await requestAssistance();
-                        invalidate('assistance');
-                        setHelpOpen(false);
-                      } catch (e) {
-                        setAssistErr(e instanceof Error ? e.message : String(e));
-                      } finally {
-                        setAssistBusy(false);
-                      }
+                    onClick={() => {
+                      setHelpOpen(false);
+                      setAssistOpen(true);
                     }}
                   >
-                    <BellRing size={14} /> {assistBusy ? 'Notifying…' : 'Request assistance'}
+                    <BellRing size={14} /> Request assistance
                     {!identity?.station && <small>register first</small>}
                   </button>
-                  {assistErr && <p className="helpmenu__error">{assistErr}</p>}
                 </div>
               )}
             </div>
@@ -302,6 +288,7 @@ export function AppShell() {
           <AssistanceBar enabled={Boolean(identity?.station)} />
           <Outlet />
         </main>
+        {assistOpen && <AssistanceDialog onClose={() => setAssistOpen(false)} />}
         {identityOpen && (
           <IdentityDialog
             stationRequired={!identity?.station}

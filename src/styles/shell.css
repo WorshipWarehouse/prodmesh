@@ -553,3 +553,24 @@
   color: var(--warn-text);
   animation: none;
 }
+
+/* The assistance dialog's note box — a textarea opting out of the 40px
+   single-line control height. */
+.assistdlg__msg {
+  height: auto;
+  min-height: 84px;
+  padding: 10px 12px;
+  resize: vertical;
+  font: inherit;
+  font-size: 0.95rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.assistbar__note {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-style: italic;
+}

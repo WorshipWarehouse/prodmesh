@@ -845,13 +845,16 @@ export interface AssistanceState {
   active: boolean;
   requestedAt?: number;
   userName?: string | null;
+  /** The reported problem, relayed to Slack so the right person responds. */
+  message?: string | null;
   /** Set when a tech 👀-reacted the Slack message: they've seen it and are coming. */
   ack?: { name: string | null; at: number } | null;
 }
 
 export const getAssistance = () => getJson<AssistanceState>('/api/assistance');
 
-export const requestAssistance = () => postJson<AssistanceState>('/api/assistance', {});
+export const requestAssistance = (message?: string) =>
+  postJson<AssistanceState>('/api/assistance', message ? { message } : {});
 
 export async function dismissAssistance(): Promise<void> {
   const res = await fetch('/api/assistance', { method: 'DELETE', headers: requestHeaders() });
