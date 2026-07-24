@@ -4,6 +4,11 @@ import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2 } from 'lucide-react
 import { Checkbox } from '../components/Checkbox';
 import { HelpTip } from '../components/HelpTip';
 import { SelectField } from '../components/SelectField';
+import { ColorInput } from '../components/form/ColorInput';
+import { EditorSection } from '../components/form/EditorSection';
+import { Field } from '../components/form/Field';
+import { FormRow } from '../components/form/FormRow';
+import { useDraft } from '../components/form/useDraft';
 import { useChurch } from '../layout/church';
 import {
   getAuthStatus,
@@ -1437,63 +1442,39 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
 }
 
 function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: PcServiceType[] }) {
-  const [types, setTypes] = useState<PcServiceType[]>(initial);
-  const [baseline, setBaseline] = useState(JSON.stringify(initial));
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const dirty = JSON.stringify(types) !== baseline;
-
-  const save = async () => {
-    setErr(''); setMsg(''); setBusy(true);
-    try {
-      const stored = await savePcServiceTypes(roomId, types);
-      setTypes(stored.serviceTypes);
-      setBaseline(JSON.stringify(stored.serviceTypes));
-      setMsg('Saved.');
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally { setBusy(false); }
-  };
+  const f = useDraft<PcServiceType[]>(initial, async (types) =>
+    (await savePcServiceTypes(roomId, types)).serviceTypes);
+  const editType = (i: number, patch: Partial<PcServiceType>) =>
+    f.setDraft((all) => all.map((x, j) => j === i ? { ...x, ...patch } : x));
 
   return (
-    <div className="pctypes">
-      <div className="campuses__head">
-        <div>
-          <h3 className="pctypes__title">Planning Center service types
-            <HelpTip text="The event types this room hosts. The ID is in the Planning Center Services URL for that service type." />
-          </h3>
-        </div>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
-          {busy ? 'Saving…' : dirty ? 'Save service types' : 'Saved'}
-        </button>
-      </div>
-
-      {types.length === 0 && <p className="settings__muted">None — this room shows no Planning Center events.</p>}
-      {types.map((st, i) => (
-        <div className="campuses__tile" key={i}>
-          <label className="lfield campuses__grow"><span>Name</span>
+    <EditorSection
+      title="Planning Center service types"
+      help="The event types this room hosts. The ID is in the Planning Center Services URL for that service type."
+      saveLabel="Save service types"
+      form={f}
+    >
+      {f.draft.length === 0 && <p className="settings__muted">None — this room shows no Planning Center events.</p>}
+      {f.draft.map((st, i) => (
+        <FormRow key={i}>
+          <Field label="Name" width="grow">
             <input className="field" placeholder="e.g. Sunday" value={st.name}
-              onChange={(e) => setTypes((all) => all.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
-          </label>
-          <label className="lfield"><span>Service type ID</span>
+              onChange={(e) => editType(i, { name: e.target.value })} />
+          </Field>
+          <Field label="Service type ID">
             <input className="field" placeholder="e.g. 500001" inputMode="numeric" value={st.id}
-              onChange={(e) => setTypes((all) => all.map((x, j) => j === i ? { ...x, id: e.target.value } : x))} />
-          </label>
-          <div className="campuses__rowactions">
+              onChange={(e) => editType(i, { id: e.target.value })} />
+          </Field>
+          <div className="formrow__actions">
             <button className="iconbtn iconbtn--danger" title="Remove service type" aria-label="Remove service type"
-              onClick={() => setTypes((all) => all.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
+              onClick={() => f.setDraft((all) => all.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
           </div>
-        </div>
+        </FormRow>
       ))}
-      <button className="btn campuses__addtile" onClick={() => setTypes((all) => [...all, { id: '', name: '' }])}>
+      <button className="btn" onClick={() => f.setDraft((all) => [...all, { id: '', name: '' }])}>
         + Add service type
       </button>
-
-      {err && <p className="settings__error">{err}</p>}
-      {msg && <p className="settings__ok">{msg}</p>}
-    </div>
+    </EditorSection>
   );
 }
 
@@ -1524,20 +1505,33 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
 }
 
 function AnalysisEditor({ roomId, initial }: { roomId: string; initial: AnalysisConfig | null }) {
-  const [draft, setDraft] = useState<AnalysisDraft>(() => toDraft(initial));
-  const [baseline, setBaseline] = useState(() => JSON.stringify(toDraft(initial)));
   const [hasPassword, setHasPassword] = useState(Boolean(initial?.hasPassword));
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const dirty = JSON.stringify(draft) !== baseline;
-  const set = (patch: Partial<AnalysisDraft>) => setDraft((d) => ({ ...d, ...patch }));
+  const f = useDraft(toDraft(initial), async (d) => {
+    const stored = await saveAnalysis(
+      roomId,
+      d.source === 'none'
+        ? null
+        : {
+            source: d.source,
+            host: d.host,
+            port: d.port === '' ? undefined : Number(d.port),
+            target: d.target === '' ? undefined : Number(d.target),
+            limit: d.limit === '' ? undefined : Number(d.limit),
+            metric: d.metric || undefined,
+            logControl: d.source === 'smaart' && d.logControl ? true : undefined,
+            // Omit password unless typed — omitted keeps the stored one.
+            ...(d.password ? { password: d.password } : {}),
+          },
+    );
+    setHasPassword(Boolean(stored?.hasPassword));
+    return toDraft(stored);
+  });
+  const { draft } = f;
 
   if (initial?.mock) {
     return (
-      <div className="pctypes">
-        <h3 className="pctypes__title">Analysis source
+      <div className="fsection">
+        <h3 className="fsection__title">Analysis source
           <HelpTip text="Where this room's SPL numbers come from." />
         </h3>
         <p className="settings__muted">Simulated meter (dev room).</p>
@@ -1545,109 +1539,73 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
     );
   }
 
-  const save = async () => {
-    setErr(''); setMsg(''); setBusy(true);
-    try {
-      const stored = await saveAnalysis(
-        roomId,
-        draft.source === 'none'
-          ? null
-          : {
-              source: draft.source,
-              host: draft.host,
-              port: draft.port === '' ? undefined : Number(draft.port),
-              target: draft.target === '' ? undefined : Number(draft.target),
-              limit: draft.limit === '' ? undefined : Number(draft.limit),
-              metric: draft.metric || undefined,
-              logControl: draft.source === 'smaart' && draft.logControl ? true : undefined,
-              // Omit password unless typed — omitted keeps the stored one.
-              ...(draft.password ? { password: draft.password } : {}),
-            },
-      );
-      const next = toDraft(stored);
-      setDraft(next);
-      setBaseline(JSON.stringify(next));
-      setHasPassword(Boolean(stored?.hasPassword));
-      setMsg('Saved.');
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally { setBusy(false); }
-  };
-
   return (
-    <div className="pctypes">
-      <div className="campuses__head">
-        <h3 className="pctypes__title">Analysis source
-          <HelpTip text="Where this room's SPL numbers come from — a Smaart rig or the free ProdMesh Remote RTA app. Target and limit set the dB goals on the live meter and show reports." />
-        </h3>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
-          {busy ? 'Saving…' : dirty ? 'Save analysis source' : 'Saved'}
-        </button>
-      </div>
-
-      <div className="campuses__tile">
-        <label className="lfield"><span>Source</span>
+    <EditorSection
+      title="Analysis source"
+      help="Where this room's SPL numbers come from — a Smaart rig or the free ProdMesh Remote RTA app. Target and limit set the dB goals on the live meter and show reports."
+      saveLabel="Save analysis source"
+      form={f}
+    >
+      <FormRow>
+        <Field label="Source">
           <SelectField value={draft.source}
-            onChange={(e) => set({ source: e.target.value as AnalysisDraft['source'] })}>
+            onChange={(e) => f.patch({ source: e.target.value as AnalysisDraft['source'] })}>
             <option value="none">None</option>
             <option value="smaart">Smaart</option>
             <option value="rta">ProdMesh Remote RTA</option>
           </SelectField>
-        </label>
+        </Field>
         {draft.source !== 'none' && (
           <>
-            <label className="lfield campuses__grow"><span>Host</span>
+            <Field label="Host" width="grow">
               <input className="field" placeholder="e.g. 192.0.2.7" value={draft.host}
-                onChange={(e) => set({ host: e.target.value })} />
-            </label>
-            <label className="lfield"><span>Port</span>
-              <input className="field campuses__tileport" inputMode="numeric"
+                onChange={(e) => f.patch({ host: e.target.value })} />
+            </Field>
+            <Field label="Port" width="sm">
+              <input className="field" inputMode="numeric"
                 placeholder={draft.source === 'smaart' ? '26000' : '8517'} value={draft.port}
-                onChange={(e) => set({ port: e.target.value })} />
-            </label>
+                onChange={(e) => f.patch({ port: e.target.value })} />
+            </Field>
           </>
         )}
-      </div>
+      </FormRow>
 
       {draft.source !== 'none' && (
-        <div className="campuses__tile">
-          <label className="lfield"><span>Target dB</span>
-            <input className="field campuses__tileport" inputMode="numeric" placeholder="e.g. 90"
-              value={draft.target} onChange={(e) => set({ target: e.target.value })} />
-          </label>
-          <label className="lfield"><span>Limit dB</span>
-            <input className="field campuses__tileport" inputMode="numeric" placeholder="e.g. 95"
-              value={draft.limit} onChange={(e) => set({ limit: e.target.value })} />
-          </label>
-          <label className="lfield campuses__grow"><span>Metric</span>
+        <FormRow>
+          <Field label="Target dB" width="sm">
+            <input className="field" inputMode="numeric" placeholder="e.g. 90"
+              value={draft.target} onChange={(e) => f.patch({ target: e.target.value })} />
+          </Field>
+          <Field label="Limit dB" width="sm">
+            <input className="field" inputMode="numeric" placeholder="e.g. 95"
+              value={draft.limit} onChange={(e) => f.patch({ limit: e.target.value })} />
+          </Field>
+          <Field label="Metric" width="grow">
             <input className="field" placeholder={draft.source === 'smaart' ? 'SPL A Slow' : 'slow_db'}
-              value={draft.metric} onChange={(e) => set({ metric: e.target.value })} />
-          </label>
+              value={draft.metric} onChange={(e) => f.patch({ metric: e.target.value })} />
+          </Field>
           {draft.source === 'smaart' && (
-            <label className="lfield"><span>API password</span>
+            <Field label="API password">
               <input className="field" type="password" autoComplete="off"
                 placeholder={hasPassword ? 'unchanged' : 'none'} value={draft.password}
-                onChange={(e) => set({ password: e.target.value })} />
-            </label>
+                onChange={(e) => f.patch({ password: e.target.value })} />
+            </Field>
           )}
-        </div>
+        </FormRow>
       )}
 
       {draft.source === 'smaart' && (
-        <div className="campuses__tile">
+        <FormRow>
           <Checkbox
             label={<>Start/stop SPL logging with shows
               <HelpTip text="Show start turns Smaart's SPL logging on; show end turns it off (only if the show turned it on). Needs a calibrated input in Smaart." />
             </>}
             checked={draft.logControl}
-            onChange={(e) => set({ logControl: e.target.checked })}
+            onChange={(e) => f.patch({ logControl: e.target.checked })}
           />
-        </div>
+        </FormRow>
       )}
-
-      {err && <p className="settings__error">{err}</p>}
-      {msg && <p className="settings__ok">{msg}</p>}
-    </div>
+    </EditorSection>
   );
 }
 
@@ -1697,18 +1655,28 @@ function toCompanionDraft(cfg: CompanionConfig | null): CompanionDraft {
 }
 
 function CompanionEditor({ roomId, initial }: { roomId: string; initial: CompanionConfig | null }) {
-  const [draft, setDraft] = useState<CompanionDraft>(() => toCompanionDraft(initial));
-  const [baseline, setBaseline] = useState(() => JSON.stringify(toCompanionDraft(initial)));
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const dirty = JSON.stringify(draft) !== baseline;
-  const set = (patch: Partial<CompanionDraft>) => setDraft((d) => ({ ...d, ...patch }));
+  const f = useDraft(toCompanionDraft(initial), async (d) =>
+    toCompanionDraft(await saveCompanion(roomId, {
+      mock: d.mock,
+      host: d.host || undefined,
+      port: d.port === '' ? undefined : Number(d.port),
+      variable: d.variable || undefined,
+      modes: d.modes.map((m) => ({
+        id: m.id,
+        label: m.label,
+        color: m.color,
+        match: m.match,
+        ...(m.page === '' && m.row === '' && m.column === ''
+          ? {}
+          : { press: { page: Number(m.page), row: Number(m.row), column: Number(m.column) } }),
+        ...(m.isStandby ? { isStandby: true } : {}),
+      })),
+    })));
+  const { draft } = f;
   const setMode = (i: number, patch: Partial<ModeDraft>) =>
-    setDraft((d) => ({ ...d, modes: d.modes.map((m, j) => (j === i ? { ...m, ...patch } : m)) }));
+    f.setDraft((d) => ({ ...d, modes: d.modes.map((m, j) => (j === i ? { ...m, ...patch } : m)) }));
   const moveMode = (i: number, dir: -1 | 1) =>
-    setDraft((d) => {
+    f.setDraft((d) => {
       const j = i + dir;
       if (j < 0 || j >= d.modes.length) return d;
       const modes = [...d.modes];
@@ -1716,124 +1684,86 @@ function CompanionEditor({ roomId, initial }: { roomId: string; initial: Compani
       return { ...d, modes };
     });
 
-  const save = async () => {
-    setErr(''); setMsg(''); setBusy(true);
-    try {
-      const stored = await saveCompanion(roomId, {
-        mock: draft.mock,
-        host: draft.host || undefined,
-        port: draft.port === '' ? undefined : Number(draft.port),
-        variable: draft.variable || undefined,
-        modes: draft.modes.map((m) => ({
-          id: m.id,
-          label: m.label,
-          color: m.color,
-          match: m.match,
-          ...(m.page === '' && m.row === '' && m.column === ''
-            ? {}
-            : { press: { page: Number(m.page), row: Number(m.row), column: Number(m.column) } }),
-          ...(m.isStandby ? { isStandby: true } : {}),
-        })),
-      });
-      const next = toCompanionDraft(stored);
-      setDraft(next);
-      setBaseline(JSON.stringify(next));
-      setMsg('Saved.');
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally { setBusy(false); }
-  };
-
   return (
-    <div className="pctypes">
-      <div className="campuses__head">
-        <h3 className="pctypes__title">Companion &amp; modes
-          <HelpTip text="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches its value. Every Companion lays its buttons out differently — set each mode's location to match this room's." />
-        </h3>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
-          {busy ? 'Saving…' : dirty ? 'Save Companion' : 'Saved'}
-        </button>
-      </div>
-
-      <div className="campuses__tile">
+    <EditorSection
+      title="Companion & modes"
+      help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches its value. Every Companion lays its buttons out differently — set each mode's location to match this room's."
+      saveLabel="Save Companion"
+      form={f}
+    >
+      <FormRow>
         <Checkbox
           label={<>Simulated
             <HelpTip text="No Companion yet — room state is kept in memory so every screen still works. Untick when this room's Companion has the state variable and buttons set up." />
           </>}
           checked={draft.mock}
-          onChange={(e) => set({ mock: e.target.checked })}
+          onChange={(e) => f.patch({ mock: e.target.checked })}
         />
-        <label className="lfield campuses__grow"><span>Host</span>
+        <Field label="Host" width="grow">
           <input className="field" placeholder="e.g. 192.0.2.31" value={draft.host}
-            onChange={(e) => set({ host: e.target.value })} />
-        </label>
-        <label className="lfield"><span>Port</span>
-          <input className="field campuses__tileport" inputMode="numeric" placeholder="8000"
-            value={draft.port} onChange={(e) => set({ port: e.target.value })} />
-        </label>
-        <label className="lfield"><span>State variable</span>
+            onChange={(e) => f.patch({ host: e.target.value })} />
+        </Field>
+        <Field label="Port" width="sm">
+          <input className="field" inputMode="numeric" placeholder="8000"
+            value={draft.port} onChange={(e) => f.patch({ port: e.target.value })} />
+        </Field>
+        <Field label="State variable">
           <input className="field" placeholder="roomState" value={draft.variable}
-            onChange={(e) => set({ variable: e.target.value })} />
-        </label>
-      </div>
+            onChange={(e) => f.patch({ variable: e.target.value })} />
+        </Field>
+      </FormRow>
 
       {draft.modes.map((m, i) => (
-        <div className="campuses__tile" key={i}>
-          <label className="lfield campuses__modecolor"><span>Color</span>
-            <input className="field" type="color" value={m.color}
-              onChange={(e) => setMode(i, { color: e.target.value })} />
-          </label>
-          <label className="lfield"><span>Label</span>
+        <FormRow card key={i}>
+          <Field label="Color" width="xs">
+            <ColorInput value={m.color} onChange={(e) => setMode(i, { color: e.target.value })} />
+          </Field>
+          <Field label="Label">
             <input className="field" value={m.label}
               onChange={(e) => setMode(i, { label: e.target.value })} />
-          </label>
-          <label className="lfield"><span>ID</span>
+          </Field>
+          <Field label="ID">
             <input className="field" placeholder="e.g. sunday" value={m.id}
               onChange={(e) => setMode(i, { id: e.target.value })} />
-          </label>
-          <label className="lfield"><span>Match</span>
+          </Field>
+          <Field label="Match">
             <input className="field" placeholder="e.g. SUNDAY" value={m.match}
               onChange={(e) => setMode(i, { match: e.target.value })} />
-          </label>
-          <label className="lfield campuses__tileport"><span>Page</span>
+          </Field>
+          <Field label="Page" width="sm">
             <input className="field" inputMode="numeric" value={m.page}
               onChange={(e) => setMode(i, { page: e.target.value })} />
-          </label>
-          <label className="lfield campuses__tileport"><span>Row</span>
+          </Field>
+          <Field label="Row" width="sm">
             <input className="field" inputMode="numeric" value={m.row}
               onChange={(e) => setMode(i, { row: e.target.value })} />
-          </label>
-          <label className="lfield campuses__tileport"><span>Col</span>
+          </Field>
+          <Field label="Col" width="sm">
             <input className="field" inputMode="numeric" value={m.column}
               onChange={(e) => setMode(i, { column: e.target.value })} />
-          </label>
+          </Field>
           <Checkbox label="Standby" checked={m.isStandby}
             onChange={(e) => setMode(i, { isStandby: e.target.checked })} />
-          <div className="campuses__rowactions">
+          <div className="formrow__actions">
             <button className="iconbtn" title="Move mode up" aria-label="Move mode up"
               onClick={() => moveMode(i, -1)}><ArrowUp size={14} /></button>
             <button className="iconbtn" title="Move mode down" aria-label="Move mode down"
               onClick={() => moveMode(i, 1)}><ArrowDown size={14} /></button>
             <button className="iconbtn iconbtn--danger" title="Remove mode" aria-label="Remove mode"
-              onClick={() => setDraft((d) => ({ ...d, modes: d.modes.filter((_, j) => j !== i) }))}>
+              onClick={() => f.setDraft((d) => ({ ...d, modes: d.modes.filter((_, j) => j !== i) }))}>
               <Trash2 size={14} /></button>
           </div>
-        </div>
+        </FormRow>
       ))}
 
-      <div>
-        <button className="btn" onClick={() => setDraft((d) => ({
-          ...d,
-          modes: [...d.modes, {
-            id: '', label: '', color: '#5b8def', match: '',
-            page: '', row: '', column: '', isStandby: false,
-          }],
-        }))}>+ Add mode</button>
-      </div>
-
-      {err && <p className="settings__error">{err}</p>}
-      {msg && <p className="settings__ok">{msg}</p>}
-    </div>
+      <button className="btn" onClick={() => f.setDraft((d) => ({
+        ...d,
+        modes: [...d.modes, {
+          id: '', label: '', color: '#5b8def', match: '',
+          page: '', row: '', column: '', isStandby: false,
+        }],
+      }))}>+ Add mode</button>
+    </EditorSection>
   );
 }
 
@@ -1854,65 +1784,41 @@ function toPpDraft(cfg: ProPresenterConfig | null): PpDraft {
 }
 
 function ProPresenterEditor({ roomId, initial }: { roomId: string; initial: ProPresenterConfig | null }) {
-  const [draft, setDraft] = useState<PpDraft>(() => toPpDraft(initial));
-  const [baseline, setBaseline] = useState(() => JSON.stringify(toPpDraft(initial)));
-  const [msg, setMsg] = useState('');
-  const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const dirty = JSON.stringify(draft) !== baseline;
-  const set = (patch: Partial<PpDraft>) => setDraft((d) => ({ ...d, ...patch }));
-
-  const save = async () => {
-    setErr(''); setMsg(''); setBusy(true);
-    try {
-      const stored = await saveProPresenter(
-        roomId,
-        draft.host.trim()
-          ? {
-              host: draft.host,
-              port: draft.port === '' ? undefined : Number(draft.port),
-              timer: draft.timer || undefined,
-            }
-          : null,
-      );
-      const next = toPpDraft(stored);
-      setDraft(next);
-      setBaseline(JSON.stringify(next));
-      setMsg('Saved.');
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally { setBusy(false); }
-  };
+  // An empty host means "not in this room" and saves as a clear.
+  const f = useDraft(toPpDraft(initial), async (d) =>
+    toPpDraft(await saveProPresenter(
+      roomId,
+      d.host.trim()
+        ? {
+            host: d.host,
+            port: d.port === '' ? undefined : Number(d.port),
+            timer: d.timer || undefined,
+          }
+        : null,
+    )));
+  const { draft } = f;
 
   return (
-    <div className="pctypes">
-      <div className="campuses__head">
-        <h3 className="pctypes__title">ProPresenter
-          <HelpTip text="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter." />
-        </h3>
-        <button className="btn btn--primary" onClick={save} disabled={!dirty || busy}>
-          {busy ? 'Saving…' : dirty ? 'Save ProPresenter' : 'Saved'}
-        </button>
-      </div>
-
-      <div className="campuses__tile">
-        <label className="lfield campuses__grow"><span>Host</span>
+    <EditorSection
+      title="ProPresenter"
+      help="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter."
+      saveLabel="Save ProPresenter"
+      form={f}
+    >
+      <FormRow>
+        <Field label="Host" width="grow">
           <input className="field" placeholder="e.g. 192.0.2.74" value={draft.host}
-            onChange={(e) => set({ host: e.target.value })} />
-        </label>
-        <label className="lfield"><span>Port</span>
-          <input className="field campuses__tileport" inputMode="numeric" placeholder="62202"
-            value={draft.port} onChange={(e) => set({ port: e.target.value })} />
-        </label>
-        <label className="lfield campuses__grow"><span>Countdown timer</span>
+            onChange={(e) => f.patch({ host: e.target.value })} />
+        </Field>
+        <Field label="Port" width="sm">
+          <input className="field" inputMode="numeric" placeholder="62202"
+            value={draft.port} onChange={(e) => f.patch({ port: e.target.value })} />
+        </Field>
+        <Field label="Countdown timer" width="grow">
           <input className="field" placeholder="First countdown timer" value={draft.timer}
-            onChange={(e) => set({ timer: e.target.value })} />
-        </label>
-      </div>
-
-      {err && <p className="settings__error">{err}</p>}
-      {msg && <p className="settings__ok">{msg}</p>}
-    </div>
+            onChange={(e) => f.patch({ timer: e.target.value })} />
+        </Field>
+      </FormRow>
+    </EditorSection>
   );
 }
