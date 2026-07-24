@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRooms, getRoomService, type RoomMeta, type ServicePlan } from '../api';
 import { inCampus, useCampus } from '../layout/campus';
+import { roomLabel, useChurch } from '../layout/church';
 
 const REFRESH_MS = 5 * 60 * 1000;
 
@@ -27,6 +28,7 @@ function fmtTimes(plan: ServicePlan) {
 // page (times, plan notes, startup checklist) — the operational front door.
 export function Services() {
   const { campusId } = useCampus();
+  const church = useChurch();
   const [events, setEvents] = useState<EventRow[] | null>(null);
   const [anyLive, setAnyLive] = useState(false);
 
@@ -107,7 +109,7 @@ export function Services() {
                   <span className="svc__type-name eventrow__type">{plan.serviceTypeName}</span>
                 </div>
                 <div className="eventrow__meta">
-                  {room.name}
+                  {roomLabel(room.name, room.site, church, campusId)}
                   {plan.seriesTitle ? ` · ${plan.seriesTitle}` : ''}
                 </div>
               </div>

@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
+  CalendarRange,
   CircleUser,
   ClipboardList,
   MonitorCog,
@@ -28,6 +29,7 @@ import logoUrl from '../assets/logo.png';
 const NAV = [
   { to: '/', label: 'Home', icon: HomeIcon, end: true },
   { to: '/services', label: 'Services', icon: CalendarDays },
+  { to: '/calendar', label: 'Calendar', icon: CalendarRange },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/admin/general', label: 'Admin', icon: Wrench },
 ];

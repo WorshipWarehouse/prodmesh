@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
 import { Home } from './pages/Home';
 import { Services } from './pages/Services';
+import { Calendar } from './pages/Calendar';
 import { Analytics } from './pages/Analytics';
 import { RoomStatus } from './pages/RoomStatus';
 import { EventDetail } from './pages/EventDetail';
@@ -17,6 +18,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/admin" element={<Navigate to="/admin/general" replace />} />
         <Route path="/admin/general" element={<Settings section="general" />} />
