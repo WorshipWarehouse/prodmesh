@@ -1419,8 +1419,8 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
 
       {conn && !conn.hasServerRoom && (
         <p className="settings__muted">
-          No server integration entry exists for room id <code>{roomId}</code> yet —
-          integrations are wired per room in <code>server/rooms.config.js</code>.
+          The server doesn't know a room <code>{roomId}</code> — save the campus
+          configuration above, then reload this page.
         </p>
       )}
 

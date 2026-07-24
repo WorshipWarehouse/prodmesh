@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 
-import { rooms } from './rooms.config.js';
+import { rooms, rebuildRooms } from './roomsStore.js';
 import { readCustomVariable, pressButton } from './companion.js';
 import { publicRoom, rawToModeId } from './roomModel.js';
 import { validateRooms } from './validate.js';
@@ -77,8 +77,8 @@ function auditSuccess(req, action, context = {}) {
 }
 
 // In-memory state used when a room is in mock mode or Companion is unreachable.
+// Lazily keyed (?? 'standby' at reads) so rooms created after boot just work.
 const mockState = Object.create(null);
-for (const id of Object.keys(rooms)) mockState[id] = 'standby';
 
 const app = express();
 app.use(express.json());
@@ -713,6 +713,12 @@ app.get('/api/config', (_req, res) => {
 app.put('/api/config', requirePermission('config.manage'), (req, res) => {
   try {
     const stored = appConfig.replaceChurch(req.body);
+    // Topology edits become real server rooms immediately: rebuild the live
+    // map, re-apply stored connectivity onto the (possibly new) room objects,
+    // and reconcile per-room watchers/shows with the result.
+    rebuildRooms();
+    connectivity.applyConnectivity();
+    show.syncAutomation();
     auditSuccess(req, 'config.manage', {
       resourceType: 'topology',
       details: {
@@ -749,7 +755,11 @@ app.get('/api/config/rooms/:roomId/connectivity', (req, res) => {
     planningCenter: connectivity.getPlanningCenter(req.params.roomId) ?? { serviceTypes: [] },
     analysis: redactAnalysis(connectivity.getAnalysis(req.params.roomId)),
     proPresenter: connectivity.getProPresenter(req.params.roomId),
-    companion: connectivity.getCompanion(req.params.roomId),
+    // A room with no stored row yet (created in Admin → Campuses) shows its
+    // live defaults so the editor opens pre-filled rather than unsavable.
+    companion:
+      connectivity.getCompanion(req.params.roomId) ??
+      connectivity.companionFromRoom(rooms[req.params.roomId]),
   });
 });
 

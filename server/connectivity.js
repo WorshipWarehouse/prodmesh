@@ -25,7 +25,7 @@
 //  onConnectivityChange listeners, which restart any affected watcher.
 // ─────────────────────────────────────────────────────────────────────────────
 import { getDb } from './db.js';
-import { rooms } from './rooms.config.js';
+import { rooms } from './roomsStore.js';
 import { SOURCES } from './integrations/analysis.js';
 
 const PC = 'planningCenter';
@@ -243,6 +243,19 @@ export function setCompanion(roomId, config) {
   return clean;
 }
 
+/** A room's effective Companion config in stored-blob shape — used to seed
+ *  first boots and to show a room that has no row yet (a room created in
+ *  Admin → Campuses) with its live defaults ready to edit. */
+export function companionFromRoom(room) {
+  return {
+    mock: Boolean(room.mock),
+    ...(room.companion?.host ? { host: room.companion.host } : {}),
+    ...(room.companion?.port != null ? { port: room.companion.port } : {}),
+    ...(room.state?.variable ? { variable: room.state.variable } : {}),
+    modes: room.modes,
+  };
+}
+
 // Companion is stored as one blob but lives on four legacy room keys.
 function applyCompanion(room, stored) {
   room.mock = stored.mock;
@@ -310,13 +323,7 @@ function seedIfEmpty() {
         : null,
     [ANALYSIS]: (room) => room.analysis ?? null,
     [PP]: (room) => room.proPresenter ?? null,
-    [COMPANION]: (room) => ({
-      mock: Boolean(room.mock),
-      ...(room.companion?.host ? { host: room.companion.host } : {}),
-      ...(room.companion?.port != null ? { port: room.companion.port } : {}),
-      ...(room.state?.variable ? { variable: room.state.variable } : {}),
-      modes: room.modes,
-    }),
+    [COMPANION]: companionFromRoom,
   };
   for (const integration of INTEGRATIONS) {
     const key = `connectivity_seeded:${integration}`;

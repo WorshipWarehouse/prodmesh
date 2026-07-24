@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 process.env.PRODMESH_DATA_DIR ??= mkdtempSync(join(tmpdir(), 'prodmesh-conn-'));
 process.env.PRODMESH_LOCAL_TEST = '1'; // include the dev room in the map
-const { rooms } = await import('./rooms.config.js');
+const { rooms } = await import('./roomsStore.js');
 const conn = await import('./connectivity.js');
 
 test('first boot seeds service types from rooms.config.js', () => {
