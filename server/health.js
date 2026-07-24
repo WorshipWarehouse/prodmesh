@@ -17,6 +17,17 @@
 
 const integrations = new Map(); // key → { lastSuccess, lastError, consecutiveFailures }
 
+/**
+ * Register a configured integration before it's ever contacted, so the health
+ * surface lists everything that SHOULD be reachable — not just what happened
+ * to be used since boot. A declared-but-uncontacted entry reports ok: null.
+ */
+export function declare(key) {
+  if (!integrations.has(key)) {
+    integrations.set(key, { lastSuccess: null, lastError: null, consecutiveFailures: 0 });
+  }
+}
+
 /** Record one real request's outcome for an integration key. */
 export function report(key, ok, errorMessage) {
   let e = integrations.get(key);
@@ -44,9 +55,9 @@ export function snapshot() {
   const out = {};
   for (const [key, e] of integrations) {
     out[key] = {
-      // ok = the latest report was a success — i.e. lastSuccess is newer than
-      // lastError (lastError is kept after recovery as outage history).
-      ok: e.consecutiveFailures === 0,
+      // ok = the latest report was a success (lastError is kept after
+      // recovery as outage history). null = declared but never contacted yet.
+      ok: e.lastSuccess == null && e.lastError == null ? null : e.consecutiveFailures === 0,
       lastSuccess: e.lastSuccess,
       lastError: e.lastError,
       consecutiveFailures: e.consecutiveFailures,

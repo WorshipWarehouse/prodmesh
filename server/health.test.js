@@ -178,3 +178,30 @@ test('a caller abort is not a ProPresenter failure', async () => {
     await srv.close();
   }
 });
+
+// ── Boot declarations (every configured integration appears immediately) ─────
+
+test('declareConfiguredIntegrations lists configured-but-uncontacted integrations as ok:null', async () => {
+  health.reset();
+  const { declareConfiguredIntegrations } = await import('./healthBootstrap.js');
+  declareConfiguredIntegrations();
+  const snap = health.snapshot();
+
+  // Seeded rooms carry real ProPresenter/Companion/analysis hosts — they must
+  // all be present before anything has talked to them.
+  const kinds = Object.keys(snap).map((k) => k.split('@')[0]);
+  assert.ok(kinds.includes('proPresenter'), 'ProPresenter declared');
+  assert.ok(kinds.includes('companion'), 'Companion declared');
+  assert.ok(kinds.includes('analysis'), 'analysis (Smaart/RTA) declared');
+  for (const [key, e] of Object.entries(snap)) {
+    assert.equal(e.ok, null, `${key} is declared but uncontacted`);
+    assert.equal(e.lastSuccess, null);
+    assert.equal(e.lastError, null);
+  }
+
+  // A report on a declared key flips it to a real status.
+  const anyKey = Object.keys(snap)[0];
+  health.report(anyKey, true);
+  assert.equal(health.snapshot()[anyKey].ok, true);
+  health.reset();
+});

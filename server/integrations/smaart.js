@@ -40,7 +40,7 @@ import { report } from '../health.js';
 export const isConfigured = (cfg) => Boolean(cfg && (cfg.mock || cfg.host));
 
 // Health key shared with rta.js — both are the room's "analysis" source.
-const healthKey = (cfg) => `analysis@${cfg.host}:${cfg.port ?? 26000}`;
+export const healthKey = (cfg) => `analysis@${cfg.host}:${cfg.port ?? 26000}`;
 
 const RETRY_MS = 5000;
 const RPC_TIMEOUT_MS = 8000;
