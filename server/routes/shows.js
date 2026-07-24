@@ -31,7 +31,13 @@ router.get('/api/rooms/:id/show', (req, res) => res.json(show.getState(req.param
 router.post('/api/rooms/:id/show/start', requirePermission('shows.operate'), async (req, res) => {
   if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
   try {
-    res.json(await show.startShow(req.params.id, req.body?.planId, String(req.body?.timeId || 'default')));
+    // A rehearsal runs the full show machinery under its own synthetic
+    // timeId, so it never overwrites the real service's timeline and is
+    // identifiable (and excludable from aggregates) by the prefix alone.
+    const timeId = req.body?.rehearsal
+      ? `rehearsal-${Date.now()}`
+      : String(req.body?.timeId || 'default');
+    res.json(await show.startShow(req.params.id, req.body?.planId, timeId));
   } catch (err) {
     res.status(err.code === 'conflict' ? 409 : 400).json({ error: String(err.message ?? err) });
   }

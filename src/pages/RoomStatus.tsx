@@ -1,19 +1,69 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Lock, Wifi, WifiOff } from 'lucide-react';
+import { Lock, Radio, Wifi, WifiOff } from 'lucide-react';
 import {
   getRoom,
+  getRoomPlan,
   getRoomState,
+  getShow,
   setRoomMode,
   OverrideRequiredError,
   type RoomMeta,
   type RoomMode,
   type RoomState,
 } from '../api';
+import { useQuery } from '../lib/useQuery';
 import { Widget, WidgetGrid } from '../components/Widget';
 import { ServicePanel } from '../components/ServicePanel';
 
 const POLL_MS = 4000;
+
+// When a show is live in this room, say so LOUDLY: which service, since when,
+// and one tap to the live Run of Show. (The Home tile already shows LIVE —
+// this is the page that tile lands on, so it must carry the thread.)
+function LiveBanner({ roomId }: { roomId: string }) {
+  const show = useQuery(`show:${roomId}`, () => getShow(roomId), { pollMs: 5000, staleMs: 2000 });
+  const active = show.data?.active ? show.data : null;
+  const planQ = useQuery(
+    active?.planId ? `plan:${roomId}:${active.planId}` : null,
+    () => getRoomPlan(roomId, active!.planId!),
+    { staleMs: 10 * 60_000 },
+  );
+  if (!active) return null;
+
+  const plan = planQ.data?.plan;
+  const time = plan?.times.find((t) => t.id === active.timeId) ?? null;
+  const timeLabel = active.timeId?.startsWith('rehearsal')
+    ? 'Rehearsal'
+    : time
+      ? [time.name, time.startsAt ? new Date(time.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : null]
+          .filter(Boolean)
+          .join(' · ')
+      : null;
+  const startedAt = active.startedAt
+    ? new Date(active.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : null;
+
+  return (
+    <div className="livebar">
+      <span className="livebar__badge">
+        <Radio size={15} /> LIVE
+      </span>
+      <span className="livebar__what">
+        <span className="livebar__title">{plan?.title ?? 'Show in progress'}</span>
+        <span className="livebar__meta">
+          {[timeLabel, startedAt ? `started ${startedAt}` : null].filter(Boolean).join(' · ')}
+        </span>
+      </span>
+      <Link
+        className="btn btn--primary livebar__go"
+        to={`/room/${roomId}/run/${active.planId}${active.timeId && active.timeId !== 'default' ? `?time=${active.timeId}` : ''}`}
+      >
+        Open Run of Show
+      </Link>
+    </div>
+  );
+}
 
 export function RoomStatus() {
   const { roomId = '' } = useParams();
@@ -115,6 +165,8 @@ export function RoomStatus() {
           <p className="pagehead__sub">Room Status</p>
         </div>
       </div>
+
+      <LiveBanner roomId={roomId} />
 
       {showProtection && (
         <div className="protbar">

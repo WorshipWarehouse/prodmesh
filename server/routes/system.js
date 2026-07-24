@@ -13,8 +13,9 @@ import * as summaries from '../showSummaries.js';
 import * as show from '../showManager.js';
 import * as settings from '../settings.js';
 import * as auth from '../authStore.js';
+import * as splStore from '../splStore.js';
 import * as health from '../health.js';
-import { requirePermission } from '../httpAuth.js';
+import { requirePermission, auditSuccess } from '../httpAuth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -78,6 +79,7 @@ router.get('/api/history', async (_req, res) => {
       startedAt: row.startedAt,
       completedAt: row.completedAt,
       itemCount: row.itemCount,
+      rehearsal: Boolean(row.timeId?.startsWith('rehearsal-')),
       totals: {
         planned: row.plannedSeconds,
         actual: row.actualSeconds,
@@ -89,6 +91,24 @@ router.get('/api/history', async (_req, res) => {
     };
   });
   res.json({ shows });
+});
+
+// Erase a recorded run (accidental start, invalid rehearsal). Removes the
+// timeline JSON, the SPL samples, and the summary row — irreversible, so it's
+// permission-gated, audited, and refused while that instance is live.
+router.delete('/api/history/:instanceId', requirePermission('history.delete'), (req, res) => {
+  const { instanceId } = req.params;
+  if (show.activeInstanceIds().includes(instanceId)) {
+    return res.status(409).json({ error: 'That show is live right now — end it first' });
+  }
+  if (!summaries.get(instanceId) && !timeline.get(instanceId)) {
+    return res.status(404).json({ error: 'Unknown show instance' });
+  }
+  timeline.remove(instanceId);
+  splStore.removeInstance(instanceId);
+  summaries.remove(instanceId);
+  auditSuccess(req, 'history.delete', { resourceType: 'show-instance', resourceId: instanceId });
+  res.json({ ok: true });
 });
 
 // ── System (version + self-update) ─────────────────────────────────────────────

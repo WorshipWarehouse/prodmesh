@@ -239,13 +239,18 @@ router.get('/api/rooms/:id/service', async (req, res) => {
   }
   try {
     const plans = await upcomingForRoom(room.planningCenter, 3);
-    if (plans[0]) {
-      const st = stOf(plans[0]);
-      [plans[0].times, plans[0].items] = await Promise.all([
-        pco.getPlanTimes(st, plans[0].id),
-        pco.getPlanItems(st, plans[0].id),
-      ]);
-    }
+    // Times for EVERY plan (the Services page shows each row's date/times);
+    // the order-of-service items only for the next one, which is all the
+    // preview uses. Times are TTL-cached per plan, so this stays cheap.
+    await Promise.all(
+      plans.map(async (plan, i) => {
+        const st = stOf(plan);
+        [plan.times, plan.items] = await Promise.all([
+          pco.getPlanTimes(st, plan.id),
+          i === 0 ? pco.getPlanItems(st, plan.id) : Promise.resolve([]),
+        ]);
+      }),
+    );
     res.json({ configured: true, live: pco.isConfigured(), plans });
   } catch (err) {
     res.status(502).json({ configured: true, live: pco.isConfigured(), plans: [], error: String(err.message ?? err) });

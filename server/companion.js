@@ -15,7 +15,7 @@ function baseUrl(companion) {
 
 // Health is keyed by the machine we actually talked to (mock rooms never
 // reach this module, so they never report).
-const healthKey = (companion) => `companion@${companion.host}:${companion.port ?? 8000}`;
+export const healthKey = (companion) => `companion@${companion.host}:${companion.port ?? 8000}`;
 
 /** Read a Companion custom variable; returns the raw string value. */
 export async function readCustomVariable(companion, name) {

@@ -119,6 +119,11 @@ export function syncFromTimelines() {
   if (built) console.log(`[summaries] backfilled ${built} show summaries from timelines`);
 }
 
+/** Erase a summary row (deleting a recorded show). */
+export function remove(instanceId) {
+  getDb().prepare('DELETE FROM show_summaries WHERE instance_id = ?').run(instanceId);
+}
+
 /** Test hook: allow syncFromTimelines to run again. */
 export function resetSyncFlag() {
   synced = false;

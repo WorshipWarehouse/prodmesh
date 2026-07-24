@@ -27,7 +27,7 @@ import { report } from '../health.js';
 export const isConfigured = (cfg) => Boolean(cfg && cfg.host);
 
 // Health key shared with smaart.js — both are the room's "analysis" source.
-const healthKey = (cfg) => `analysis@${cfg.host}:${cfg.port ?? 8517}`;
+export const healthKey = (cfg) => `analysis@${cfg.host}:${cfg.port ?? 8517}`;
 
 const RETRY_MS = 5000;
 const CONNECT_TIMEOUT_MS = 8000;

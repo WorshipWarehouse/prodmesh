@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart3,
+  BellRing,
+  BookOpen,
   Building2,
   CalendarDays,
   CalendarRange,
+  CircleHelp,
   CircleUser,
   ClipboardList,
   MonitorCog,
@@ -17,7 +20,7 @@ import {
   PanelLeftOpen,
   Wrench,
 } from 'lucide-react';
-import { getAbout, getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
+import { getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { ChurchContext, EMPTY_CHURCH } from './church';
 import type { Church } from '../types';
@@ -55,16 +58,16 @@ export function AppShell() {
   const [campusId, setCampusId] = useState(
     () => localStorage.getItem('prodmesh.campus') ?? ALL_CAMPUSES,
   );
-  const [version, setVersion] = useState('');
   const [church, setChurch] = useState<Church>(EMPTY_CHURCH);
   const [identity, setIdentity] = useState<AuthStatus | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+  const helpRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getAbout().then((a) => setVersion(a.version)).catch(() => {});
     getAuthStatus().then((s) => {
       setIdentity(s);
       if (!s.station) setIdentityOpen(true);
@@ -81,12 +84,16 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
-    if (!accountOpen) return;
+    if (!accountOpen && !helpOpen) return;
     const dismiss = (event: PointerEvent) => {
-      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+      if (accountOpen && !accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+      if (helpOpen && !helpRef.current?.contains(event.target as Node)) setHelpOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAccountOpen(false);
+      if (event.key === 'Escape') {
+        setAccountOpen(false);
+        setHelpOpen(false);
+      }
     };
     document.addEventListener('pointerdown', dismiss);
     document.addEventListener('keydown', escape);
@@ -94,7 +101,7 @@ export function AppShell() {
       document.removeEventListener('pointerdown', dismiss);
       document.removeEventListener('keydown', escape);
     };
-  }, [accountOpen]);
+  }, [accountOpen, helpOpen]);
 
   useEffect(() => {
     const open = () => setIdentityOpen(true);
@@ -199,6 +206,31 @@ export function AppShell() {
           </nav>
 
           <div className="sidebar__foot">
+            {/* Help lives at the bottom, above the clock. Both entries are
+                placeholders for now: docs are being written, and Request
+                Assistance will ping the team Slack via webhook (the Lowe's
+                aisle-button model) once that's configured. */}
+            <div className="sidebar__help" ref={helpRef}>
+              <button
+                className="sidebar__toggle"
+                title="Help"
+                onClick={() => setHelpOpen((open) => !open)}
+                aria-expanded={helpOpen}
+              >
+                <CircleHelp size={17} />
+                <span className="sidebar__label rail-hide">Help</span>
+              </button>
+              {helpOpen && (
+                <div className="accountmenu helpmenu">
+                  <button disabled title="Documentation is being written">
+                    <BookOpen size={14} /> Documentation <small>coming soon</small>
+                  </button>
+                  <button disabled title="Will notify the tech team in Slack">
+                    <BellRing size={14} /> Request assistance <small>coming soon</small>
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="sidebar__clock rail-hide">
               <Clock compact />
             </div>
@@ -215,7 +247,7 @@ export function AppShell() {
                 )}
                 <div className="sidebar__label rail-hide">
                   <span className="sidebar__username">{operatorName}</span>
-                  <span className="sidebar__version">{stationName}{version ? ` · v${version}` : ''}</span>
+                  <span className="sidebar__version">{stationName}</span>
                 </div>
               </button>
               {accountOpen && identity?.authenticated && (

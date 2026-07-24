@@ -101,8 +101,10 @@ function withTimeout(signal, ms = 3000) {
 
 // All reads funnel through here; the room isn't known at this depth, so health
 // is keyed by the machine we actually talked to.
+export const healthKey = (pp) => `proPresenter@${pp.host}:${pp.port ?? DEFAULT_PORT}`;
+
 async function ppGet(pp, path, signal) {
-  const key = `proPresenter@${pp.host}:${pp.port ?? DEFAULT_PORT}`;
+  const key = healthKey(pp);
   try {
     const res = await fetch(`${baseUrl(pp)}${path}`, { signal: withTimeout(signal) });
     if (!res.ok) throw new Error(`ProPresenter ${res.status}`);

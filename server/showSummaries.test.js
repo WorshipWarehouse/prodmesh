@@ -129,3 +129,81 @@ test('pruned SPL samples: report falls back to the summary aggregate', async () 
   // Recent samples survived the prune.
   assert.equal(splStore.aggregate(INST).count, 3);
 });
+
+test('rehearsal start records under a synthetic rehearsal timeId, flagged in history', async () => {
+  // A user with shows.operate, since /show/start is permission-gated.
+  const auth = await import('./authStore.js');
+  const group = auth.createGroup({ name: 'Show Runners', permissions: ['shows.operate'] });
+  auth.createUser({ username: 'runner', displayName: 'Runner', pin: '1357', groupIds: [group.id] });
+  const station = auth.registerStation({ name: 'Summaries Test Station' });
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Prodmesh-Station': station.token },
+    body: JSON.stringify({ username: 'runner', pin: '1357' }),
+  });
+  const { token } = await login.json();
+  const authed = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Prodmesh-Station': station.token };
+
+  const started = await fetch(`${base}/api/rooms/${ROOM}/show/start`, {
+    method: 'POST',
+    headers: authed,
+    body: JSON.stringify({ planId: 'plan-sum', timeId: 'time-1', rehearsal: true }),
+  });
+  assert.equal(started.status, 200);
+  const state = await started.json();
+  assert.match(state.timeId, /^rehearsal-\d+$/); // NOT the service's time-1
+  assert.equal(state.active, true);
+
+  const ended = await fetch(`${base}/api/rooms/${ROOM}/show/end`, { method: 'POST', headers: authed });
+  assert.equal(ended.status, 200);
+
+  const { shows } = await (await fetch(`${base}/api/history`)).json();
+  const rehearsalRow = shows.find((s) => s.timeId === state.timeId);
+  assert.equal(rehearsalRow.rehearsal, true);
+  assert.ok(rehearsalRow.completedAt, 'rehearsal completes like any show');
+  // The real service instance from the earlier tests is untouched and unflagged.
+  const serviceRow = shows.find((s) => s.instanceId === INST);
+  assert.equal(serviceRow.rehearsal, false);
+  assert.equal(serviceRow.totals.planned, 90);
+});
+
+test('DELETE /api/history/:instanceId erases a run (gated, audited, refuses live shows)', async () => {
+  const auth = await import('./authStore.js');
+  const splStore2 = await import('./splStore.js');
+  const group = auth.createGroup({ name: 'Historians', permissions: ['history.delete', 'shows.operate'] });
+  auth.createUser({ username: 'historian', displayName: 'Historian', pin: '2460', groupIds: [group.id] });
+  const station = auth.registerStation({ name: 'Delete Test Station' });
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Prodmesh-Station': station.token },
+    body: JSON.stringify({ username: 'historian', pin: '2460' }),
+  });
+  const { token } = await login.json();
+  const authed = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Prodmesh-Station': station.token };
+
+  // No permission → denied (station-only identity).
+  const anon = await fetch(`${base}/api/history/plan-old__default`, { method: 'DELETE' });
+  assert.equal(anon.status, 401);
+
+  // A live show's instance is protected.
+  const started = await (await fetch(`${base}/api/rooms/${ROOM}/show/start`, {
+    method: 'POST', headers: authed, body: JSON.stringify({ planId: 'plan-live', timeId: 'now' }),
+  })).json();
+  assert.equal(started.active, true);
+  const liveDel = await fetch(`${base}/api/history/plan-live__now`, { method: 'DELETE', headers: authed });
+  assert.equal(liveDel.status, 409);
+  await fetch(`${base}/api/rooms/${ROOM}/show/end`, { method: 'POST', headers: authed });
+
+  // Deleting an ended run removes timeline + samples + summary + history row.
+  const del = await fetch(`${base}/api/history/plan-old__default`, { method: 'DELETE', headers: authed });
+  assert.equal(del.status, 200);
+  assert.equal(summaries.get('plan-old__default'), null);
+  assert.equal(timeline.get('plan-old__default'), null);
+  assert.equal(splStore2.aggregate('plan-old__default'), null);
+  const { shows } = await (await fetch(`${base}/api/history`)).json();
+  assert.ok(!shows.some((s) => s.instanceId === 'plan-old__default'));
+
+  // Deleting it again → 404.
+  const again = await fetch(`${base}/api/history/plan-old__default`, { method: 'DELETE', headers: authed });
+  assert.equal(again.status, 404);
+});

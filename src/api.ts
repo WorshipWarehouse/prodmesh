@@ -755,8 +755,17 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const startShow = (roomId: string, planId: string, timeId: string) =>
-  postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/start`, { planId, timeId });
+export const startShow = (
+  roomId: string,
+  planId: string,
+  timeId: string,
+  opts?: { rehearsal?: boolean },
+) =>
+  postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/start`, {
+    planId,
+    timeId,
+    ...(opts?.rehearsal ? { rehearsal: true } : {}),
+  });
 
 export const endShow = (roomId: string) =>
   postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/end`, {});
@@ -785,9 +794,20 @@ export interface HistoryShow {
   itemCount: number;
   totals: { planned: number; actual: number; delta: number };
   spl: SplReport | null;
+  /** True for practice runs (timeId `rehearsal-*`) — excluded from real-service metrics. */
+  rehearsal: boolean;
 }
 
 export const getHistory = () => getJson<{ shows: HistoryShow[] }>('/api/history');
+
+/** Erase a recorded run (timing + loudness). Irreversible; requires history.delete. */
+export async function deleteHistoryShow(instanceId: string): Promise<void> {
+  const res = await fetch(`/api/history/${encodeURIComponent(instanceId)}`, {
+    method: 'DELETE',
+    headers: requestHeaders(),
+  });
+  await requireOk(res);
+}
 
 // ── Planning Center Calendar (room bookings) ─────────────────────────────────
 

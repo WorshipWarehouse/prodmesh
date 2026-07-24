@@ -162,8 +162,9 @@ function CaGauge({ ca }: { ca: NonNullable<SplState['ca']> }) {
 
 export function RunOfShow() {
   const { roomId = '', planId = '' } = useParams();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const timeId = params.get('time') || 'default';
+  const isRehearsal = timeId.startsWith('rehearsal-');
 
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [plan, setPlan] = useState<ServicePlan | null>(null);
@@ -239,6 +240,21 @@ export function RunOfShow() {
     }
   };
   const pick = (itemId: string) => act(() => setShowCurrent(roomId, { itemId }));
+
+  // A rehearsal gets its own synthetic timeId from the server; adopting it
+  // into the URL makes this page (and its report link) track that instance.
+  const startRehearsal = async () => {
+    setBusy(true);
+    try {
+      const next = await startShow(roomId, planId, timeId, { rehearsal: true });
+      setState(next);
+      if (next.timeId) setParams({ time: next.timeId }, { replace: true });
+    } catch {
+      /* SSE will reconcile */
+    } finally {
+      setBusy(false);
+    }
+  };
   const step = (delta: number) => {
     const n = idx < 0 ? (delta > 0 ? 0 : -1) : idx + delta;
     if (n >= 0 && n < trackable.length) pick(trackable[n].id);
@@ -287,12 +303,18 @@ export function RunOfShow() {
                   <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
                     Reopen show
                   </button>
+                  <button className="btn btn--ghost btn--sm" disabled={busy} onClick={startRehearsal} title="Practice run — records timing under its own instance, never against the service">
+                    Start Rehearsal
+                  </button>
                 </>
               ) : (
                 <>
                   <span className="ros-track__status ros-track__status--idle">No show running</span>
                   <button className="btn btn--primary" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
                     <Play size={15} /> Start Show
+                  </button>
+                  <button className="btn btn--ghost btn--sm" disabled={busy} onClick={startRehearsal} title="Practice run — records timing under its own instance, never against the service">
+                    Start Rehearsal
                   </button>
                 </>
               )}
@@ -305,6 +327,7 @@ export function RunOfShow() {
                 }`}
               >
                 <span>
+                  {isRehearsal && <span className="ros-rehearsal">Rehearsal</span>}
                   {ppConnected == null ? (
                     'connecting to ProPresenter…'
                   ) : !ppConnected ? (

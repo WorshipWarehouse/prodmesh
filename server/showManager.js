@@ -298,6 +298,10 @@ function persistShow(show) {
     startedAt: show.startedAt,
     startedLogging: show.startedLogging ?? false,
     status: 'active',
+    // The hydrated order of service, so a mid-show server restart during a
+    // Planning Center outage restores with its item list intact (PP→item
+    // mapping and timing capture keep working).
+    items: show.items,
   });
 }
 
@@ -317,9 +321,14 @@ async function findPlan(room, planId) {
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
-async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = false } = {}) {
+async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = false, fallbackItems = [] } = {}) {
   const room = rooms[roomId];
   if (!room) throw new Error('Unknown room');
+
+  // Base identity first, unconditionally — even if the plan can't be resolved
+  // (PC down, plan aged out), the timeline and its history row still know
+  // whose show this was. Labels are layered on below when the plan is found.
+  timeline.ensure(`${planId}__${timeId}`, { roomId, planId, timeId });
 
   let items = [];
   try {
@@ -346,6 +355,15 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
     }
   } catch {
     /* items stay [] */
+  }
+
+  // Plan unavailable (PCO outage, plan aged out) but we have a persisted copy
+  // from when this show originally started — run on that instead of nothing.
+  if (!items.length && fallbackItems.length) {
+    items = fallbackItems;
+    console.log(
+      `[show] ${roomId}: Planning Center unavailable — using persisted order of service (${items.length} items)`,
+    );
   }
 
   const show = {
@@ -655,6 +673,7 @@ export async function restoreShows() {
       if (meta.status === 'active' && meta.roomId && meta.planId && !shows.has(meta.roomId)) {
         await beginShow(meta.roomId, meta.planId, meta.timeId ?? 'default', meta.startedAt ?? Date.now(), {
           startedLogging: Boolean(meta.startedLogging),
+          fallbackItems: Array.isArray(meta.items) ? meta.items : [],
         });
       }
     } catch {

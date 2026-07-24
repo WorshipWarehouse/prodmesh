@@ -9,6 +9,8 @@ const api = vi.hoisted(() => ({
   getRoom: vi.fn(),
   getRoomState: vi.fn(),
   setRoomMode: vi.fn(),
+  getShow: vi.fn(),
+  getRoomPlan: vi.fn(),
 }));
 
 // Partial mock: OverrideRequiredError must be the REAL class so the page's
@@ -24,6 +26,7 @@ vi.mock('../components/ServicePanel', () => ({
 }));
 
 import { OverrideRequiredError } from '../api';
+import { clearQueryCache } from '../lib/useQuery';
 
 const room: RoomMeta = {
   id: 'north-main',
@@ -68,9 +71,21 @@ function renderPage() {
 const dialog = () => screen.getByRole('dialog');
 
 beforeEach(() => {
+  clearQueryCache();
   api.getRoom.mockResolvedValue(room);
   api.getRoomState.mockResolvedValue(baseState);
   api.setRoomMode.mockReset();
+  api.getShow.mockReset();
+  api.getShow.mockResolvedValue({ active: false });
+  api.getRoomPlan.mockReset();
+  api.getRoomPlan.mockResolvedValue({
+    live: true,
+    plan: {
+      id: 'plan-1', serviceTypeId: 'st', serviceTypeName: 'Sunday', title: 'July 27 Service',
+      seriesTitle: null, dates: 'July 27', sortDate: null, items: [],
+      times: [{ id: 't-svc', name: '1st Service', startsAt: '2026-07-26T16:00:00Z', endsAt: null, type: 'service' }],
+    },
+  });
 });
 
 describe('mode buttons', () => {
@@ -117,6 +132,40 @@ describe('mode buttons', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(api.setRoomMode).not.toHaveBeenCalled();
+  });
+});
+
+describe('live-show banner', () => {
+  it('is absent when no show is running', async () => {
+    renderPage();
+    await screen.findByText('Companion live');
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument();
+  });
+
+  it('announces the live service with its time and links to the Run of Show', async () => {
+    api.getShow.mockResolvedValue({
+      active: true, roomId: 'north-main', planId: 'plan-1', timeId: 't-svc',
+      startedAt: new Date('2026-07-26T15:58:00Z').getTime(),
+    });
+    renderPage();
+
+    expect(await screen.findByText('LIVE')).toBeInTheDocument();
+    expect(await screen.findByText('July 27 Service')).toBeInTheDocument();
+    expect(screen.getByText(/1st Service/)).toBeInTheDocument();
+    expect(screen.getByText(/started/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Run of Show' }))
+      .toHaveAttribute('href', '/room/north-main/run/plan-1?time=t-svc');
+  });
+
+  it('falls back gracefully when the plan is no longer fetchable', async () => {
+    api.getShow.mockResolvedValue({ active: true, planId: 'plan-old', timeId: 'default' });
+    api.getRoomPlan.mockRejectedValue(new Error('Plan not found'));
+    renderPage();
+
+    expect(await screen.findByText('LIVE')).toBeInTheDocument();
+    expect(screen.getByText('Show in progress')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Run of Show' }))
+      .toHaveAttribute('href', '/room/north-main/run/plan-old');
   });
 });
 

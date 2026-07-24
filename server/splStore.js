@@ -66,6 +66,11 @@ export function runningStats(instanceId) {
   };
 }
 
+/** Erase one instance's samples (deleting a recorded show). */
+export function removeInstance(instanceId) {
+  return getDb().prepare('DELETE FROM spl_samples WHERE instance_id = ?').run(instanceId).changes;
+}
+
 // ── Retention ─────────────────────────────────────────────────────────────────
 // Raw samples only serve the detailed report and reopen-seeding; the show's
 // aggregate (leq/peak/ca) survives in show_summaries. Prune samples older than

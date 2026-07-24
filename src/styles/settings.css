@@ -544,13 +544,26 @@
   display: block;
 }
 
-.lfield > span {
+/* Caption only — SelectField's wrapper is ALSO a direct-child span, and
+   letting it match here gave select-lfields caption styling (block + 4px
+   margin) while input-lfields kept an inline descender gap under the
+   control: the classic input-vs-select misalignment on Campuses. */
+.lfield > span:not(.selectfield) {
   display: block;
   margin-bottom: 4px;
   color: var(--text-faint);
   font-size: 0.64rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.lfield > .selectfield {
+  display: flex; /* block-level: no inline gap, same box as an input */
+  width: 100%;
+}
+
+.lfield .field {
+  display: block; /* kill the inline-level descender gap under inputs */
 }
 
 .lfield .field,

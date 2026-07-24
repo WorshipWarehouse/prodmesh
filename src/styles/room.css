@@ -114,6 +114,66 @@
   opacity: 0.85;
 }
 
+/* Live-show banner — the loudest thing on the page while a show runs. */
+.livebar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 107, 107, 0.08);
+  border: 1px solid var(--danger-soft);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+
+.livebar__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--danger);
+  animation: live-pulse 1.6s ease-in-out infinite; /* keyframes in home.css */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .livebar__badge { animation: none; }
+}
+
+.livebar__what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.livebar__title {
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.livebar__meta {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.livebar__go {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .livebar {
+    flex-wrap: wrap;
+  }
+  .livebar__go {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 /* Protected banner */
 .protbar {
   background: var(--warn-soft);

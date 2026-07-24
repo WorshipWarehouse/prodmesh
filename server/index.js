@@ -16,6 +16,7 @@ import { validateRooms } from './validate.js';
 import * as show from './showManager.js';
 import * as splStore from './splStore.js';
 import * as summaries from './showSummaries.js';
+import { initHealthDeclarations } from './healthBootstrap.js';
 import { resolveIdentity } from './httpAuth.js';
 
 import roomsRouter from './routes/rooms.js';
@@ -63,6 +64,7 @@ if (process.argv[1] === __filename) {
   show.initAutomation(); // per-room autostart watchers (PP-driven, browserless)
   summaries.syncFromTimelines(); // legacy timelines → summary rows (one-time per boot)
   splStore.startRetention(); // prune old SPL samples now + daily
+  initHealthDeclarations(); // every configured integration appears on /api/system/health
   app.listen(PORT, () => {
     console.log(`Production dashboard server on http://localhost:${PORT}`);
   });
