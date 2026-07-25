@@ -35,6 +35,7 @@ export async function fakeProPresenter({
     timers: { defs: [], currents: [] },
     items: [], // [{ index, name }] — the playlist body (pp21 resolution path)
     focusedIndex: null, // pp21: which playlist item the UI has selected
+    totalCues: null, // PP 21.4+: total_cues in slide_index
   };
   const seen = { requests: 0, paths: [] };
   let failRemaining = 0;
@@ -117,7 +118,12 @@ export async function fakeProPresenter({
       case '/v1/presentation/slide_index':
         return json({
           presentation_index: a
-            ? { index: state.slideIndex, presentation_id: { uuid: presUuid(a.index), name: a.name } }
+            ? {
+                index: state.slideIndex,
+                presentation_id: { uuid: presUuid(a.index), name: a.name },
+                // PP 21.4+ reports the arrangement-aware total here.
+                ...(state.totalCues != null ? { total_cues: state.totalCues } : {}),
+              }
             : null,
         });
       case '/v1/presentation/active':
@@ -150,6 +156,9 @@ export async function fakeProPresenter({
     },
     setSlideCount(n) {
       state.slideCount = n;
+    },
+    setTotalCues(n) {
+      state.totalCues = n;
     },
     setTimers(defs, currents) {
       state.timers = { defs, currents };

@@ -50,6 +50,7 @@ test('readSlide fetches the current slide position', async () => {
       slideIndex: 3,
       presUuid: 'pres-4',
       presName: 'Praise',
+      totalCues: null,
     });
   } finally {
     await srv.close();
@@ -216,6 +217,34 @@ test('pollRunState tracks a PP 21 service end to end', async () => {
       'the item change with a fresh slide count',
     );
     assert.equal(states.at(-1).itemName, 'Worship Set');
+
+    ctl.abort();
+    await done;
+  } finally {
+    ctl.abort();
+    await srv.close();
+  }
+});
+
+test('pollRunState prefers PP 21.4 total_cues and skips the presentation read', async () => {
+  const srv = await fakeProPresenter({ pp21: true });
+  const ctl = new AbortController();
+  const states = [];
+  try {
+    srv.setPlaylistItems(['Riverside']);
+    srv.setActive(0, 'Riverside');
+    srv.setFocusedIndex(0);
+    srv.setSlide(1);
+    srv.setSlideCount(21); // the raw group sum — WRONG for this arrangement
+    srv.setTotalCues(35); // what PP itself says the arrangement plays
+    const done = pollRunState(pp(srv), (s) => states.push(s), ctl.signal, 30);
+
+    await waitFor(() => states.length >= 1, 'the initial state');
+    assert.equal(states[0].slideCount, 35);
+    assert.ok(
+      !srv.seen.paths.includes('/v1/presentation/active'),
+      'total_cues makes the presentation read unnecessary',
+    );
 
     ctl.abort();
     await done;
