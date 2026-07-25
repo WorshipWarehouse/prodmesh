@@ -20,13 +20,12 @@ function baseUrl(pp) {
 
 // ── Mapping (pure, tested) ────────────────────────────────────────────────────
 
-// Extract the active presentation playlist item from a /v1/playlist/active body.
-// Fields live under `playlist_item.id`; the active arrangement (which the
-// presentation's own `current_arrangement` does NOT reliably report) lives under
-// `playlist_item.presentation_info`. Both verified against the live API.
-export function parseActive(state) {
-  const p = state?.presentation ?? {};
-  const pli = p.playlist_item ?? null;
+// The playlist-item shape this module hands to callers, from a raw
+// `playlist_item` body (same nesting in /v1/playlist/active, /v1/playlist/
+// focused, and playlist item listings): fields under `.id`, the active
+// arrangement (which the presentation's own `current_arrangement` does NOT
+// reliably report) under `.presentation_info`.
+function itemShape(pli, playlistName) {
   const id = pli?.id ?? null;
   const info = pli?.presentation_info ?? {};
   return {
@@ -35,8 +34,14 @@ export function parseActive(state) {
     uuid: id?.uuid ?? null,
     arrangementUuid: info.arrangement_uuid || null,
     arrangementName: info.arrangement_name || null,
-    playlistName: p.playlist?.name ?? null,
+    playlistName: playlistName ?? null,
   };
+}
+
+// Extract the active presentation playlist item from a /v1/playlist/active body.
+export function parseActive(state) {
+  const p = state?.presentation ?? {};
+  return itemShape(p.playlist_item ?? null, p.playlist?.name ?? null);
 }
 
 const norm = (s) =>
@@ -119,9 +124,94 @@ async function ppGet(pp, path, signal) {
   }
 }
 
-/** One-shot read of the current active playlist item. */
-export async function readActive(pp, signal) {
-  return parseActive(await ppGet(pp, '/v1/playlist/active', signal));
+// Like ppGet but without health reporting — for probes where a failure is an
+// expected answer (PP 21 404s the uuid playlist route), not an outage.
+async function rawGet(pp, path, signal) {
+  const res = await fetch(`${baseUrl(pp)}${path}`, { signal: withTimeout(signal) });
+  if (!res.ok) throw new Error(`ProPresenter ${res.status}`);
+  return res.json();
+}
+
+// ── ProPresenter 21 compatibility ────────────────────────────────────────────
+//
+//  PP 21 (verified live against 21.1, 2026-07-24) broke two PP 7 behaviors
+//  this module was built on:
+//    · /v1/playlist/active answers all-null even while a presentation is live.
+//    · /v1/playlist/{uuid} no longer resolves uuids — playlists are addressed
+//      by index path ("/v1/playlist/1/0" = second root node, first child).
+//  What still works: /v1/presentation/slide_index (the active presentation's
+//  uuid), /v1/playlist/focused (a full playlist_item), and playlist bodies
+//  whose items carry presentation_info.presentation_uuid. So when `active`
+//  reads empty, we resolve the live item by its presentation uuid instead.
+
+/** Fetch a playlist body by uuid (PP 7) or, failing that, index path (PP 21). */
+async function fetchPlaylistBody(pp, ref, signal) {
+  try {
+    return await rawGet(pp, `/v1/playlist/${ref.uuid}`, signal);
+  } catch {
+    /* PP 21 — fall through to index-path addressing */
+  }
+  let path = ref.path;
+  if (!path) {
+    const all = flattenPlaylists(await ppGet(pp, '/v1/playlists', signal));
+    path = all.find((p) => p.uuid === ref.uuid)?.path;
+  }
+  if (!path) throw new Error(`playlist ${ref.uuid} not found in /v1/playlists`);
+  return ppGet(pp, `/v1/playlist/${path.join('/')}`, signal);
+}
+
+// Per-machine cache of the focused playlist's items for uuid resolution — the
+// poller asks every ~800ms and the playlist rarely changes. `missed` remembers
+// presentations that aren't in the playlist (launched from the library) so
+// they don't refetch every poll; misses retry after REFETCH_MS in case the
+// operator edited the playlist mid-show.
+const REFETCH_MS = 60_000;
+const resolveCache = new Map(); // healthKey → { playlistUuid, items, missed, fetchedAt }
+
+async function resolveByPresentation(pp, slide, signal) {
+  if (!slide?.presUuid) return null;
+  const focused = await ppGet(pp, '/v1/playlist/focused', signal).catch(() => null);
+  const playlistName = focused?.playlist?.name ?? null;
+  // Common case: the live item is also the focused one (triggering selects).
+  const direct = focused?.playlist_item;
+  if (direct?.presentation_info?.presentation_uuid === slide.presUuid) {
+    return itemShape(direct, playlistName);
+  }
+  // The focused SELECTION drifted from what's live (operator arrowing around)
+  // — scan the focused playlist's items for the active presentation.
+  const plUuid = focused?.playlist?.uuid;
+  if (!plUuid) return null;
+  const key = healthKey(pp);
+  let c = resolveCache.get(key);
+  const hitIn = (cache) =>
+    cache?.items.find((it) => it.presentation_info?.presentation_uuid === slide.presUuid);
+  const staleMiss = c && c.missed.has(slide.presUuid) && Date.now() - c.fetchedAt > REFETCH_MS;
+  if (!c || c.playlistUuid !== plUuid || (!hitIn(c) && (staleMiss || !c.missed.has(slide.presUuid)))) {
+    const body = await fetchPlaylistBody(pp, { uuid: plUuid }, signal).catch(() => null);
+    if (body) {
+      c = { playlistUuid: plUuid, items: body.items ?? [], missed: new Set(), fetchedAt: Date.now() };
+      resolveCache.set(key, c);
+    }
+  }
+  const hit = hitIn(c);
+  if (!hit) {
+    c?.missed.add(slide.presUuid);
+    return null;
+  }
+  return itemShape(hit, playlistName);
+}
+
+/**
+ * One-shot read of the current active playlist item. On PP 21 the `active`
+ * route reads null mid-show, so we fall back to resolving by the active
+ * presentation's uuid; pass a pre-fetched `slide` (from readSlide) to skip
+ * the extra slide_index request.
+ */
+export async function readActive(pp, signal, slide) {
+  const parsed = parseActive(await ppGet(pp, '/v1/playlist/active', signal));
+  if (parsed.index != null) return parsed;
+  const s = slide === undefined ? await readSlide(pp, signal).catch(() => null) : slide;
+  return (await resolveByPresentation(pp, s, signal).catch(() => null)) ?? parsed;
 }
 
 /**
@@ -146,12 +236,14 @@ export function pickPlaylistForPlan(playlists, plan) {
   return best;
 }
 
-// /v1/playlists nests folders via `children` — flatten to playlist leaves.
-function flattenPlaylists(nodes, out = []) {
-  for (const n of nodes ?? []) {
-    if (n.field_type === 'playlist' && n.id?.uuid) out.push({ uuid: n.id.uuid, name: n.id.name ?? '' });
-    flattenPlaylists(n.children, out);
-  }
+// /v1/playlists nests folders via `children` — flatten to playlist leaves,
+// keeping each leaf's index path (sibling positions) for PP 21 addressing.
+function flattenPlaylists(nodes, out = [], prefix = []) {
+  (nodes ?? []).forEach((n, i) => {
+    const path = [...prefix, i];
+    if (n.field_type === 'playlist' && n.id?.uuid) out.push({ uuid: n.id.uuid, name: n.id.name ?? '', path });
+    flattenPlaylists(n.children, out, path);
+  });
   return out;
 }
 
@@ -176,11 +268,15 @@ export async function readPlaylistItems(pp, signal, plan = null) {
   }
   if (!target) {
     const active = await ppGet(pp, '/v1/playlist/active', signal);
-    const pl = active?.presentation?.playlist ?? null;
+    let pl = active?.presentation?.playlist ?? null;
+    if (!pl?.uuid) {
+      // PP 21 answers null here even mid-show — use the focused playlist.
+      pl = (await ppGet(pp, '/v1/playlist/focused', signal).catch(() => null))?.playlist ?? null;
+    }
     if (!pl?.uuid) return null;
     target = pl;
   }
-  const body = await ppGet(pp, `/v1/playlist/${target.uuid}`, signal);
+  const body = await fetchPlaylistBody(pp, target, signal);
   return {
     playlistName: target.name ?? null,
     matched,
@@ -190,6 +286,15 @@ export async function readPlaylistItems(pp, signal, plan = null) {
       type: it.type ?? 'presentation',
     })),
   };
+}
+
+/**
+ * Cheapest real request — identifies the machine and app version, e.g.
+ * "ProPresenter 21.1 · Booth-Mac". Reports into health like any read.
+ */
+export async function ping(pp, signal) {
+  const v = await ppGet(pp, '/version', signal);
+  return [v.host_description, v.name].filter(Boolean).join(' · ');
 }
 
 /** Current slide position within the active presentation. */
@@ -314,7 +419,8 @@ export async function pollRunState(pp, onState, signal, intervalMs = 800) {
   const countCache = { key: null, count: null };
   while (!signal.aborted) {
     try {
-      const [item, slide] = await Promise.all([readActive(pp, signal), readSlide(pp, signal)]);
+      const slide = await readSlide(pp, signal);
+      const item = await readActive(pp, signal, slide); // slide feeds the PP 21 fallback
       fails = 0;
       // Slide count depends on the presentation AND the active arrangement;
       // refresh (expensive) only when either changes.

@@ -32,6 +32,27 @@ export async function readCustomVariable(companion, name) {
   }
 }
 
+/**
+ * Probe: read the configured state variable (the request the dashboard
+ * actually depends on), else just reach the web UI. Returns a human detail
+ * line; throws with the failure reason.
+ */
+export async function ping(companion) {
+  if (companion.variable) {
+    const value = await readCustomVariable(companion, companion.variable);
+    return `$(${companion.variable}) = ${JSON.stringify(value)}`;
+  }
+  try {
+    const res = await fetch(baseUrl(companion), { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`Companion → HTTP ${res.status}`);
+    report(healthKey(companion), true);
+    return 'reachable (no state variable configured)';
+  } catch (err) {
+    report(healthKey(companion), false, String(err.message ?? err));
+    throw err;
+  }
+}
+
 /** Press a Companion button at a page/row/column location. */
 export async function pressButton(companion, location) {
   const { page, row, column } = location;

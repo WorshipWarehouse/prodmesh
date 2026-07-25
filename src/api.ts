@@ -443,6 +443,26 @@ export interface RoomConnectivity {
 export const getRoomConnectivity = (roomId: string) =>
   getJson<RoomConnectivity>(`/api/config/rooms/${roomId}/connectivity`);
 
+// One integration's live status from the on-demand connectivity probe.
+// ok: true = probe succeeded, false = failed, null = nothing to probe
+// (simulated, or not contacted yet); detail is the human-readable line.
+export interface IntegrationStatus {
+  ok: boolean | null;
+  detail: string | null;
+  at: number;
+  mock?: boolean;
+}
+
+export interface RoomConnectivityStatus {
+  planningCenter: IntegrationStatus | null;
+  proPresenter: IntegrationStatus | null;
+  companion: IntegrationStatus | null;
+  analysis: IntegrationStatus | null;
+}
+
+export const getRoomConnectivityStatus = (roomId: string) =>
+  getJson<RoomConnectivityStatus>(`/api/config/rooms/${roomId}/connectivity/status`);
+
 export async function savePcServiceTypes(
   roomId: string,
   serviceTypes: PcServiceType[],
