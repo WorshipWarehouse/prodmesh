@@ -71,6 +71,13 @@ export async function fakeProPresenter({
     if (!pp21 && req.url === `/v1/playlist/${playlistUuid}`) return playlistBody();
 
     switch (req.url) {
+      case '/version':
+        return json({
+          name: 'FAKE-PP',
+          platform: 'test',
+          host_description: pp21 ? 'ProPresenter 21.1' : 'ProPresenter 7.9',
+          api_version: 'v1',
+        });
       case '/v1/playlist/active':
         if (pp21) {
           // PP 21 answers all-null here even while a presentation is live.

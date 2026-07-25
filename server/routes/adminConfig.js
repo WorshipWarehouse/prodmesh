@@ -9,6 +9,7 @@ import * as show from '../showManager.js';
 import * as auth from '../authStore.js';
 import * as appConfig from '../appConfig.js';
 import * as connectivity from '../connectivity.js';
+import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 
 const router = express.Router();
@@ -100,6 +101,15 @@ router.get('/api/config/rooms/:roomId/connectivity', (req, res) => {
       connectivity.getCompanion(req.params.roomId) ??
       connectivity.companionFromRoom(rooms[req.params.roomId]),
   });
+});
+
+// Live per-integration status (the chips next to each editor). Probes the
+// room's devices on demand — behind config.manage since it generates real
+// outbound requests.
+router.get('/api/config/rooms/:roomId/connectivity/status', requirePermission('config.manage'), async (req, res) => {
+  const room = rooms[req.params.roomId];
+  if (!room) return res.status(404).json({ error: 'unknown room' });
+  res.json(await roomStatus(room));
 });
 
 router.put('/api/config/rooms/:roomId/connectivity/planning-center', requirePermission('config.manage'), (req, res) => {

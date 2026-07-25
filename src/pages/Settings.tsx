@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, CircleUser, MonitorCog, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CircleUser, MonitorCog, RefreshCw, Trash2 } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { HelpTip } from '../components/HelpTip';
 import { SelectField } from '../components/SelectField';
@@ -34,6 +34,7 @@ import {
   getConfig,
   saveConfig,
   getRoomConnectivity,
+  getRoomConnectivityStatus,
   savePcServiceTypes,
   saveAnalysis,
   saveProPresenter,
@@ -44,6 +45,8 @@ import {
   type CompanionConfig,
   type ModeConfig,
   type RoomConnectivity,
+  type RoomConnectivityStatus,
+  type IntegrationStatus,
   type ServerLogTail,
   type AuditEntry,
   type RoomMeta,
@@ -1405,12 +1408,33 @@ function TileEditor({ tile, onChange, onMove, onRemove }: {
 function ConnectivityPanel({ roomId }: { roomId: string }) {
   const [conn, setConn] = useState<RoomConnectivity | null>(null);
   const [err, setErr] = useState('');
+  const [status, setStatus] = useState<RoomConnectivityStatus | null>(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     getRoomConnectivity(roomId)
       .then(setConn)
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
   }, [roomId]);
+
+  // One probe on load, then on demand via each chip's refresh button — the
+  // devices are on the local network, no need to poll.
+  const check = useCallback(() => {
+    setChecking(true);
+    getRoomConnectivityStatus(roomId)
+      .then(setStatus)
+      .catch(() => setStatus(null))
+      .finally(() => setChecking(false));
+  }, [roomId]);
+
+  const hasServerRoom = conn?.hasServerRoom;
+  useEffect(() => {
+    if (hasServerRoom) check();
+  }, [hasServerRoom, check]);
+
+  const chip = (s: IntegrationStatus | null | undefined) => (
+    <StatusChip status={s} checking={checking} onRefresh={check} />
+  );
 
   return (
     <section className="panel campuses">
@@ -1431,17 +1455,48 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
 
       {conn?.hasServerRoom && (
         <>
-          <CompanionEditor roomId={roomId} initial={conn.companion} />
-          <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} />
-          <AnalysisEditor roomId={roomId} initial={conn.analysis} />
-          <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} />
+          <CompanionEditor roomId={roomId} initial={conn.companion} status={chip(status?.companion)} />
+          <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} status={chip(status?.planningCenter)} />
+          <AnalysisEditor roomId={roomId} initial={conn.analysis} status={chip(status?.analysis)} />
+          <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} status={chip(status?.proPresenter)} />
         </>
       )}
     </section>
   );
 }
 
-function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: PcServiceType[] }) {
+// The live dot next to an integration's title: green = the probe's real
+// request succeeded, red = it failed (the reason inline), gray = simulated or
+// not probed. The refresh button re-probes the room on demand.
+function StatusChip({ status, checking, onRefresh }: {
+  status: IntegrationStatus | null | undefined;
+  checking: boolean;
+  onRefresh: () => void;
+}) {
+  if (!status) return null; // not configured — nothing to report
+  const kind = status.mock ? 'sim' : status.ok === true ? 'ok' : status.ok === false ? 'down' : 'unknown';
+  const label = status.mock ? 'Simulated' : status.ok === true ? 'Connected' : status.ok === false ? 'Unreachable' : 'Not checked';
+  return (
+    <span className={`connstatus connstatus--${kind}`} title={status.detail ?? undefined}>
+      <span className="connstatus__dot" aria-hidden />
+      {label}
+      {status.detail && !status.mock && <span className="connstatus__detail">{status.detail}</span>}
+      {!status.mock && (
+        <button
+          className="iconbtn connstatus__refresh"
+          title="Check now"
+          aria-label="Check integration status now"
+          onClick={onRefresh}
+          disabled={checking}
+        >
+          <RefreshCw size={12} className={checking ? 'connstatus__spin' : undefined} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+function PcServiceTypesEditor({ roomId, initial, status }: { roomId: string; initial: PcServiceType[]; status?: ReactNode }) {
   const f = useDraft<PcServiceType[]>(initial, async (types) =>
     (await savePcServiceTypes(roomId, types)).serviceTypes);
   const editType = (i: number, patch: Partial<PcServiceType>) =>
@@ -1450,6 +1505,7 @@ function PcServiceTypesEditor({ roomId, initial }: { roomId: string; initial: Pc
   return (
     <EditorSection
       title="Planning Center service types"
+      status={status}
       help="The event types this room hosts. The ID is in the Planning Center Services URL for that service type."
       saveLabel="Save service types"
       form={f}
@@ -1504,7 +1560,7 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
   };
 }
 
-function AnalysisEditor({ roomId, initial }: { roomId: string; initial: AnalysisConfig | null }) {
+function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: AnalysisConfig | null; status?: ReactNode }) {
   const [hasPassword, setHasPassword] = useState(Boolean(initial?.hasPassword));
   const f = useDraft(toDraft(initial), async (d) => {
     const stored = await saveAnalysis(
@@ -1533,6 +1589,7 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
       <div className="fsection">
         <h3 className="fsection__title">Analysis source
           <HelpTip text="Where this room's SPL numbers come from." />
+          {status}
         </h3>
         <p className="settings__muted">Simulated meter (dev room).</p>
       </div>
@@ -1542,6 +1599,7 @@ function AnalysisEditor({ roomId, initial }: { roomId: string; initial: Analysis
   return (
     <EditorSection
       title="Analysis source"
+      status={status}
       help="Where this room's SPL numbers come from — a Smaart rig or the free ProdMesh Remote RTA app. Target and limit set the dB goals on the live meter and show reports."
       saveLabel="Save analysis source"
       form={f}
@@ -1654,7 +1712,7 @@ function toCompanionDraft(cfg: CompanionConfig | null): CompanionDraft {
   };
 }
 
-function CompanionEditor({ roomId, initial }: { roomId: string; initial: CompanionConfig | null }) {
+function CompanionEditor({ roomId, initial, status }: { roomId: string; initial: CompanionConfig | null; status?: ReactNode }) {
   const f = useDraft(toCompanionDraft(initial), async (d) =>
     toCompanionDraft(await saveCompanion(roomId, {
       mock: d.mock,
@@ -1687,6 +1745,7 @@ function CompanionEditor({ roomId, initial }: { roomId: string; initial: Compani
   return (
     <EditorSection
       title="Companion & modes"
+      status={status}
       help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches its value. Every Companion lays its buttons out differently — set each mode's location to match this room's."
       saveLabel="Save Companion"
       form={f}
@@ -1783,7 +1842,7 @@ function toPpDraft(cfg: ProPresenterConfig | null): PpDraft {
   };
 }
 
-function ProPresenterEditor({ roomId, initial }: { roomId: string; initial: ProPresenterConfig | null }) {
+function ProPresenterEditor({ roomId, initial, status }: { roomId: string; initial: ProPresenterConfig | null; status?: ReactNode }) {
   // An empty host means "not in this room" and saves as a clear.
   const f = useDraft(toPpDraft(initial), async (d) =>
     toPpDraft(await saveProPresenter(
@@ -1801,6 +1860,7 @@ function ProPresenterEditor({ roomId, initial }: { roomId: string; initial: ProP
   return (
     <EditorSection
       title="ProPresenter"
+      status={status}
       help="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter."
       saveLabel="Save ProPresenter"
       form={f}

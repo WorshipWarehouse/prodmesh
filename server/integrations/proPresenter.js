@@ -288,6 +288,15 @@ export async function readPlaylistItems(pp, signal, plan = null) {
   };
 }
 
+/**
+ * Cheapest real request — identifies the machine and app version, e.g.
+ * "ProPresenter 21.1 · Booth-Mac". Reports into health like any read.
+ */
+export async function ping(pp, signal) {
+  const v = await ppGet(pp, '/version', signal);
+  return [v.host_description, v.name].filter(Boolean).join(' · ');
+}
+
 /** Current slide position within the active presentation. */
 export async function readSlide(pp, signal) {
   const pi = (await ppGet(pp, '/v1/presentation/slide_index', signal)).presentation_index;

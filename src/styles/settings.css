@@ -748,3 +748,50 @@
 .campuses__back:hover {
   color: var(--accent-text);
 }
+
+/* ── Integration status chips (room configuration → Integrations) ─────────── */
+
+.connstatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  vertical-align: middle;
+}
+
+.connstatus__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: none;
+}
+
+.connstatus--ok .connstatus__dot { background: var(--ok); }
+.connstatus--down .connstatus__dot { background: var(--danger); }
+.connstatus--down { color: var(--danger); }
+
+.connstatus__detail {
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.connstatus__refresh {
+  width: 22px;
+  height: 22px;
+}
+
+.connstatus__spin {
+  animation: connstatus-spin 0.9s linear infinite;
+}
+
+@keyframes connstatus-spin {
+  to { transform: rotate(360deg); }
+}

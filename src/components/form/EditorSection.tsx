@@ -4,9 +4,10 @@ import type { DraftForm } from './useDraft';
 
 // Section wrapper for a useDraft-backed editor: title + one primary save
 // action, with the error/success line adjacent to the content it belongs to.
-export function EditorSection({ title, help, saveLabel, form, children }: {
+export function EditorSection({ title, help, status, saveLabel, form, children }: {
   title: string;
   help?: string;
+  status?: ReactNode;
   saveLabel: string;
   form: DraftForm;
   children: ReactNode;
@@ -16,6 +17,7 @@ export function EditorSection({ title, help, saveLabel, form, children }: {
       <div className="fsection__head">
         <h3 className="fsection__title">{title}
           {help && <HelpTip text={help} />}
+          {status}
         </h3>
         <button className="btn btn--primary" onClick={form.submit} disabled={!form.dirty || form.busy}>
           {form.busy ? 'Saving…' : form.dirty ? saveLabel : 'Saved'}
