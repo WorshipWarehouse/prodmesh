@@ -4,7 +4,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readActive, readSlide, readTimers, pollRunState } from './proPresenter.js';
+import { readActive, readSlide, readTimers, readPlaylistItems, pollRunState } from './proPresenter.js';
 import { fakeProPresenter } from './fakeProPresenter.js';
 
 const pp = (srv) => ({ host: '127.0.0.1', port: srv.port() });
@@ -133,9 +133,9 @@ test('pollRunState tolerates two consecutive failures and recovers', async () =>
     const done = pollRunState(pp(srv), (s) => states.push(s), ctl.signal, 30);
     await waitFor(() => states.length >= 1, 'the initial state');
 
-    // One poll cycle = 2 requests (readActive + readSlide), so 4 failing
-    // requests = exactly 2 failed cycles — under the 3-strike limit.
-    srv.failNextRequests(4);
+    // A poll cycle starts with readSlide, which fails the whole cycle, so 2
+    // failing requests = exactly 2 failed cycles — under the 3-strike limit.
+    srv.failNextRequests(2);
     srv.setSlide(2);
     await waitFor(() => states.some((s) => s.slideIndex === 2), 'recovery after 2 failed cycles');
 
@@ -143,6 +143,117 @@ test('pollRunState tolerates two consecutive failures and recovers', async () =>
     await done;
   } finally {
     ctl.abort();
+    await srv.close();
+  }
+});
+
+// ── ProPresenter 21 ──────────────────────────────────────────────────────────
+//  /v1/playlist/active answers all-null mid-show and uuid playlist routes 404
+//  (see the compatibility block in proPresenter.js) — the client resolves the
+//  live item by presentation uuid instead.
+
+test('readActive resolves the live item on PP 21 (focused hit, drift scan, library miss)', async () => {
+  const srv = await fakeProPresenter({ pp21: true, playlistName: 'Sunday Morning' });
+  try {
+    srv.setPlaylistItems(['Pre-Service Slides', 'Announcements', 'Worship']);
+
+    // Common case: triggering an item also selects it → focused direct hit.
+    srv.setActive(1, 'Announcements');
+    srv.setFocusedIndex(1);
+    let active = await readActive(pp(srv));
+    assert.equal(active.index, 1);
+    assert.equal(active.name, 'Announcements');
+    assert.equal(active.playlistName, 'Sunday Morning');
+    assert.ok(!srv.seen.paths.includes('/v1/playlist/0/0'), 'direct hit needs no playlist fetch');
+
+    // Selection drifted (operator arrowing around) → scan the playlist items.
+    srv.setActive(2, 'Worship');
+    srv.setFocusedIndex(0);
+    active = await readActive(pp(srv));
+    assert.equal(active.index, 2);
+    assert.equal(active.name, 'Worship');
+    assert.ok(srv.seen.paths.includes('/v1/playlist/0/0'), 'scan fetches by index path');
+
+    // A presentation launched outside the playlist resolves to nothing —
+    // and the miss is remembered, so repeats don't refetch the playlist.
+    srv.setActive(7, 'Library Slide');
+    assert.equal((await readActive(pp(srv))).index, null);
+    const fetches = srv.seen.paths.filter((p) => p === '/v1/playlist/0/0').length;
+    assert.equal((await readActive(pp(srv))).index, null);
+    assert.equal(srv.seen.paths.filter((p) => p === '/v1/playlist/0/0').length, fetches);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('pollRunState tracks a PP 21 service end to end', async () => {
+  const srv = await fakeProPresenter({ pp21: true });
+  const ctl = new AbortController();
+  const states = [];
+  try {
+    srv.setPlaylistItems(['Countdown', 'Welcome', 'Worship Set']);
+    srv.setActive(0, 'Countdown');
+    srv.setFocusedIndex(0);
+    srv.setSlide(0);
+    srv.setSlideCount(4);
+    const done = pollRunState(pp(srv), (s) => states.push(s), ctl.signal, 30);
+
+    await waitFor(() => states.length >= 1, 'the initial state');
+    assert.deepEqual(states[0], {
+      itemIndex: 0,
+      itemName: 'Countdown',
+      slideIndex: 0,
+      slideCount: 4,
+      presName: 'Countdown',
+    });
+
+    srv.setActive(2, 'Worship Set');
+    srv.setFocusedIndex(2);
+    srv.setSlide(0);
+    srv.setSlideCount(9);
+    await waitFor(
+      () => states.at(-1).itemIndex === 2 && states.at(-1).slideCount === 9,
+      'the item change with a fresh slide count',
+    );
+    assert.equal(states.at(-1).itemName, 'Worship Set');
+
+    ctl.abort();
+    await done;
+  } finally {
+    ctl.abort();
+    await srv.close();
+  }
+});
+
+test('readPlaylistItems addresses playlists by uuid on PP 7 and index path on PP 21', async () => {
+  const plan = { title: 'Weekend Service', dates: 'July 26, 2026' };
+  for (const pp21 of [false, true]) {
+    const srv = await fakeProPresenter({ pp21 });
+    try {
+      srv.setPlaylistItems(['Pre-Service Slides', 'Announcements']);
+      const got = await readPlaylistItems(pp(srv), undefined, plan);
+      assert.equal(got.matched, true, `pp21=${pp21}`);
+      assert.deepEqual(
+        got.items.map((it) => it.name),
+        ['Pre-Service Slides', 'Announcements'],
+        `pp21=${pp21}`,
+      );
+      const wanted = pp21 ? '/v1/playlist/0/0' : '/v1/playlist/pl-1';
+      assert.ok(srv.seen.paths.includes(wanted), `pp21=${pp21} fetched ${wanted}`);
+    } finally {
+      await srv.close();
+    }
+  }
+});
+
+test('readPlaylistItems without a plan falls back to the focused playlist on PP 21', async () => {
+  const srv = await fakeProPresenter({ pp21: true });
+  try {
+    srv.setPlaylistItems(['Pre-Service Slides']);
+    const got = await readPlaylistItems(pp(srv));
+    assert.equal(got.matched, false);
+    assert.deepEqual(got.items.map((it) => it.name), ['Pre-Service Slides']);
+  } finally {
     await srv.close();
   }
 });
