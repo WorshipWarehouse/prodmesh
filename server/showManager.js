@@ -25,7 +25,7 @@ import * as timeline from './timeline.js';
 import * as splStore from './splStore.js';
 import * as summaries from './showSummaries.js';
 import * as showConfig from './showConfig.js';
-import { armWindow, pickAutostartTime, shouldAutostart, shouldAutoComplete } from './autoShow.js';
+import { armWindow, pickAutostartTime, shouldAutostart, shouldAutoComplete, armsAutoComplete } from './autoShow.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SHOWS_DIR = join(process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data'), 'shows');
@@ -454,7 +454,7 @@ function startPoller(show) {
     return;
   }
   ppro
-    .pollRunState(pp, (s) => onPoll(show, s), show.abort.signal)
+    .pollRunState(pp, (s) => onPoll(show, s), show.abort.signal, SHOW_POLL_MS)
     .catch(() => {
       if (!show.abort.signal.aborted) {
         show.ppConnected = false;
@@ -476,8 +476,12 @@ function onPoll(show, s) {
     if (itemId) applyCurrent(show, itemId, s.itemName, s.itemIndex);
     // Auto-complete: last slide of the configured end item. Follow mode only —
     // in manual override, current.itemId no longer describes what PP is
-    // showing, so slide position would be meaningless here.
-    if (shouldAutoComplete(show.config, show.current)) {
+    // showing, so slide position would be meaningless here. Edge-triggered:
+    // the end item must be seen midway first (see autoShow.js — PP flashes a
+    // re-triggered item's stored slide, which can be the last one).
+    if (show.current.itemId !== show.config?.endItemId) show.endArmed = false;
+    else if (armsAutoComplete(show.config, show.current)) show.endArmed = true;
+    if (shouldAutoComplete(show.config, show.current, show.endArmed)) {
       endShow(show.roomId);
       return;
     }
@@ -519,9 +523,10 @@ export function refreshConfig(roomId, planId) {
 // Dev-only: PRODMESH_AUTOSTART_TEST=1 arms configured events regardless of
 // the clock, so autostart can be exercised outside the Sunday window. Never
 // set this in production — it would let a Tuesday rehearsal start a show.
-// PRODMESH_AUTOSTART_ARM_MS / PRODMESH_AUTOSTART_POLL_MS override the loop
-// cadences so tests can run in milliseconds; unset (production) they default
-// to the real values and are inert.
+// PRODMESH_AUTOSTART_ARM_MS / PRODMESH_AUTOSTART_POLL_MS /
+// PRODMESH_SHOW_POLL_MS override the loop cadences so tests can run in
+// milliseconds; unset (production) they default to the real values and are
+// inert.
 const IGNORE_WINDOW = process.env.PRODMESH_AUTOSTART_TEST === '1';
 const envMs = (name, fallback) => {
   const n = Number(process.env[name]);
@@ -529,6 +534,7 @@ const envMs = (name, fallback) => {
 };
 const ARM_CHECK_MS = envMs('PRODMESH_AUTOSTART_ARM_MS', 60 * 1000);
 const PP_POLL_MS = envMs('PRODMESH_AUTOSTART_POLL_MS', 3000);
+const SHOW_POLL_MS = envMs('PRODMESH_SHOW_POLL_MS', 800);
 
 export async function nextArmedEvent(room, now) {
   const plans = [];

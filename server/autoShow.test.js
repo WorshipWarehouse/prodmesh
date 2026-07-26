@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { armWindow, pickAutostartTime, shouldAutostart, shouldAutoComplete } from './autoShow.js';
+import { armWindow, pickAutostartTime, shouldAutostart, shouldAutoComplete, armsAutoComplete } from './autoShow.js';
 import { mapActiveToItemId } from './integrations/proPresenter.js';
 
 const T9 = '2026-07-12T16:00:00Z'; // 9:00 local
@@ -38,15 +38,33 @@ test('shouldAutostart is edge-triggered', () => {
   assert.equal(shouldAutostart(null, 'preservice', 'worship'), false); // unconfigured
 });
 
-test('shouldAutoComplete fires only on the end item’s last slide', () => {
+test('shouldAutoComplete fires only on the end item’s last slide, once armed', () => {
   const cfg = { endItemId: 'closing' };
   const cur = (itemId, slideIndex, slideCount) => ({ itemId, slideIndex, slideCount });
-  assert.equal(shouldAutoComplete(cfg, cur('closing', 3, 4)), true);
-  assert.equal(shouldAutoComplete(cfg, cur('closing', 2, 4)), false);
-  assert.equal(shouldAutoComplete(cfg, cur('worship', 3, 4)), false);
-  assert.equal(shouldAutoComplete(cfg, cur('closing', null, 4)), false); // no slide data
-  assert.equal(shouldAutoComplete(cfg, cur('closing', 0, null)), false);
-  assert.equal(shouldAutoComplete({ endItemId: null }, cur('closing', 3, 4)), false);
+  assert.equal(shouldAutoComplete(cfg, cur('closing', 3, 4), true), true);
+  assert.equal(shouldAutoComplete(cfg, cur('closing', 2, 4), true), false);
+  assert.equal(shouldAutoComplete(cfg, cur('worship', 3, 4), true), false);
+  assert.equal(shouldAutoComplete(cfg, cur('closing', null, 4), true), false); // no slide data
+  assert.equal(shouldAutoComplete(cfg, cur('closing', 0, null), true), false);
+  assert.equal(shouldAutoComplete({ endItemId: null }, cur('closing', 3, 4), true), false);
+
+  // Unarmed, the last slide is treated as PP's stale-position flash — a
+  // re-triggered item briefly reports where it was left last service.
+  assert.equal(shouldAutoComplete(cfg, cur('closing', 3, 4), false), false);
+  // …except a single-slide end item, which can only ever complete on entry.
+  assert.equal(shouldAutoComplete(cfg, cur('closing', 0, 1), false), true);
+});
+
+test('armsAutoComplete arms on any non-last slide of the end item', () => {
+  const cfg = { endItemId: 'closing' };
+  const cur = (itemId, slideIndex, slideCount) => ({ itemId, slideIndex, slideCount });
+  assert.equal(armsAutoComplete(cfg, cur('closing', 0, 4)), true);
+  assert.equal(armsAutoComplete(cfg, cur('closing', 2, 4)), true);
+  assert.equal(armsAutoComplete(cfg, cur('closing', 3, 4)), false); // last slide never arms
+  assert.equal(armsAutoComplete(cfg, cur('worship', 0, 4)), false); // wrong item
+  assert.equal(armsAutoComplete(cfg, cur('closing', null, 4)), false); // no slide data
+  assert.equal(armsAutoComplete(cfg, cur('closing', 0, null)), false);
+  assert.equal(armsAutoComplete(cfg, cur('closing', 0, 1)), false); // single slide: nothing to arm on
 });
 
 test('mapActiveToItemId honors manual overrides over index mapping', () => {
