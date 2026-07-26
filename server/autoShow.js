@@ -44,14 +44,35 @@ export function shouldAutostart(config, prevItemId, itemId) {
   );
 }
 
-/** Show is on the configured end item's LAST slide → complete the show. */
-export function shouldAutoComplete(config, current) {
+// Completion is edge-triggered like the start side. When an item is
+// re-triggered, ProPresenter briefly reports that item's STORED slide position
+// before landing on the slide the operator actually clicked — so re-opening
+// the sermon in a second service flashes the first service's last slide for a
+// poll cycle (observed live 2026-07-26, PP 21.1). The last slide therefore
+// only completes the show after the end item has been seen on an EARLIER
+// slide ("armed"). Single-slide end items still complete on entry: there is
+// no earlier slide to arm on, and no stale position distinct from the real one.
+
+/** Seeing the end item midway (any non-last slide) arms auto-complete. */
+export function armsAutoComplete(config, current) {
+  return Boolean(
+    config?.endItemId &&
+      current?.itemId === config.endItemId &&
+      current.slideIndex != null &&
+      current.slideCount != null &&
+      current.slideIndex < current.slideCount - 1,
+  );
+}
+
+/** Armed show is on the configured end item's LAST slide → complete it. */
+export function shouldAutoComplete(config, current, armed) {
   return Boolean(
     config?.endItemId &&
       current?.itemId === config.endItemId &&
       current.slideIndex != null &&
       current.slideCount != null &&
       current.slideCount > 0 &&
-      current.slideIndex >= current.slideCount - 1,
+      current.slideIndex >= current.slideCount - 1 &&
+      (armed || current.slideCount === 1),
   );
 }

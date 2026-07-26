@@ -6,10 +6,13 @@ import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
 
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-show-'));
+process.env.PRODMESH_SHOW_POLL_MS = '30'; // PP poll: 800ms → 30ms
 const sm = await import('./showManager.js');
 const pco = await import('./integrations/planningCenter.js');
 const timeline = await import('./timeline.js');
 const conn = await import('./connectivity.js');
+const showCfg = await import('./showConfig.js');
+const { fakeProPresenter } = await import('./integrations/fakeProPresenter.js');
 
 // north-youth has no proPresenter host → no live poller (test stays offline),
 // and mock PC data supplies a plan + items.
@@ -76,6 +79,48 @@ async function waitFor(predicate, what, timeoutMs = 4000) {
   }
   assert.fail(`timed out waiting for ${what}`);
 }
+
+test('auto-complete ignores PP’s stale last-slide flash when the end item is re-triggered', async () => {
+  // Sunday 2026-07-26, second service: re-triggering the sermon completed the
+  // show instantly, because PP briefly reports a re-triggered item's STORED
+  // slide position — the last slide it showed in the FIRST service.
+  const plan = (await pco.getUpcomingPlans(ST, 5))[0];
+  const items = await pco.getPlanItems(ST, plan.id);
+  const first = 0;
+  const end = items.length - 1;
+  showCfg.setConfig(ROOM, plan.id, { endItemId: items[end].id });
+  const srv = await fakeProPresenter();
+  try {
+    srv.setActive(first, items[first].title);
+    srv.setSlide(0);
+    srv.setSlideCount(3);
+    conn.setProPresenter(ROOM, { host: '127.0.0.1', port: srv.port() });
+    await sm.startShow(ROOM, plan.id, 't2');
+    await waitFor(() => sm.getState(ROOM).current?.itemId === items[first].id, 'the poller to map the opening item');
+
+    // The op triggers the sermon → PP flashes its stored position: the last
+    // slide (34 of 35) left over from the previous service.
+    srv.setActive(end, items[end].title);
+    srv.setSlide(34);
+    srv.setSlideCount(35);
+    await waitFor(() => sm.getState(ROOM).current?.itemId === items[end].id, 'the end item to map');
+    await new Promise((r) => setTimeout(r, 150)); // several more poll cycles on the stale slide
+    assert.equal(sm.getState(ROOM).active, true, 'a stale last-slide flash must not complete the show');
+
+    // PP settles on the slide the op actually clicked → arms completion…
+    srv.setSlide(0);
+    await waitFor(() => sm.getState(ROOM).current?.slideIndex === 0, 'the real slide position');
+
+    // …so reaching the genuine last slide completes the show.
+    srv.setSlide(34);
+    await waitFor(() => !sm.getState(ROOM).active, 'auto-complete on the genuine last slide');
+    assert.ok(timeline.getReport(`${plan.id}__t2`).completedAt != null);
+  } finally {
+    if (sm.getState(ROOM).active) sm.endShow(ROOM);
+    conn.setProPresenter(ROOM, null); // leave the shared room as this test found it
+    await srv.close();
+  }
+});
 
 test('a connectivity save restarts the SPL watcher with the new config', async () => {
   const srvA = fakeRta(85);
