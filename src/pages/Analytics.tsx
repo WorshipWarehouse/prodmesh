@@ -175,7 +175,7 @@ export function Analytics() {
           <div className="confirm__card">
             <p className="confirm__text">
               Delete <strong>{toDelete.planTitle ?? 'this run'}</strong>
-              {toDelete.rehearsal ? ' (rehearsal)' : ''}? Its timing report and loudness data are
+              {toDelete.rehearsal ? ' (rehearsal)' : ''}? Its show report and loudness data are
               erased permanently.
             </p>
             {deleteErr && <p className="confirm__error">{deleteErr}</p>}

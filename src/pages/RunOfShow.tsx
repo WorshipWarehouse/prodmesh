@@ -53,13 +53,36 @@ function fmtSecondsOfDay(sec: number) {
 
 // The room's ProPresenter timer wins when it's running (the operator's Message
 // re-targets + starts it between services); otherwise fall back to clock math
-// against the Planning Center service time.
-function Countdown({ time, timer }: { time: PlanTime | null; timer: PpTimer | null }) {
+// against the Planning Center service time. A completed service freezes into
+// its recorded length — no counter should keep running on a finished show.
+function Countdown({
+  time,
+  timer,
+  completed,
+}: {
+  time: PlanTime | null;
+  timer: PpTimer | null;
+  completed: { startedAt: number | null; completedAt: number } | null;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
   }, []);
+
+  if (completed) {
+    const length =
+      completed.startedAt != null ? (completed.completedAt - completed.startedAt) / 1000 : null;
+    return (
+      <div className="ros-count ros-count--done">
+        <span className="ros-count__label">Service length</span>
+        <span className="ros-count__time">{length != null ? hhmmss(length) : '—'}</span>
+        <span className="ros-count__at">
+          Ended {new Date(completed.completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+        </span>
+      </div>
+    );
+  }
 
   if (timer && timer.state === 'running' && timer.remainingSeconds != null) {
     const target =
@@ -172,6 +195,7 @@ export function RunOfShow() {
   const [state, setState] = useState<ShowState>({ active: false });
   const [busy, setBusy] = useState(false);
   const [completedAt, setCompletedAt] = useState<number | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     getRoom(roomId).then(setRoom).catch(() => setError('Room not found'));
@@ -199,7 +223,11 @@ export function RunOfShow() {
   useEffect(() => {
     let on = true;
     getReport(roomId, planId, timeId)
-      .then((r) => on && setCompletedAt(r?.completedAt ?? null))
+      .then((r) => {
+        if (!on) return;
+        setCompletedAt(r?.completedAt ?? null);
+        setStartedAt(r?.startedAt ?? null);
+      })
       .catch(() => {});
     return () => {
       on = false;
@@ -275,13 +303,17 @@ export function RunOfShow() {
             className="btn btn--sm"
             to={`/room/${roomId}/run/${planId}/report${timeId !== 'default' ? `?time=${timeId}` : ''}`}
           >
-            <BarChart3 size={14} /> Timing report
+            <BarChart3 size={14} /> Show report
           </Link>
         </div>
       </div>
 
       <section className="ros__widgets">
-        <Countdown time={selectedTime} timer={state.timer ?? null} />
+        <Countdown
+          time={selectedTime}
+          timer={state.timer ?? null}
+          completed={!isThisShow && completedAt != null ? { startedAt, completedAt } : null}
+        />
         <SplMeter spl={state.spl ?? null} />
 
         <div className="ros-track">
@@ -381,7 +413,7 @@ export function RunOfShow() {
           {isThisShow
             ? 'Following ProPresenter live. Tap an item to override.'
             : completedAt
-              ? 'This service is complete — see the timing report for how it ran.'
+              ? 'This service is complete — see the show report for how it ran.'
               : 'Start the show to track it live and record timing.'}
         </p>
         <OrderOfService items={plan.items} currentId={currentId} onSelect={isThisShow ? pick : undefined} />

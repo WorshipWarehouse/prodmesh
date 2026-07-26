@@ -227,11 +227,33 @@ describe('completed show', () => {
     const reopen = screen.getByRole('button', { name: 'Reopen show' });
     expect(screen.queryByRole('button', { name: 'Start Show' })).not.toBeInTheDocument();
     expect(
-      screen.getByText('This service is complete — see the timing report for how it ran.'),
+      screen.getByText('This service is complete — see the show report for how it ran.'),
     ).toBeInTheDocument();
 
     await user.click(reopen);
     expect(api.startShow).toHaveBeenCalledWith('north-main', 'plan-1', 't-svc');
+  });
+
+  it('freezes the counter into the recorded service length instead of ticking on', async () => {
+    api.getReport.mockResolvedValue({
+      items: [], totals: { planned: 0, actual: 0, delta: 0 },
+      startedAt: new Date('2026-07-26T11:02:00Z').getTime(),
+      completedAt: new Date('2026-07-26T12:15:30Z').getTime(),
+    });
+    renderPage();
+
+    expect(await screen.findByText('Service length')).toBeInTheDocument();
+    expect(screen.getByText('1:13:30')).toBeInTheDocument();
+    expect(screen.getByText(/Ended/)).toBeInTheDocument();
+    expect(screen.queryByText('Elapsed since start')).not.toBeInTheDocument();
+
+    // Even a running PP timer (counting to the next service) must not unfreeze it.
+    emitState({
+      active: false,
+      timer: { uuid: null, name: 'Walk In', state: 'running', remainingSeconds: 300, targetSecondsOfDay: null, countsDownToTime: false },
+    });
+    expect(screen.getByText('Service length')).toBeInTheDocument();
+    expect(screen.queryByText('05:00')).not.toBeInTheDocument();
   });
 });
 

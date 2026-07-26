@@ -33,6 +33,7 @@
 
 .ros-count--pre { border-top-color: var(--accent); }
 .ros-count--live { border-top-color: var(--ok); }
+.ros-count--done { border-top-color: var(--text-faint); }
 
 .ros-count__label {
   font-size: 0.78rem;
