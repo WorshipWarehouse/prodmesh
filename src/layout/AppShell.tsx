@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   BellRing,
@@ -141,6 +141,22 @@ export function AppShell() {
   const stationName = identity?.station?.name ?? 'Unregistered station';
   const operatorName = identity?.user?.displayName ?? 'Read-only';
 
+  // A station pinned to its room ("Room only when locked") browses just that
+  // room while nobody is logged in — kiosk focus for lobby/booth displays,
+  // not a security boundary. Logging in lifts the restriction.
+  const lockedRoomId =
+    identity && !identity.authenticated && identity.station?.roomOnly
+      ? identity.station.roomId
+      : null;
+  const lockedRoomName = lockedRoomId
+    ? church.sites.flatMap((s) => s.auditoriums).find((a) => a.id === lockedRoomId)?.name ?? 'Room Status'
+    : null;
+  const lockedPrefix = lockedRoomId ? `/room/${lockedRoomId}` : null;
+  const offLimits =
+    lockedPrefix != null &&
+    location.pathname !== lockedPrefix &&
+    !location.pathname.startsWith(`${lockedPrefix}/`);
+
   const lock = async () => {
     await logoutAdmin();
     setIdentity(await getAuthStatus());
@@ -181,7 +197,16 @@ export function AppShell() {
           </div>
 
           <nav className="sidebar__nav">
-            {NAV.map(({ to, label, icon: Icon, end }) => {
+            {lockedPrefix ? (
+              <NavLink
+                to={lockedPrefix}
+                title={lockedRoomName ?? undefined}
+                className={({ isActive }) => `sidebar__item${isActive ? ' sidebar__item--active' : ''}`}
+              >
+                <HomeIcon size={19} className="sidebar__icon" />
+                <span className="sidebar__label rail-hide">{lockedRoomName}</span>
+              </NavLink>
+            ) : NAV.map(({ to, label, icon: Icon, end }) => {
               const adminActive = label === 'Admin' && location.pathname.startsWith('/admin');
               return (
                 <div key={to} className="sidebar__navgroup">
@@ -286,7 +311,7 @@ export function AppShell() {
 
         <main className="shell__main">
           <AssistanceBar enabled={Boolean(identity?.station)} />
-          <Outlet />
+          {offLimits ? <Navigate to={lockedPrefix!} replace /> : <Outlet />}
         </main>
         {assistOpen && <AssistanceDialog onClose={() => setAssistOpen(false)} />}
         {identityOpen && (

@@ -87,7 +87,7 @@ describe('Stations', () => {
     await user.selectOptions(screen.getByLabelText('Room'), 'north-main');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(api.updateStation).toHaveBeenCalledWith('station-1', {
-      name: 'FOH – Producer', campusId: 'north', roomId: 'north-main',
+      name: 'FOH – Producer', campusId: 'north', roomId: 'north-main', roomOnly: false,
     });
 
     await user.click(screen.getByRole('button', { name: 'Revoke' }));

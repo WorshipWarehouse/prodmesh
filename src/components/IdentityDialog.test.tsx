@@ -25,6 +25,7 @@ const station: Station = {
   name: 'FOH – Producer',
   campusId: 'north',
   roomId: null,
+  roomOnly: false,
 };
 
 const readOnlyStatus: AuthStatus = {

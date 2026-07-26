@@ -58,7 +58,7 @@ export function ServiceReport() {
       <div className="pagehead">
         <div>
           <Link className="backlink" to={backToRun}>← Run of Show</Link>
-          <h1 className="pagehead__title">Timing Report</h1>
+          <h1 className="pagehead__title">Show Report</h1>
           {serviceLine && <p className="pagehead__sub">{serviceLine}</p>}
         </div>
         <div className="pagehead__right">

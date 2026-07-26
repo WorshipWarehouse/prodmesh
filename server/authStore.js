@@ -65,32 +65,33 @@ export function registerStation({ name, campusId = null, roomId = null }) {
   getDb().prepare(
     'INSERT INTO stations (id, name, campus_id, room_id, token_hash, created_at, last_seen) VALUES (?, ?, ?, ?, ?, ?, ?)',
   ).run(stationId, clean, campusId, roomId, digest(token), now, now);
-  return { id: stationId, name: clean, campusId, roomId, token };
+  return { id: stationId, name: clean, campusId, roomId, roomOnly: false, token };
 }
 
 export function resolveStation(token) {
   if (!token) return null;
   const row = getDb().prepare(
-    'SELECT id, name, campus_id AS campusId, room_id AS roomId FROM stations WHERE token_hash = ?',
+    'SELECT id, name, campus_id AS campusId, room_id AS roomId, room_only AS roomOnly FROM stations WHERE token_hash = ?',
   ).get(digest(token));
   if (row) getDb().prepare('UPDATE stations SET last_seen = ? WHERE id = ?').run(Date.now(), row.id);
-  return row ?? null;
+  return row ? { ...row, roomOnly: Boolean(row.roomOnly) } : null;
 }
 
 export function listStations() {
   return getDb().prepare(
-    `SELECT id, name, campus_id AS campusId, room_id AS roomId,
+    `SELECT id, name, campus_id AS campusId, room_id AS roomId, room_only AS roomOnly,
             created_at AS createdAt, last_seen AS lastSeen
        FROM stations ORDER BY name COLLATE NOCASE`,
-  ).all();
+  ).all().map((row) => ({ ...row, roomOnly: Boolean(row.roomOnly) }));
 }
 
-export function updateStation(stationId, { name, campusId = null, roomId = null }) {
+export function updateStation(stationId, { name, campusId = null, roomId = null, roomOnly = false }) {
   const clean = String(name ?? '').trim();
   if (clean.length < 2 || clean.length > 80) throw new Error('Station name must be 2–80 characters');
+  // roomOnly is meaningless without a room assignment — never persist it alone.
   const result = getDb().prepare(
-    'UPDATE stations SET name = ?, campus_id = ?, room_id = ? WHERE id = ?',
-  ).run(clean, campusId || null, roomId || null, stationId);
+    'UPDATE stations SET name = ?, campus_id = ?, room_id = ?, room_only = ? WHERE id = ?',
+  ).run(clean, campusId || null, roomId || null, roomId && roomOnly ? 1 : 0, stationId);
   if (!result.changes) throw new Error('Unknown station');
   return listStations().find((station) => station.id === stationId);
 }

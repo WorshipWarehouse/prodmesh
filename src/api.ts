@@ -121,6 +121,8 @@ export interface Station {
   name: string;
   campusId: string | null;
   roomId: string | null;
+  /** Read-only mode (nobody logged in) browses only the assigned room. */
+  roomOnly: boolean;
 }
 
 export interface ManagedStation extends Station {
@@ -185,7 +187,7 @@ export const getStations = () => getJson<{ stations: ManagedStation[] }>('/api/s
 
 export async function updateStation(
   stationId: string,
-  input: { name: string; campusId: string | null; roomId: string | null },
+  input: { name: string; campusId: string | null; roomId: string | null; roomOnly: boolean },
 ): Promise<ManagedStation> {
   const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}`, {
     method: 'PUT',

@@ -400,10 +400,15 @@ function StationEditor({
   const [name, setName] = useState(station.name);
   const [campusId, setCampusId] = useState(station.campusId ?? '');
   const [roomId, setRoomId] = useState(station.roomId ?? '');
+  const [roomOnly, setRoomOnly] = useState(station.roomOnly ?? false);
   const [busy, setBusy] = useState(false);
 
   const campusRooms = rooms.filter((room) => !campusId || room.site === campusId);
-  const dirty = name !== station.name || campusId !== (station.campusId ?? '') || roomId !== (station.roomId ?? '');
+  const dirty =
+    name !== station.name ||
+    campusId !== (station.campusId ?? '') ||
+    roomId !== (station.roomId ?? '') ||
+    (roomId !== '' && roomOnly !== (station.roomOnly ?? false));
 
   const save = async () => {
     setBusy(true);
@@ -412,6 +417,7 @@ function StationEditor({
         name,
         campusId: campusId || null,
         roomId: roomId || null,
+        roomOnly: Boolean(roomId) && roomOnly,
       }));
     } finally {
       setBusy(false);
@@ -450,6 +456,15 @@ function StationEditor({
             {campusRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
           </SelectField>
         </label>
+        <Checkbox
+          label="Room only when locked"
+          title={roomId
+            ? 'In read-only mode (nobody logged in), this station only browses its assigned room. Logging in unlocks everything.'
+            : 'Assign a room first'}
+          checked={Boolean(roomId) && roomOnly}
+          disabled={!roomId}
+          onChange={(event) => setRoomOnly(event.target.checked)}
+        />
       </div>
       <div className="stations__actions">
         <button className="btn btn--primary btn--sm" disabled={!dirty || busy || name.trim().length < 2} onClick={save}>Save</button>
