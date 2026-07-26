@@ -36,6 +36,7 @@ const authenticated: AuthStatus = {
     name: 'FOH – Producer',
     campusId: 'north',
     roomId: null,
+    roomOnly: false,
   },
 };
 
@@ -47,6 +48,7 @@ function renderShell(path = '/admin/users') {
           <Route path="/admin/users" element={<div>Users page content</div>} />
           <Route path="/admin/general" element={<div>General page content</div>} />
           <Route path="/admin/checklists" element={<div>Checklists page content</div>} />
+          <Route path="/room/:roomId" element={<div>Room page content</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -114,5 +116,54 @@ describe('AppShell identity and Admin navigation', () => {
     const buttons = screen.getAllByRole('button', { name: 'Lock station' });
     await user.click(buttons.at(-1)!);
     await waitFor(() => expect(api.logoutAdmin).toHaveBeenCalledOnce());
+  });
+});
+
+describe('room-only station', () => {
+  const lockedStation = {
+    id: 'station-2',
+    name: 'Lobby Display',
+    campusId: 'north',
+    roomId: 'north-main',
+    roomOnly: true,
+  };
+
+  beforeEach(() => {
+    api.getConfig.mockResolvedValue({
+      name: 'Test Church',
+      sites: [{
+        id: 'north', name: 'North', status: 'active',
+        auditoriums: [{ id: 'north-main', name: 'Main Auditorium', tiles: [] }],
+      }],
+    });
+  });
+
+  it('in read-only mode, collapses nav to the assigned room and redirects everything else there', async () => {
+    api.getAuthStatus.mockResolvedValue({
+      authenticated: false, admin: false, setupNeeded: false, user: null, permissions: [],
+      station: lockedStation,
+    });
+    renderShell('/admin/users');
+
+    // The admin page never renders — the shell bounces to the room page.
+    expect(await screen.findByText('Room page content')).toBeInTheDocument();
+    expect(screen.queryByText('Users page content')).not.toBeInTheDocument();
+
+    // Nav is just the room; the global destinations are gone.
+    expect(await screen.findByRole('link', { name: 'Main Auditorium' })).toHaveAttribute('href', '/room/north-main');
+    for (const gone of ['Home', 'Services', 'Calendar', 'Analytics', 'Admin']) {
+      expect(screen.queryByRole('link', { name: gone })).not.toBeInTheDocument();
+    }
+
+    // The way out — logging in — stays reachable.
+    expect(screen.getByRole('button', { name: /Read-only/ })).toBeInTheDocument();
+  });
+
+  it('a logged-in user on the same station browses freely', async () => {
+    api.getAuthStatus.mockResolvedValue({ ...authenticated, station: lockedStation });
+    renderShell('/admin/users');
+
+    expect(await screen.findByText('Users page content')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument();
   });
 });

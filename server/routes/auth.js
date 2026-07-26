@@ -50,6 +50,7 @@ router.put('/api/stations/:stationId', requirePermission('stations.manage'), (re
       name: req.body?.name,
       campusId: room?.site ?? requestedCampus,
       roomId,
+      roomOnly: Boolean(req.body?.roomOnly),
     });
     auditSuccess(req, 'stations.manage', {
       resourceType: 'station', resourceId: station.id, details: { operation: 'update' },

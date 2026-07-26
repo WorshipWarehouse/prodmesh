@@ -26,6 +26,21 @@ test('stations can be listed, renamed, assigned, and revoked', () => {
   });
   assert.equal(updated.name, 'FOH – Producer');
   assert.equal(updated.roomId, 'north-main');
+  assert.equal(updated.roomOnly, false);
+
+  // Pinning to the assigned room sticks, and resolveStation carries it to
+  // every request's req.station (the read-only UI reads it from auth status).
+  const pinned = auth.updateStation(registered.id, {
+    name: 'FOH – Producer', campusId: 'north', roomId: 'north-main', roomOnly: true,
+  });
+  assert.equal(pinned.roomOnly, true);
+  assert.equal(auth.resolveStation(registered.token).roomOnly, true);
+
+  // Clearing the room assignment clears the pin — it can't exist alone.
+  const unassigned = auth.updateStation(registered.id, {
+    name: 'FOH – Producer', campusId: 'north', roomId: null, roomOnly: true,
+  });
+  assert.equal(unassigned.roomOnly, false);
 
   auth.revokeStation(registered.id);
   assert.equal(auth.resolveStation(registered.token), null);

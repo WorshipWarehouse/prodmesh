@@ -244,6 +244,16 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    // A station assigned to a room can be pinned to it: while nobody is
+    // logged in (read-only mode), the UI limits browsing to that room. A
+    // kiosk-focus setting, not a security boundary — station identity is
+    // browser-held and registration is open by design.
+    name: 'stations-room-only',
+    up(d) {
+      addColumn(d, 'stations', 'room_only', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
