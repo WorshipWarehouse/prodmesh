@@ -443,3 +443,44 @@ test('logo upload: gated, sniffed by bytes, size-capped, served with nosniff', a
   })).status, 200);
   assert.equal((await fetch(`${base}/api/branding/logo`)).status, 404);
 });
+
+test('secrets are write-only over HTTP and need full admin', async () => {
+  const conf = auth.createGroup({ name: 'Config Only', permissions: ['config.manage', 'settings.manage'] });
+  auth.createUser({ username: 'configonly', displayName: 'Config Only', pin: '1123', groupIds: [conf.id] });
+  const weak = (await (await post('/api/auth/login', { username: 'configonly', pin: '1123' }, null, station.token)).json()).token;
+
+  const get = (token) => fetch(`${base}/api/secrets`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+
+  // Credentials to other systems are not an "operational setting".
+  assert.equal((await get()).status, 401);
+  assert.equal((await get(weak)).status, 403);
+
+  // '*' isn't grantable — it comes from the Administrators system group.
+  const adminGroup = auth.listDirectory().groups.find((x) => x.systemKey === 'admin');
+  auth.createUser({ username: 'realadmin', displayName: 'Real Admin', pin: '3344', groupIds: [adminGroup.id] });
+  const admin = (await (await post('/api/auth/login', { username: 'realadmin', pin: '3344' }, null, station.token)).json()).token;
+
+  const put = (updates) => fetch(`${base}/api/secrets`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` },
+    body: JSON.stringify({ updates }),
+  });
+
+  const SECRET = 'pco-secret-value-abc123';
+  assert.equal((await put({ 'planningCenter.secret': SECRET })).status, 200);
+
+  // The whole contract: it is stored and usable, but the API never says it.
+  const body = await (await get(admin)).text();
+  assert.ok(!body.includes(SECRET), 'the secret came back over the API');
+  const entry = JSON.parse(body).secrets.find((s) => s.path === 'planningCenter.secret');
+  assert.equal(entry.set, true);
+  assert.equal(entry.length, SECRET.length);
+
+  // Unknown keys are refused rather than quietly written to the file.
+  assert.equal((await put({ 'evil.path': 'x' })).status, 400);
+
+  // The audit records WHICH keys changed and never a value.
+  const audit = JSON.stringify(auth.listAudit({ limit: 50 }));
+  assert.ok(audit.includes('planningCenter.secret'), 'the change should be audited');
+  assert.ok(!audit.includes(SECRET), 'a value leaked into the audit trail');
+});

@@ -378,6 +378,34 @@ export const getVersion = () => getJson<Version>('/api/system/version');
 // ADR 0009; the Admin → Campuses editor saves the whole tree transactionally.
 export const getConfig = () => getJson<Church>('/api/config');
 
+// ── Secrets (write-only) ─────────────────────────────────────────────────────
+
+/** What is configured — deliberately never the value itself. */
+export interface SecretStatus {
+  path: string;
+  label: string;
+  set: boolean;
+  length: number;
+  /** An env var is winning, so editing here would have no effect. */
+  env: boolean;
+}
+
+export const getSecrets = () => getJson<{ secrets: SecretStatus[] }>('/api/secrets');
+
+export async function saveSecrets(updates: Record<string, string>): Promise<{ secrets: SecretStatus[] }> {
+  const res = await fetch('/api/secrets', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ updates }),
+  });
+  await requireOk(res);
+  return res.json();
+}
+
+/** Do the stored credentials actually work? null = not configured. */
+export const checkIntegrations = () =>
+  getJson<{ planningCenter: boolean | null }>('/api/secrets/check');
+
 // ── Branding ─────────────────────────────────────────────────────────────────
 
 /** The institution's logo endpoint. 404s when no override is set, which is the

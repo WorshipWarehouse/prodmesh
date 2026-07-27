@@ -844,3 +844,26 @@
   color: var(--text-dim);
   max-width: 220px;
 }
+
+/* ── Integration secrets (write-only) ───────────────────────────────────── */
+.secrets {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.secrets__row > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.secrets__state {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.secrets__state--on { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.secrets__state--off { color: var(--text-faint); background: rgba(127, 127, 127, 0.12); }

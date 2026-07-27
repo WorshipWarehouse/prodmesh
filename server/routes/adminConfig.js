@@ -10,10 +10,57 @@ import * as auth from '../authStore.js';
 import * as appConfig from '../appConfig.js';
 import * as connectivity from '../connectivity.js';
 import * as branding from '../branding.js';
+import * as secrets from '../secrets.js';
+import * as pco from '../integrations/planningCenter.js';
 import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 
 const router = express.Router();
+
+// ── Secrets (write-only) ──────────────────────────────────────────────────────
+//
+//  Nothing here ever returns a stored value. A stolen admin session can
+//  overwrite the church's Planning Center token or Slack bot token — loudly,
+//  and things visibly break — but cannot learn them. Reading them back means
+//  opening the file on the server, which already implies owning the box.
+//  Requires '*' rather than settings.manage: these are the credentials to
+//  other systems, not an operational setting.
+
+router.get('/api/secrets', requirePermission('*'), (_req, res) => {
+  res.json({ secrets: secrets.describeSecrets() }); // set/length/env only
+});
+
+router.put('/api/secrets', requirePermission('*'), (req, res) => {
+  try {
+    const touched = secrets.setSecrets(req.body?.updates ?? {});
+    pco.clearCache(); // new credentials must not serve cached results
+    auditSuccess(req, '*', {
+      resourceType: 'secrets', resourceId: 'secrets',
+      details: { paths: touched }, // WHICH keys changed, never their values
+    });
+    res.json({ ok: true, secrets: secrets.describeSecrets() });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
+  }
+});
+
+// Do the stored credentials actually work? Saving a typo'd token otherwise
+// looks like success and surfaces as a dead integration on Sunday. Returns
+// booleans only — never anything derived from the secret itself.
+router.get('/api/secrets/check', requirePermission('*'), async (_req, res) => {
+  if (!pco.isConfigured()) return res.json({ planningCenter: null });
+  const serviceTypes = [...new Set(
+    Object.values(rooms).flatMap((r) => (r.planningCenter?.serviceTypes ?? []).map((st) => st.id)),
+  )];
+  if (!serviceTypes.length) return res.json({ planningCenter: null });
+  try {
+    pco.clearCache();
+    await pco.getUpcomingPlans({ id: serviceTypes[0], name: 'check' }, 1);
+    res.json({ planningCenter: true });
+  } catch {
+    res.json({ planningCenter: false });
+  }
+});
 
 // ── Branding (institution logo) ───────────────────────────────────────────────
 

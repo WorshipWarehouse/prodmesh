@@ -58,6 +58,10 @@ import {
   logoSrc,
   uploadLogo,
   clearLogo,
+  getSecrets,
+  saveSecrets,
+  checkIntegrations,
+  type SecretStatus,
 } from '../api';
 import type { Church, Site, Tile } from '../types';
 import logoUrl from '../assets/logo.png';
@@ -163,7 +167,7 @@ function LoginForm({ onDone }: { onDone: () => void }) {
 function AdminPanels({ section }: { section: AdminSection }) {
   return (
     <>
-      {section === 'general' && <><SecurityPanel /><SystemPanel /><SchedulesPanel /></>}
+      {section === 'general' && <><SecurityPanel /><SecretsPanel /><SystemPanel /><SchedulesPanel /></>}
       {section === 'campuses' && <CampusesPanel />}
       {section === 'room' && <RoomConfigPanel />}
       {section === 'users' && <UserManagementPanel />}
@@ -717,6 +721,88 @@ function SecurityPanel() {
         </div>
       </div>
       <Msg msg={msg} />
+    </section>
+  );
+}
+
+// Credentials for Planning Center and Slack. WRITE-ONLY on purpose: the server
+// never returns a stored value, so this can say whether something is set and
+// how long it is, but can never show it back. Reading a secret means opening
+// the file on the box, which already implies owning the box.
+function SecretsPanel() {
+  const [items, setItems] = useState<SecretStatus[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Feedback>(null);
+
+  const load = useCallback(() => {
+    getSecrets().then((r) => setItems(r.secrets)).catch(() => setItems([]));
+  }, []);
+  useEffect(load, [load]);
+
+  const dirty = Object.values(draft).some((v) => v !== '');
+
+  const save = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await saveSecrets(draft);
+      setItems(res.secrets);
+      setDraft({});
+      // Credentials are only really "saved" if they work. Checking now beats
+      // finding out mid-service on Sunday.
+      const check = await checkIntegrations().catch(() => null);
+      setMsg(check && check.planningCenter === false
+        ? { kind: 'err', text: 'Saved, but Planning Center rejected these credentials — double-check the App ID and Secret.' }
+        : ok('Saved.'));
+    } catch (err) {
+      setMsg(fail(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!items) return null;
+
+  return (
+    <section className="panel">
+      <p className="section-label">Credentials</p>
+      <h2 className="panel__title">
+        Integration secrets
+        <HelpTip text="Write-only: prodmesh never shows a saved secret back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
+      </h2>
+      <p className="settings__muted">
+        Paste a new value to replace what's stored. Leave a field blank to keep it.
+      </p>
+
+      <div className="secrets">
+        {items.map((item) => (
+          <label key={item.path} className="lfield secrets__row">
+            <span>
+              {item.label}
+              <span className={`secrets__state secrets__state--${item.set ? 'on' : 'off'}`}>
+                {item.env ? 'set by environment' : item.set ? `set · ${item.length} chars` : 'not set'}
+              </span>
+            </span>
+            <input
+              className="field"
+              type="password"
+              autoComplete="new-password"
+              placeholder={item.set ? '•••••••• (unchanged)' : 'not set'}
+              value={draft[item.path] ?? ''}
+              disabled={item.env}
+              onChange={(e) => setDraft((d) => ({ ...d, [item.path]: e.target.value }))}
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="settings__actions">
+        <button className="btn btn--primary" disabled={!dirty || busy} onClick={save}>
+          {busy ? 'Saving…' : 'Save secrets'}
+        </button>
+        {msg && <span className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</span>}
+      </div>
     </section>
   );
 }
