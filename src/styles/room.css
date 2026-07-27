@@ -278,3 +278,6 @@
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 8px;
 }
+
+/* The service widget sits between accordions, so it needs their rhythm. */
+.status .widgets { margin-top: 16px; }

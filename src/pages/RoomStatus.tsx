@@ -183,10 +183,6 @@ export function RoomStatus() {
         </div>
       )}
 
-      <WidgetGrid>
-        <ServicePanel roomId={roomId} span="third" />
-      </WidgetGrid>
-
       {/* Room Mode changes once at call time and then stays put, so it only
           claims the page while the room is in Standby. Out of Standby it
           collapses to its own answer — the current mode — leaving the console
@@ -246,6 +242,12 @@ export function RoomStatus() {
           })}
         </div>
       </Accordion>
+
+      {/* Full width: it is the widest content on the page and has no
+          neighbour to sit beside now that Room Mode is a full-width panel. */}
+      <WidgetGrid>
+        <ServicePanel roomId={roomId} />
+      </WidgetGrid>
 
       {tiles.length > 0 && (
         <Accordion

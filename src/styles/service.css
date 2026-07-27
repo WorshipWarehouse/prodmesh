@@ -38,6 +38,10 @@
   background: var(--bg-tile);
   border: 1px solid var(--border);
   margin-right: 6px;
+  /* Chips that link into Run of Show are <a>s; without this they pick up the
+     browser's default link AND visited colours, so a chip changed colour once
+     you had opened it. Declared on the base so --rehearsal still wins. */
+  color: inherit;
 }
 
 /* Rehearsal times stand out in purple; services keep the neutral chip. */
