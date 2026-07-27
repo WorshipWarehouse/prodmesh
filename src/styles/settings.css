@@ -957,3 +957,15 @@
   font-weight: 400;
   color: var(--text-faint);
 }
+
+/* Fields stored ahead of the feature that will use them. Quiet, so they don't
+   read as missing configuration. */
+.integration__opt {
+  margin-left: 6px;
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  text-transform: none;
+  font-style: italic;
+}
