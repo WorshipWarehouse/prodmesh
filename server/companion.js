@@ -40,7 +40,15 @@ export async function readCustomVariable(companion, name) {
 export async function ping(companion) {
   if (companion.variable) {
     const value = await readCustomVariable(companion, companion.variable);
-    return `$(${companion.variable}) = ${JSON.stringify(value)}`;
+    // Report the SHAPE of the answer, not the bytes. This string is surfaced
+    // to the operator through the connectivity status chip, so echoing the
+    // response verbatim turned a mistyped (or malicious) host into a readable
+    // fetch of whatever it pointed at. Host validation blocks the URL games
+    // now; not echoing bodies means it stays closed if that ever regresses.
+    const summary = value === ''
+      ? 'empty'
+      : `${JSON.stringify(value.slice(0, 24))}${value.length > 24 ? '…' : ''}`;
+    return `$(${companion.variable}) = ${summary}`;
   }
   try {
     const res = await fetch(baseUrl(companion), { signal: AbortSignal.timeout(TIMEOUT_MS) });

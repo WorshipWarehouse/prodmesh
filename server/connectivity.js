@@ -45,6 +45,26 @@ function notifyChange(roomId, integration) {
   for (const fn of changeListeners) fn(roomId, integration);
 }
 
+/**
+ * A device address must be a bare hostname or IP — nothing that can reshape
+ * the URL it gets interpolated into.
+ *
+ * Every integration builds `http://${host}:${port}` and appends a fixed path.
+ * With only a length check, a trailing `#` made that appended path a fragment
+ * and handed the operator the whole URL — so `config.manage` became an
+ * authenticated read-anything primitive, with the response body echoed back
+ * through the Companion status chip. `/`, `?`, `#`, `@` and `:` are the
+ * characters that make that possible, so none of them survive.
+ */
+function validateHost(input, what) {
+  const host = String(input ?? '').trim();
+  if (!host || host.length > 100) throw new Error(`${what} (max 100 characters)`);
+  const bare = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host; // IPv6 literal
+  const ok = /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/i.test(bare) || /^[0-9a-f:.]+$/i.test(bare);
+  if (!ok) throw new Error(`${what} must be a hostname or IP address, with no path, port, or credentials`);
+  return host;
+}
+
 export function validateServiceTypes(input) {
   if (!Array.isArray(input)) throw new Error('serviceTypes must be an array');
   if (input.length > 10) throw new Error('Too many service types (max 10)');
@@ -68,8 +88,7 @@ export function validateAnalysis(input) {
   if (typeof input !== 'object' || Array.isArray(input)) throw new Error('analysis must be an object');
   const source = String(input.source ?? 'smaart');
   if (!SOURCES.includes(source)) throw new Error(`Unknown analysis source "${source}"`);
-  const host = String(input.host ?? '').trim();
-  if (!host || host.length > 100) throw new Error('Analysis source needs a host (max 100 characters)');
+  const host = validateHost(input.host, 'Analysis source needs a host');
   const out = { source, host };
   const port = input.port === '' || input.port == null ? null : Number(input.port);
   if (port != null) {
@@ -157,8 +176,7 @@ export function setAnalysis(roomId, config) {
 export function validateProPresenter(input) {
   if (input === null) return null;
   if (typeof input !== 'object' || Array.isArray(input)) throw new Error('proPresenter must be an object');
-  const host = String(input.host ?? '').trim();
-  if (!host || host.length > 100) throw new Error('ProPresenter needs a host (max 100 characters)');
+  const host = validateHost(input.host, 'ProPresenter needs a host');
   const out = { host };
   const port = input.port === '' || input.port == null ? null : Number(input.port);
   if (port != null) {
@@ -183,9 +201,10 @@ export function validateCompanion(input) {
     throw new Error('companion must be an object (rooms cannot clear it — use Simulated instead)');
   }
   const out = { mock: input.mock === true };
+  // Optional here: a simulated room has no Companion at all. Validated the
+  // same way when present.
   const host = String(input.host ?? '').trim();
-  if (host.length > 100) throw new Error('host must be at most 100 characters');
-  if (host) out.host = host;
+  if (host) out.host = validateHost(host, 'Companion host');
   const port = input.port === '' || input.port == null ? null : Number(input.port);
   if (port != null) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
