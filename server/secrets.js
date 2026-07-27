@@ -50,16 +50,37 @@ export function getSecret(path) {
 //  Callers get to know only whether a value is SET, and its length, which is
 //  enough to tell "configured" from "not" and to spot a truncated paste.
 
-/** Every secret the app actually reads. Anything else is refused. */
-export const SECRET_KEYS = [
-  { path: 'planningCenter.appId', label: 'Planning Center App ID' },
-  { path: 'planningCenter.secret', label: 'Planning Center Secret' },
-  { path: 'slack.test.botOauthToken', label: 'Slack bot token (test)' },
-  { path: 'slack.test.channel', label: 'Slack channel (test)' },
-  { path: 'slack.prod.botOauthToken', label: 'Slack bot token (prod)' },
-  { path: 'slack.prod.channel', label: 'Slack channel (prod)' },
-  { path: 'slack.use', label: 'Active Slack environment (test|prod)' },
+/**
+ * Every secret the app reads, grouped by the integration it belongs to so the
+ * UI can present one card per integration rather than a flat list of paths.
+ *
+ * Slack is deliberately ONE set of credentials. It used to be split test/prod
+ * with `slack.use` choosing — a development convenience that every installing
+ * church had to reason about. slack.js still reads the legacy nested keys as a
+ * fallback, so existing installs keep working; they are just not editable here.
+ */
+export const SECRET_GROUPS = [
+  {
+    id: 'planningCenter',
+    label: 'Planning Center',
+    hint: 'Personal Access Token from planningcenteronline.com → Developer → Personal Access Tokens.',
+    fields: [
+      { path: 'planningCenter.appId', label: 'Application ID' },
+      { path: 'planningCenter.secret', label: 'Secret' },
+    ],
+  },
+  {
+    id: 'slack',
+    label: 'Slack',
+    hint: 'Bot token from your Slack app (starts xoxb-), and the channel assistance requests post to.',
+    fields: [
+      { path: 'slack.botOauthToken', label: 'Bot token' },
+      { path: 'slack.channel', label: 'Channel', secret: false },
+    ],
+  },
 ];
+
+export const SECRET_KEYS = SECRET_GROUPS.flatMap((g) => g.fields.map((f) => ({ ...f, group: g.id })));
 
 const isSecretKey = (path) => SECRET_KEYS.some((k) => k.path === path);
 
@@ -69,7 +90,7 @@ const isSecretKey = (path) => SECRET_KEYS.some((k) => k.path === path);
  */
 export function describeSecrets() {
   const file = load();
-  return SECRET_KEYS.map(({ path, label }) => {
+  const describeField = ({ path, label, secret = true }) => {
     const envKey = `PRODMESH_SECRET_${path.replace(/\./g, '_').toUpperCase()}`;
     const fromEnv = Boolean(process.env[envKey]);
     const fileValue = path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), file);
@@ -77,11 +98,22 @@ export function describeSecrets() {
     return {
       path,
       label,
+      secret, // false = safe to show (a channel name is not a credential)
       set: Boolean(value),
       length: value ? String(value).length : 0,
+      // Non-secret values are echoed so the UI can show which channel is
+      // configured. Credentials never are.
+      value: !secret && value ? String(value) : null,
       env: fromEnv,
     };
-  });
+  };
+  return SECRET_GROUPS.map((g) => ({
+    id: g.id,
+    label: g.label,
+    hint: g.hint,
+    fields: g.fields.map(describeField),
+    configured: g.fields.every((f) => describeField(f).set),
+  }));
 }
 
 /**

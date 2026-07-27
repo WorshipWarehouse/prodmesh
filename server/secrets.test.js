@@ -11,7 +11,7 @@ const secrets = await import('./secrets.js');
 
 test('describeSecrets reports set/length but never the value', () => {
   secrets.setSecrets({ 'planningCenter.appId': 'app-12345', 'planningCenter.secret': 'sh' });
-  const described = secrets.describeSecrets();
+  const described = secrets.describeSecrets().flatMap((g) => g.fields);
   const appId = described.find((s) => s.path === 'planningCenter.appId');
   assert.equal(appId.set, true);
   assert.equal(appId.length, 9);
@@ -19,20 +19,25 @@ test('describeSecrets reports set/length but never the value', () => {
   const serialized = JSON.stringify(described);
   assert.ok(!serialized.includes('app-12345'), 'a value leaked into the description');
   for (const entry of described) {
-    assert.deepEqual(Object.keys(entry).sort(), ['env', 'label', 'length', 'path', 'set']);
+    assert.deepEqual(Object.keys(entry).sort(), ['env', 'label', 'length', 'path', 'secret', 'set', 'value']);
+    // Only explicitly non-secret fields (a channel name) ever carry a value.
+    if (entry.secret) assert.equal(entry.value, null, `${entry.path} echoed a value`);
   }
 });
 
 test('values round-trip into the store for the app to use', () => {
-  secrets.setSecrets({ 'slack.prod.botOauthToken': 'xoxb-real-token' });
-  assert.equal(secrets.getSecret('slack.prod.botOauthToken'), 'xoxb-real-token');
+  secrets.setSecrets({ 'slack.botOauthToken': 'xoxb-real-token' });
+  assert.equal(secrets.getSecret('slack.botOauthToken'), 'xoxb-real-token');
 });
 
 test('an empty string clears a secret', () => {
   secrets.setSecrets({ 'planningCenter.appId': 'temporary' });
   secrets.setSecrets({ 'planningCenter.appId': '' });
   assert.equal(secrets.getSecret('planningCenter.appId'), undefined);
-  assert.equal(secrets.describeSecrets().find((s) => s.path === 'planningCenter.appId').set, false);
+  assert.equal(
+    secrets.describeSecrets().flatMap((g) => g.fields).find((s) => s.path === 'planningCenter.appId').set,
+    false,
+  );
 });
 
 test('unknown keys are refused rather than silently stored', () => {
@@ -53,8 +58,34 @@ test('the file is written owner-only — it was world-readable', () => {
 });
 
 test('editing one secret preserves the others', () => {
-  secrets.setSecrets({ 'planningCenter.appId': 'keep-me', 'slack.use': 'prod' });
-  secrets.setSecrets({ 'slack.use': 'test' });
+  secrets.setSecrets({ 'planningCenter.appId': 'keep-me', 'slack.channel': '#tech' });
+  secrets.setSecrets({ 'slack.channel': '#booth' });
   assert.equal(secrets.getSecret('planningCenter.appId'), 'keep-me');
-  assert.equal(secrets.getSecret('slack.use'), 'test');
+  assert.equal(secrets.getSecret('slack.channel'), '#booth');
+});
+
+test('an install configured with the old test/prod Slack shape keeps working', async () => {
+  // Slack credentials used to live under slack.test.* / slack.prod.* with
+  // `slack.use` choosing. Collapsing to one set must not silently orphan an
+  // existing install's Slack setup — including the church Producer's.
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(
+    join(process.env.PRODMESH_DATA_DIR, 'secrets.json'),
+    JSON.stringify({
+      slack: {
+        use: 'prod',
+        prod: { botOauthToken: 'xoxb-legacy-prod', channel: '#tech-team' },
+        test: { botOauthToken: 'xoxb-legacy-test', channel: '#sandbox' },
+      },
+    }),
+  );
+  secrets.reloadSecrets();
+  const slack = await import('./integrations/slack.js');
+  assert.equal(slack.isConfigured(), true, 'legacy config must still be live');
+  assert.equal(slack.activeEnv(), 'prod');
+
+  // …and the new flat key wins once set, without touching the legacy block.
+  secrets.setSecrets({ 'slack.botOauthToken': 'xoxb-new', 'slack.channel': '#new' });
+  assert.equal(slack.activeEnv(), 'default');
+  assert.equal(secrets.getSecret('slack.prod.botOauthToken'), 'xoxb-legacy-prod', 'legacy block preserved');
 });

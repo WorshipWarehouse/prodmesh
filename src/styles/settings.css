@@ -796,32 +796,38 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Institution branding (name + logo) ─────────────────────────────────── */
-.campuses__brand {
+/* ── Branding (institution name + logo) ─────────────────────────────────── */
+.branding {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 20px;
+  grid-template-columns: auto 1fr;
+  gap: 28px;
   align-items: start;
+  margin-top: 8px;
 }
 
-@media (max-width: 720px) {
-  .campuses__brand { grid-template-columns: 1fr; }
+@media (max-width: 760px) {
+  .branding { grid-template-columns: 1fr; }
 }
 
-.logofield {
+.branding__logo {
   display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.branding__previews {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* Checkerboard so a transparent PNG reads as transparent, not as white. */
-.logofield__preview {
-  width: 48px;
-  height: 48px;
+.branding__big,
+.branding__actual img {
   object-fit: contain;
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--border);
-  padding: 4px;
   background-color: var(--bg-tile);
   background-image:
     linear-gradient(45deg, rgba(127, 127, 127, 0.12) 25%, transparent 25%),
@@ -832,38 +838,122 @@
   background-position: 0 0, 0 5px, 5px -5px, -5px 0;
 }
 
-.logofield__actions {
+.branding__big {
+  width: 72px;
+  height: 72px;
+  padding: 6px;
+}
+
+/* The size it actually renders at in the sidebar — a mark that reads fine
+   large can turn to mush at 28px, and that is the size that matters. */
+.branding__actual {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  color: var(--text-faint);
+}
+.branding__actual img { width: 28px; height: 28px; padding: 2px; }
+
+.branding__logoactions {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   align-items: flex-start;
-}
-
-.logofield__input {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  max-width: 220px;
-}
-
-/* ── Integration secrets (write-only) ───────────────────────────────────── */
-.secrets {
-  display: grid;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.secrets__row > span {
-  display: flex;
-  align-items: baseline;
   gap: 8px;
 }
 
-.secrets__state {
+.branding__hint {
+  margin: 0;
   font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.branding__name {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 420px;
+}
+.branding__name .lfield { width: 100%; }
+
+/* ── Integration credentials ────────────────────────────────────────────── */
+.integrations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.integration {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-tile);
+}
+
+.integration__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.integration__name { font-weight: 600; }
+
+.integration__state {
+  margin-left: auto;
+  font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.02em;
-  padding: 1px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
 }
-.secrets__state--on { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
-.secrets__state--off { color: var(--text-faint); background: rgba(127, 127, 127, 0.12); }
+.integration__state--on { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+.integration__state--off { color: var(--text-faint); background: rgba(127, 127, 127, 0.14); }
+
+.integration__fields { margin: 0; display: grid; gap: 8px; width: 100%; }
+
+.integration__field dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.integration__field dd {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  word-break: break-all;
+}
+
+.integration__unset {
+  font-family: inherit;
+  letter-spacing: normal;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.integration__env {
+  margin-left: 8px;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+.secretdlg { max-width: 460px; text-align: left; }
+.secretdlg__title { margin: 2px 0 6px; font-size: 1.05rem; }
+.secretdlg .lfield { margin-top: 14px; }
+
+.secretdlg__kept {
+  margin-left: 8px;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--text-faint);
+}

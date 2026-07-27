@@ -380,19 +380,31 @@ export const getConfig = () => getJson<Church>('/api/config');
 
 // ── Secrets (write-only) ─────────────────────────────────────────────────────
 
-/** What is configured — deliberately never the value itself. */
-export interface SecretStatus {
+/** What is configured — deliberately never the credential itself. */
+export interface SecretField {
   path: string;
   label: string;
+  /** false = not a credential (a channel name), so `value` is populated. */
+  secret: boolean;
   set: boolean;
   length: number;
+  value: string | null;
   /** An env var is winning, so editing here would have no effect. */
   env: boolean;
 }
 
-export const getSecrets = () => getJson<{ secrets: SecretStatus[] }>('/api/secrets');
+/** One card per integration. */
+export interface SecretGroup {
+  id: string;
+  label: string;
+  hint: string;
+  fields: SecretField[];
+  configured: boolean;
+}
 
-export async function saveSecrets(updates: Record<string, string>): Promise<{ secrets: SecretStatus[] }> {
+export const getSecrets = () => getJson<{ secrets: SecretGroup[] }>('/api/secrets');
+
+export async function saveSecrets(updates: Record<string, string>): Promise<{ secrets: SecretGroup[] }> {
   const res = await fetch('/api/secrets', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...requestHeaders() },

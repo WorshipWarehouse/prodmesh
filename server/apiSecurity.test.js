@@ -472,7 +472,9 @@ test('secrets are write-only over HTTP and need full admin', async () => {
   // The whole contract: it is stored and usable, but the API never says it.
   const body = await (await get(admin)).text();
   assert.ok(!body.includes(SECRET), 'the secret came back over the API');
-  const entry = JSON.parse(body).secrets.find((s) => s.path === 'planningCenter.secret');
+  const entry = JSON.parse(body).secrets
+    .flatMap((g) => g.fields)
+    .find((s) => s.path === 'planningCenter.secret');
   assert.equal(entry.set, true);
   assert.equal(entry.length, SECRET.length);
 
