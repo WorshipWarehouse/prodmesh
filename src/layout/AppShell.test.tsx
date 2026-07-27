@@ -15,6 +15,9 @@ const api = vi.hoisted(() => ({
   getAssistance: vi.fn(async () => ({ active: false })),
   requestAssistance: vi.fn(),
   dismissAssistance: vi.fn(),
+  // The sidebar asks for the church's uploaded logo and falls back to the
+  // bundled one when the endpoint 404s.
+  logoSrc: (stamp?: number | null) => `/api/branding/logo${stamp ? `?v=${stamp}` : ''}`,
 }));
 
 vi.mock('../api', () => api);

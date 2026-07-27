@@ -378,6 +378,65 @@ export const getVersion = () => getJson<Version>('/api/system/version');
 // ADR 0009; the Admin → Campuses editor saves the whole tree transactionally.
 export const getConfig = () => getJson<Church>('/api/config');
 
+// ── Secrets (write-only) ─────────────────────────────────────────────────────
+
+/** What is configured — deliberately never the value itself. */
+export interface SecretStatus {
+  path: string;
+  label: string;
+  set: boolean;
+  length: number;
+  /** An env var is winning, so editing here would have no effect. */
+  env: boolean;
+}
+
+export const getSecrets = () => getJson<{ secrets: SecretStatus[] }>('/api/secrets');
+
+export async function saveSecrets(updates: Record<string, string>): Promise<{ secrets: SecretStatus[] }> {
+  const res = await fetch('/api/secrets', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ updates }),
+  });
+  await requireOk(res);
+  return res.json();
+}
+
+/** Do the stored credentials actually work? null = not configured. */
+export const checkIntegrations = () =>
+  getJson<{ planningCenter: boolean | null }>('/api/secrets/check');
+
+// ── Branding ─────────────────────────────────────────────────────────────────
+
+/** The institution's logo endpoint. 404s when no override is set, which is the
+ *  signal to fall back to the bundled ProdMesh mark. The cache-buster makes a
+ *  fresh upload appear without a reload. */
+export const logoSrc = (stamp?: number | null) =>
+  `/api/branding/logo${stamp ? `?v=${stamp}` : ''}`;
+
+export interface LogoMeta {
+  type: string;
+  ext: string;
+  bytes: number;
+  updatedAt: number;
+}
+
+export async function uploadLogo(file: File): Promise<LogoMeta> {
+  // Raw bytes, not multipart: the server takes the stream directly.
+  const res = await fetch('/api/branding/logo', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...requestHeaders() },
+    body: file,
+  });
+  await requireOk(res);
+  return (await res.json()) as LogoMeta;
+}
+
+export async function clearLogo(): Promise<void> {
+  const res = await fetch('/api/branding/logo', { method: 'DELETE', headers: requestHeaders() });
+  await requireOk(res);
+}
+
 export async function saveConfig(church: Church): Promise<Church> {
   const res = await fetch('/api/config', {
     method: 'PUT',

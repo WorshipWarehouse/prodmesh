@@ -55,8 +55,16 @@ import {
   type TemplateItem,
   type UserDirectory,
   type ManagedStation,
+  logoSrc,
+  uploadLogo,
+  clearLogo,
+  getSecrets,
+  saveSecrets,
+  checkIntegrations,
+  type SecretStatus,
 } from '../api';
 import type { Church, Site, Tile } from '../types';
+import logoUrl from '../assets/logo.png';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -159,7 +167,7 @@ function LoginForm({ onDone }: { onDone: () => void }) {
 function AdminPanels({ section }: { section: AdminSection }) {
   return (
     <>
-      {section === 'general' && <><SecurityPanel /><SystemPanel /><SchedulesPanel /></>}
+      {section === 'general' && <><SecurityPanel /><SecretsPanel /><SystemPanel /><SchedulesPanel /></>}
       {section === 'campuses' && <CampusesPanel />}
       {section === 'room' && <RoomConfigPanel />}
       {section === 'users' && <UserManagementPanel />}
@@ -717,6 +725,88 @@ function SecurityPanel() {
   );
 }
 
+// Credentials for Planning Center and Slack. WRITE-ONLY on purpose: the server
+// never returns a stored value, so this can say whether something is set and
+// how long it is, but can never show it back. Reading a secret means opening
+// the file on the box, which already implies owning the box.
+function SecretsPanel() {
+  const [items, setItems] = useState<SecretStatus[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Feedback>(null);
+
+  const load = useCallback(() => {
+    getSecrets().then((r) => setItems(r.secrets)).catch(() => setItems([]));
+  }, []);
+  useEffect(load, [load]);
+
+  const dirty = Object.values(draft).some((v) => v !== '');
+
+  const save = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await saveSecrets(draft);
+      setItems(res.secrets);
+      setDraft({});
+      // Credentials are only really "saved" if they work. Checking now beats
+      // finding out mid-service on Sunday.
+      const check = await checkIntegrations().catch(() => null);
+      setMsg(check && check.planningCenter === false
+        ? { kind: 'err', text: 'Saved, but Planning Center rejected these credentials — double-check the App ID and Secret.' }
+        : ok('Saved.'));
+    } catch (err) {
+      setMsg(fail(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!items) return null;
+
+  return (
+    <section className="panel">
+      <p className="section-label">Credentials</p>
+      <h2 className="panel__title">
+        Integration secrets
+        <HelpTip text="Write-only: prodmesh never shows a saved secret back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
+      </h2>
+      <p className="settings__muted">
+        Paste a new value to replace what's stored. Leave a field blank to keep it.
+      </p>
+
+      <div className="secrets">
+        {items.map((item) => (
+          <label key={item.path} className="lfield secrets__row">
+            <span>
+              {item.label}
+              <span className={`secrets__state secrets__state--${item.set ? 'on' : 'off'}`}>
+                {item.env ? 'set by environment' : item.set ? `set · ${item.length} chars` : 'not set'}
+              </span>
+            </span>
+            <input
+              className="field"
+              type="password"
+              autoComplete="new-password"
+              placeholder={item.set ? '•••••••• (unchanged)' : 'not set'}
+              value={draft[item.path] ?? ''}
+              disabled={item.env}
+              onChange={(e) => setDraft((d) => ({ ...d, [item.path]: e.target.value }))}
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="settings__actions">
+        <button className="btn btn--primary" disabled={!dirty || busy} onClick={save}>
+          {busy ? 'Saving…' : 'Save secrets'}
+        </button>
+        {msg && <span className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</span>}
+      </div>
+    </section>
+  );
+}
+
 function SystemPanel() {
   const [version, setVersion] = useState<{ commit: string; subject: string } | null>(null);
   const [status, setStatus] = useState<Feedback>(null);
@@ -1123,6 +1213,86 @@ const moveIn = <T,>(arr: T[], from: number, dir: -1 | 1) => {
 
 // The overview: institution name, sites, and each site's rooms as rows that
 // link into their own configuration page.
+// The church's own mark, replacing the bundled ProdMesh default. Saves
+// immediately rather than joining the Campuses draft — a logo is a file, not a
+// field, and pretending it participates in "unsaved changes" would be a lie.
+function LogoField() {
+  const [stamp, setStamp] = useState(() => Date.now());
+  const [hasLogo, setHasLogo] = useState(true); // assume, correct on 404
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Feedback>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const announce = () => {
+    setStamp(Date.now());
+    window.dispatchEvent(new Event('prodmesh:config-changed')); // sidebar re-reads
+  };
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await uploadLogo(file);
+      setHasLogo(true);
+      announce();
+      setMsg(ok('Logo updated.'));
+    } catch (err) {
+      setMsg(fail(err));
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const reset = async () => {
+    setBusy(true);
+    try {
+      await clearLogo();
+      setHasLogo(false);
+      announce();
+      setMsg(ok('Reverted to the default logo.'));
+    } catch (err) {
+      setMsg(fail(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="lfield campuses__logo">
+      <span>
+        Logo
+        <HelpTip text="PNG, JPEG, GIF or WebP, under 256 KB. Shown in the sidebar on every screen. SVG isn't accepted." />
+      </span>
+      <div className="logofield">
+        <img
+          className="logofield__preview"
+          src={logoSrc(stamp)}
+          alt=""
+          onError={(e) => { e.currentTarget.src = logoUrl; setHasLogo(false); }}
+        />
+        <div className="logofield__actions">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="logofield__input"
+            onChange={(e) => pick(e.target.files?.[0])}
+            disabled={busy}
+          />
+          {hasLogo && (
+            <button className="btn btn--ghost btn--sm" onClick={reset} disabled={busy}>
+              Use default
+            </button>
+          )}
+        </div>
+      </div>
+      {msg && <p className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
 export function CampusesPanel() {
   const { draft, baseline, dirty, msg, err, update, save } = useChurchDraft();
   const [selectedSite, setSelectedSite] = useState('');
@@ -1151,11 +1321,14 @@ export function CampusesPanel() {
       </div>
 
 
-      <label className="lfield campuses__institution">
-        <span>Institution name</span>
-        <input className="field" value={draft.name}
-          onChange={(e) => update((n) => { n.name = e.target.value; })} />
-      </label>
+      <div className="campuses__brand">
+        <label className="lfield campuses__institution">
+          <span>Institution name</span>
+          <input className="field" value={draft.name}
+            onChange={(e) => update((n) => { n.name = e.target.value; })} />
+        </label>
+        <LogoField />
+      </div>
 
       <div className="campuses__sitebar">
         {draft.sites.map((s) => (

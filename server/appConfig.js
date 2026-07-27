@@ -79,11 +79,35 @@ export function replaceChurch(input) {
   return getChurch();
 }
 
-// First boot: adopt the seed so an existing installation keeps looking exactly
-// the way its static config did, and a fresh install starts usable.
+/**
+ * Should first boot install the demo topology?
+ *
+ * It must NOT for a real install. topologySeed.js is Grace Community's actual
+ * campuses, rooms and device addresses, so a church installing prodmesh was
+ * getting a site called "North" containing someone else's IPs — and the
+ * first-run wizard has nothing to do if a campus already exists.
+ *
+ * It must for tests and dev, which are built on that fixture (north-youth is
+ * the mock room every server test uses).
+ *
+ * PRODMESH_SEED=demo|empty forces it either way; otherwise "am I a real
+ * install?" is NODE_ENV=production without the local-test flag.
+ */
+function wantsDemoSeed() {
+  const explicit = String(process.env.PRODMESH_SEED ?? '').toLowerCase();
+  if (explicit === 'demo') return true;
+  if (explicit === 'empty' || explicit === 'none') return false;
+  return process.env.PRODMESH_LOCAL_TEST === '1' || process.env.NODE_ENV !== 'production';
+}
+
+// First boot: an existing installation keeps looking exactly the way its static
+// config did. A fresh real install starts EMPTY, so setup can ask the church
+// who they are rather than presenting them with someone else's campuses.
 function seedIfEmpty() {
   const count = getDb().prepare('SELECT COUNT(*) AS n FROM sites').get().n;
-  if (count === 0) replaceChurch(seedChurch);
+  if (count > 0) return;
+  if (wantsDemoSeed()) return replaceChurch(seedChurch);
+  console.log('[config] fresh install — no campuses yet; run first-time setup');
 }
 
 seedIfEmpty();

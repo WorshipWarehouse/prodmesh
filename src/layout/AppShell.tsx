@@ -20,7 +20,7 @@ import {
   PanelLeftOpen,
   Wrench,
 } from 'lucide-react';
-import { getAuthStatus, getConfig, logoutAdmin, type AuthStatus, type Station } from '../api';
+import { getAuthStatus, getConfig, logoSrc, logoutAdmin, type AuthStatus, type Station } from '../api';
 import { AssistanceBar } from '../components/AssistanceBar';
 import { AssistanceDialog } from '../components/AssistanceDialog';
 import { ALL_CAMPUSES, CampusContext } from './campus';
@@ -61,6 +61,7 @@ export function AppShell() {
     () => localStorage.getItem('prodmesh.campus') ?? ALL_CAMPUSES,
   );
   const [church, setChurch] = useState<Church>(EMPTY_CHURCH);
+  const [logoStamp, setLogoStamp] = useState<number | null>(null);
   const [identity, setIdentity] = useState<AuthStatus | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -78,9 +79,13 @@ export function AppShell() {
   }, []);
 
   // Server-owned topology (ADR 0009): fetch at boot, refetch when the
-  // Campuses editor announces a save.
+  // Campuses editor announces a save. The same event re-stamps the logo so a
+  // fresh upload shows up without a reload.
   useEffect(() => {
-    const load = () => getConfig().then(setChurch).catch(() => {});
+    const load = () => {
+      getConfig().then(setChurch).catch(() => {});
+      setLogoStamp(Date.now());
+    };
     load();
     window.addEventListener('prodmesh:config-changed', load);
     return () => window.removeEventListener('prodmesh:config-changed', load);
@@ -176,7 +181,19 @@ export function AppShell() {
       <div className={`shell${collapsed ? ' shell--rail' : ''}`}>
         <aside className="sidebar">
           <div className="sidebar__brand">
-            <img className="sidebar__logo" src={logoUrl} alt="" title={church.name} />
+            {/* The church's own mark when they've uploaded one; the bundled
+                ProdMesh logo otherwise. The endpoint 404s when unset, so a
+                failed load IS the fallback signal — no extra request. */}
+            <img
+              className="sidebar__logo"
+              src={logoSrc(logoStamp)}
+              alt=""
+              title={church.name}
+              onError={(e) => {
+                const img = e.currentTarget;
+                if (img.src !== logoUrl) img.src = logoUrl;
+              }}
+            />
             <div className="sidebar__brandtext rail-hide">
               <span className="sidebar__church">{church.name}</span>
               <SelectField

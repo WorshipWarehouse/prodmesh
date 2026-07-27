@@ -398,3 +398,89 @@ test('plan notes and leaders stay anonymous; after-action reports do not', async
   assert.equal(full.restricted, undefined);
   assert.equal((await fetch(`${base}/api/history`, { headers: { Authorization: `Bearer ${token}` } })).status, 200);
 });
+
+// ── Logo upload (the app's only file-upload path) ────────────────────────────
+
+test('logo upload: gated, sniffed by bytes, size-capped, served with nosniff', async () => {
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 7)]);
+  const put = (body, token) => fetch(`${base}/api/branding/logo`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body,
+  });
+
+  // Anonymous cannot brand the church.
+  assert.equal((await put(png)).status, 401);
+
+  // A config.manage user rather than the legacy admin PIN: the throttle test
+  // above deliberately locks admin logins from this IP, and depending on it
+  // here would couple these tests by execution order.
+  const g = auth.createGroup({ name: 'Branders', permissions: ['config.manage'] });
+  auth.createUser({ username: 'brander', displayName: 'Brander', pin: '2718', groupIds: [g.id] });
+  const admin = (await (await post('/api/auth/login', { username: 'brander', pin: '2718' }, null, station.token)).json()).token;
+
+  // An SVG is refused however it is labelled — the decision is on bytes, and
+  // a same-origin SVG would execute in the origin holding the admin token.
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  assert.equal((await put(svg, admin)).status, 400);
+  // …as is HTML wearing an image Content-Type.
+  assert.equal((await put(Buffer.from('<!doctype html><script>x</script>'), admin)).status, 400);
+
+  // Oversized uploads are cut off mid-stream, not buffered then rejected.
+  assert.equal((await put(Buffer.alloc(300 * 1024, 1), admin)).status, 413);
+
+  // A real PNG lands, and comes back with the SNIFFED type plus nosniff.
+  assert.equal((await put(png, admin)).status, 200);
+  const served = await fetch(`${base}/api/branding/logo`);
+  assert.equal(served.status, 200);
+  assert.equal(served.headers.get('content-type'), 'image/png');
+  assert.equal(served.headers.get('x-content-type-options'), 'nosniff');
+  assert.ok(Buffer.from(await served.arrayBuffer()).equals(png));
+
+  // Clearing reverts to "no override", which the client reads as 404.
+  assert.equal((await fetch(`${base}/api/branding/logo`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${admin}` },
+  })).status, 200);
+  assert.equal((await fetch(`${base}/api/branding/logo`)).status, 404);
+});
+
+test('secrets are write-only over HTTP and need full admin', async () => {
+  const conf = auth.createGroup({ name: 'Config Only', permissions: ['config.manage', 'settings.manage'] });
+  auth.createUser({ username: 'configonly', displayName: 'Config Only', pin: '1123', groupIds: [conf.id] });
+  const weak = (await (await post('/api/auth/login', { username: 'configonly', pin: '1123' }, null, station.token)).json()).token;
+
+  const get = (token) => fetch(`${base}/api/secrets`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+
+  // Credentials to other systems are not an "operational setting".
+  assert.equal((await get()).status, 401);
+  assert.equal((await get(weak)).status, 403);
+
+  // '*' isn't grantable — it comes from the Administrators system group.
+  const adminGroup = auth.listDirectory().groups.find((x) => x.systemKey === 'admin');
+  auth.createUser({ username: 'realadmin', displayName: 'Real Admin', pin: '3344', groupIds: [adminGroup.id] });
+  const admin = (await (await post('/api/auth/login', { username: 'realadmin', pin: '3344' }, null, station.token)).json()).token;
+
+  const put = (updates) => fetch(`${base}/api/secrets`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${admin}` },
+    body: JSON.stringify({ updates }),
+  });
+
+  const SECRET = 'pco-secret-value-abc123';
+  assert.equal((await put({ 'planningCenter.secret': SECRET })).status, 200);
+
+  // The whole contract: it is stored and usable, but the API never says it.
+  const body = await (await get(admin)).text();
+  assert.ok(!body.includes(SECRET), 'the secret came back over the API');
+  const entry = JSON.parse(body).secrets.find((s) => s.path === 'planningCenter.secret');
+  assert.equal(entry.set, true);
+  assert.equal(entry.length, SECRET.length);
+
+  // Unknown keys are refused rather than quietly written to the file.
+  assert.equal((await put({ 'evil.path': 'x' })).status, 400);
+
+  // The audit records WHICH keys changed and never a value.
+  const audit = JSON.stringify(auth.listAudit({ limit: 50 }));
+  assert.ok(audit.includes('planningCenter.secret'), 'the change should be audited');
+  assert.ok(!audit.includes(SECRET), 'a value leaked into the audit trail');
+});

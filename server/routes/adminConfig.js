@@ -9,10 +9,115 @@ import * as show from '../showManager.js';
 import * as auth from '../authStore.js';
 import * as appConfig from '../appConfig.js';
 import * as connectivity from '../connectivity.js';
+import * as branding from '../branding.js';
+import * as secrets from '../secrets.js';
+import * as pco from '../integrations/planningCenter.js';
 import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 
 const router = express.Router();
+
+// ── Secrets (write-only) ──────────────────────────────────────────────────────
+//
+//  Nothing here ever returns a stored value. A stolen admin session can
+//  overwrite the church's Planning Center token or Slack bot token — loudly,
+//  and things visibly break — but cannot learn them. Reading them back means
+//  opening the file on the server, which already implies owning the box.
+//  Requires '*' rather than settings.manage: these are the credentials to
+//  other systems, not an operational setting.
+
+router.get('/api/secrets', requirePermission('*'), (_req, res) => {
+  res.json({ secrets: secrets.describeSecrets() }); // set/length/env only
+});
+
+router.put('/api/secrets', requirePermission('*'), (req, res) => {
+  try {
+    const touched = secrets.setSecrets(req.body?.updates ?? {});
+    pco.clearCache(); // new credentials must not serve cached results
+    auditSuccess(req, '*', {
+      resourceType: 'secrets', resourceId: 'secrets',
+      details: { paths: touched }, // WHICH keys changed, never their values
+    });
+    res.json({ ok: true, secrets: secrets.describeSecrets() });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
+  }
+});
+
+// Do the stored credentials actually work? Saving a typo'd token otherwise
+// looks like success and surfaces as a dead integration on Sunday. Returns
+// booleans only — never anything derived from the secret itself.
+router.get('/api/secrets/check', requirePermission('*'), async (_req, res) => {
+  if (!pco.isConfigured()) return res.json({ planningCenter: null });
+  const serviceTypes = [...new Set(
+    Object.values(rooms).flatMap((r) => (r.planningCenter?.serviceTypes ?? []).map((st) => st.id)),
+  )];
+  if (!serviceTypes.length) return res.json({ planningCenter: null });
+  try {
+    pco.clearCache();
+    await pco.getUpcomingPlans({ id: serviceTypes[0], name: 'check' }, 1);
+    res.json({ planningCenter: true });
+  } catch {
+    res.json({ planningCenter: false });
+  }
+});
+
+// ── Branding (institution logo) ───────────────────────────────────────────────
+
+// Public read: every page renders it, including anonymous booth screens.
+// 404 means "no override" and the client falls back to the bundled default.
+// The Content-Type is the type SNIFFED at upload, never anything the uploader
+// claimed, and nosniff stops the browser second-guessing it.
+router.get('/api/branding/logo', (_req, res) => {
+  const logo = branding.readLogo();
+  if (!logo) return res.status(404).end();
+  res.set({
+    'Content-Type': logo.type,
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+    'Cache-Control': 'no-cache',
+    ETag: `"${logo.updatedAt}"`,
+  });
+  res.end(logo.buffer);
+});
+
+// Raw body, capped, no multipart parser: this is one file, and every parser is
+// more attack surface than `PUT the bytes` deserves. express.json() is already
+// mounted, so this route takes the stream itself.
+router.put('/api/branding/logo', requirePermission('config.manage'), (req, res) => {
+  const chunks = [];
+  let size = 0;
+  let aborted = false;
+  req.on('data', (chunk) => {
+    if (aborted) return;
+    size += chunk.length;
+    // Abort mid-upload rather than buffering the whole thing and then
+    // complaining about its size.
+    if (size > branding.MAX_LOGO_BYTES) {
+      aborted = true;
+      res.status(413).json({ error: `Logo must be under ${Math.floor(branding.MAX_LOGO_BYTES / 1024)} KB` });
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on('end', () => {
+    if (aborted) return;
+    try {
+      const meta = branding.setLogo(Buffer.concat(chunks));
+      auditSuccess(req, 'config.manage', { resourceType: 'branding', resourceId: 'logo', details: { bytes: meta.bytes } });
+      res.json({ ok: true, ...meta });
+    } catch (err) {
+      res.status(err.code === 'too_large' ? 413 : 400).json({ error: String(err.message ?? err) });
+    }
+  });
+});
+
+router.delete('/api/branding/logo', requirePermission('config.manage'), (req, res) => {
+  branding.clearLogo();
+  auditSuccess(req, 'config.manage', { resourceType: 'branding', resourceId: 'logo', details: { operation: 'clear' } });
+  res.json({ ok: true });
+});
 
 // ── Settings ───────────────────────────────────────────────────────────────────
 
