@@ -13,8 +13,11 @@ import {
   type RoomState,
 } from '../api';
 import { useQuery } from '../lib/useQuery';
-import { Widget, WidgetGrid } from '../components/Widget';
+import { WidgetGrid } from '../components/Widget';
 import { ServicePanel } from '../components/ServicePanel';
+import { Accordion } from '../components/Accordion';
+import { Tile } from '../components/Tile';
+import { useChurch } from '../layout/church';
 
 const POLL_MS = 4000;
 
@@ -67,6 +70,7 @@ function LiveBanner({ roomId }: { roomId: string }) {
 
 export function RoomStatus() {
   const { roomId = '' } = useParams();
+  const church = useChurch();
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [state, setState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -156,13 +160,14 @@ export function RoomStatus() {
   const inStandby = currentMode?.isStandby ?? false;
   const buttons = room.modes.filter((m) => !m.isStandby || !inStandby);
   const showProtection = Boolean(protection?.active && protection.enforced);
+  const tiles = church.sites.flatMap((s) => s.auditoriums).find((a) => a.id === roomId)?.tiles ?? [];
 
   return (
     <div className="status">
       <div className="pagehead">
         <div>
           <h1 className="pagehead__title">{room.name}</h1>
-          <p className="pagehead__sub">Room Status</p>
+          <p className="pagehead__sub">Room Console</p>
         </div>
       </div>
 
@@ -179,56 +184,82 @@ export function RoomStatus() {
       )}
 
       <WidgetGrid>
-        <Widget
-          span="two-thirds"
-          title="Room Mode"
-          meta={
+        <ServicePanel roomId={roomId} span="third" />
+      </WidgetGrid>
+
+      {/* Room Mode changes once at call time and then stays put, so it only
+          claims the page while the room is in Standby. Out of Standby it
+          collapses to its own answer — the current mode — leaving the console
+          to the things used all day. */}
+      <Accordion
+        title="Room Mode"
+        defaultOpen={inStandby}
+        summary={
+          <>
+            <span
+              className="acc__chip"
+              style={{ ['--mode-color' as string]: currentMode?.color ?? '#6b7280' }}
+            >
+              {currentMode?.label ?? 'Unknown'}
+            </span>
             <span className={`mode-hero__conn mode-hero__conn--${state.online ? 'on' : 'off'}`}>
               {state.online ? (
                 <><Wifi size={13} /> Companion live</>
               ) : (
-                <><WifiOff size={13} /> Demo mode (Companion offline)</>
+                <><WifiOff size={13} /> Demo mode</>
               )}
             </span>
-          }
+          </>
+        }
+      >
+        <div
+          className="mode-hero"
+          style={{ ['--mode-color' as string]: currentMode?.color ?? '#6b7280' }}
         >
-          <div
-            className="mode-hero"
-            style={{ ['--mode-color' as string]: currentMode?.color ?? '#6b7280' }}
-          >
-            <span className="mode-hero__label">Current mode</span>
-            <span className="mode-hero__mode">{currentMode?.label ?? 'Unknown'}</span>
-          </div>
+          <span className="mode-hero__label">Current mode</span>
+          <span className="mode-hero__mode">{currentMode?.label ?? 'Unknown'}</span>
+        </div>
 
-          <p className="widget__hint">Set the room to…</p>
-          <div className="status__buttons">
-            {buttons.map((mode) => {
-              const isActive = mode.id === state.mode;
-              const locked = isLocked(mode.id);
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  className={`mode-btn${isActive ? ' mode-btn--active' : ''}${
-                    mode.isStandby ? ' mode-btn--standby' : ''
-                  }`}
-                  style={{ ['--mode-color' as string]: mode.color }}
-                  disabled={isActive}
-                  onClick={() => openConfirm(mode)}
-                >
-                  <span className="mode-btn__label">
-                    {locked && <Lock size={16} aria-label="locked" />}
-                    {mode.label}
-                  </span>
-                  {isActive && <span className="mode-btn__active">Active now</span>}
-                </button>
-              );
-            })}
-          </div>
-        </Widget>
+        <p className="widget__hint">Set the room to…</p>
+        <div className="status__buttons">
+          {buttons.map((mode) => {
+            const isActive = mode.id === state.mode;
+            const locked = isLocked(mode.id);
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                className={`mode-btn${isActive ? ' mode-btn--active' : ''}${
+                  mode.isStandby ? ' mode-btn--standby' : ''
+                }`}
+                style={{ ['--mode-color' as string]: mode.color }}
+                disabled={isActive}
+                onClick={() => openConfirm(mode)}
+              >
+                <span className="mode-btn__label">
+                  {locked && <Lock size={16} aria-label="locked" />}
+                  {mode.label}
+                </span>
+                {isActive && <span className="mode-btn__active">Active now</span>}
+              </button>
+            );
+          })}
+        </div>
+      </Accordion>
 
-        <ServicePanel roomId={roomId} span="third" />
-      </WidgetGrid>
+      {tiles.length > 0 && (
+        <Accordion
+          title="Quick Access"
+          defaultOpen
+          summary={<span className="acc__count">{tiles.length}</span>}
+        >
+          <div className="roomtiles">
+            {tiles.map((tile) => (
+              <Tile key={tile.id} tile={tile} />
+            ))}
+          </div>
+        </Accordion>
+      )}
 
       {pending && (
         <div className="confirm" role="dialog" aria-modal="true">

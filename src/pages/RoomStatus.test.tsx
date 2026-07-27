@@ -27,6 +27,7 @@ vi.mock('../components/ServicePanel', () => ({
 
 import { OverrideRequiredError } from '../api';
 import { clearQueryCache } from '../lib/useQuery';
+import { ChurchContext } from '../layout/church';
 
 const room: RoomMeta = {
   id: 'north-main',
@@ -70,6 +71,16 @@ function renderPage() {
 
 const dialog = () => screen.getByRole('dialog');
 
+// Room Mode collapses whenever the room is OUT of Standby, so any test that
+// drives the mode buttons has to open it first — exactly as an operator would.
+// Returns a scope for the panel BODY: the collapsed header repeats the current
+// mode's name, so an unscoped query for it matches the header too.
+async function openModePanel(user: ReturnType<typeof userEvent.setup>) {
+  const head = await screen.findByRole('button', { name: /Room Mode/ });
+  if (head.getAttribute('aria-expanded') === 'false') await user.click(head);
+  return within(document.getElementById(head.getAttribute('aria-controls')!)!);
+}
+
 beforeEach(() => {
   clearQueryCache();
   api.getRoom.mockResolvedValue(room);
@@ -90,14 +101,16 @@ beforeEach(() => {
 
 describe('mode buttons', () => {
   it('renders every mode, marks the current one active and disabled', async () => {
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByText('Companion live')).toBeInTheDocument();
-    const active = screen.getByRole('button', { name: /Walk In/ });
+    const panel = await openModePanel(user);
+    const active = panel.getByRole('button', { name: /Walk In/ });
     expect(active).toBeDisabled();
     expect(within(active).getByText('Active now')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Standby' })).toBeEnabled();
+    expect(panel.getByRole('button', { name: 'Show' })).toBeEnabled();
+    expect(panel.getByRole('button', { name: 'Standby' })).toBeEnabled();
   });
 
   it('confirms an unlocked change and applies the server response', async () => {
@@ -111,6 +124,7 @@ describe('mode buttons', () => {
     const user = userEvent.setup();
     renderPage();
 
+    await openModePanel(user);
     await user.click(await screen.findByRole('button', { name: 'Show' }));
     expect(within(dialog()).getByText(/Switch/)).toBeInTheDocument();
     await user.click(within(dialog()).getByRole('button', { name: 'Yes, Show' }));
@@ -127,11 +141,65 @@ describe('mode buttons', () => {
     const user = userEvent.setup();
     renderPage();
 
+    await openModePanel(user);
     await user.click(await screen.findByRole('button', { name: 'Show' }));
     await user.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(api.setRoomMode).not.toHaveBeenCalled();
+  });
+});
+
+describe('room console layout', () => {
+  it('collapses Room Mode out of Standby, still naming the current mode', async () => {
+    renderPage();
+
+    // Header answers the question without being opened…
+    const head = await screen.findByRole('button', { name: /Room Mode/ });
+    expect(head).toHaveAttribute('aria-expanded', 'false');
+    expect(within(head).getByText('Walk In')).toBeInTheDocument();
+    // …and the controls are genuinely not rendered.
+    expect(screen.queryByRole('button', { name: 'Show' })).not.toBeInTheDocument();
+  });
+
+  it('opens Room Mode automatically while the room is in Standby', async () => {
+    api.getRoomState.mockResolvedValue({ ...baseState, mode: 'off', raw: 'off' });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: /Room Mode/ }))
+      .toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Show' })).toBeEnabled();
+  });
+
+  it('shows the room’s Quick Access tiles', async () => {
+    render(
+      <ChurchContext.Provider
+        value={{
+          name: 'Test Church',
+          sites: [{
+            id: 'north', name: 'North', status: 'active',
+            auditoriums: [{
+              id: 'north-main', name: 'Main Auditorium',
+              tiles: [
+                { id: 't1', type: 'link', label: 'NDI Tools', url: 'https://example.test' },
+                { id: 't2', type: 'screenshare', label: 'Producer Mac', host: '10.0.0.5' },
+              ],
+            }],
+          }],
+        }}
+      >
+        <MemoryRouter initialEntries={['/room/north-main']}>
+          <Routes>
+            <Route path="/room/:roomId" element={<RoomStatus />} />
+          </Routes>
+        </MemoryRouter>
+      </ChurchContext.Provider>,
+    );
+
+    expect(await screen.findByRole('button', { name: /Quick Access/ }))
+      .toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('NDI Tools')).toBeInTheDocument();
+    expect(screen.getByText('Producer Mac')).toBeInTheDocument();
   });
 });
 
@@ -175,10 +243,12 @@ describe('override-PIN flow', () => {
   });
 
   it('shows the protection banner and a lock on the locked mode', async () => {
+    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByText('Sunday services')).toBeInTheDocument();
     expect(screen.getByText(/override PIN required/)).toBeInTheDocument();
+    await openModePanel(user);
     const locked = screen.getByRole('button', { name: /Standby/ });
     expect(within(locked).getByLabelText('locked')).toBeInTheDocument();
   });
@@ -187,6 +257,7 @@ describe('override-PIN flow', () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText('Sunday services');
+    await openModePanel(user);
 
     await user.click(screen.getByRole('button', { name: /Standby/ }));
     const pinInput = within(dialog()).getByLabelText(/Enter override PIN/);
@@ -218,6 +289,7 @@ describe('override-PIN flow', () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText('Sunday services');
+    await openModePanel(user);
 
     await user.click(screen.getByRole('button', { name: /Standby/ }));
     await user.type(within(dialog()).getByLabelText(/Enter override PIN/), '4457');
