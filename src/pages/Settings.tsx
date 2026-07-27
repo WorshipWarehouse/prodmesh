@@ -61,7 +61,7 @@ import {
   getSecrets,
   saveSecrets,
   checkIntegrations,
-  type SecretStatus,
+  type SecretGroup,
 } from '../api';
 import type { Church, Site, Tile } from '../types';
 import logoUrl from '../assets/logo.png';
@@ -167,7 +167,7 @@ function LoginForm({ onDone }: { onDone: () => void }) {
 function AdminPanels({ section }: { section: AdminSection }) {
   return (
     <>
-      {section === 'general' && <><SecurityPanel /><SecretsPanel /><SystemPanel /><SchedulesPanel /></>}
+      {section === 'general' && <><BrandingPanel /><SecurityPanel /><SecretsPanel /><SystemPanel /><SchedulesPanel /></>}
       {section === 'campuses' && <CampusesPanel />}
       {section === 'room' && <RoomConfigPanel />}
       {section === 'users' && <UserManagementPanel />}
@@ -726,84 +726,148 @@ function SecurityPanel() {
 }
 
 // Credentials for Planning Center and Slack. WRITE-ONLY on purpose: the server
-// never returns a stored value, so this can say whether something is set and
-// how long it is, but can never show it back. Reading a secret means opening
-// the file on the box, which already implies owning the box.
+// never returns a stored credential, so this shows WHETHER one is set (as a
+// row of dots) and never what it is. Editing opens a modal per integration, so
+// the common case — looking at this page to check something is configured —
+// stays a glance rather than a form.
 function SecretsPanel() {
-  const [items, setItems] = useState<SecretStatus[] | null>(null);
+  const [groups, setGroups] = useState<SecretGroup[] | null>(null);
+  const [editing, setEditing] = useState<SecretGroup | null>(null);
+
+  const load = useCallback(() => {
+    getSecrets().then((r) => setGroups(r.secrets)).catch(() => setGroups([]));
+  }, []);
+  useEffect(load, [load]);
+
+  if (!groups) return null;
+
+  return (
+    <section className="panel">
+      <p className="section-label">Credentials</p>
+      <h2 className="panel__title">
+        Integrations
+        <HelpTip text="Write-only: prodmesh never shows a saved credential back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
+      </h2>
+
+      <div className="integrations">
+        {groups.map((group) => (
+          <div key={group.id} className="integration">
+            <div className="integration__head">
+              <span className="integration__name">{group.label}</span>
+              <span className={`integration__state integration__state--${group.configured ? 'on' : 'off'}`}>
+                {group.configured ? 'Configured' : 'Not configured'}
+              </span>
+            </div>
+            <dl className="integration__fields">
+              {group.fields.map((f) => (
+                <div key={f.path} className="integration__field">
+                  <dt>{f.label}</dt>
+                  <dd className={f.set ? '' : 'integration__unset'}>
+                    {!f.set
+                      ? 'not set'
+                      : f.secret
+                        ? '•'.repeat(Math.min(f.length, 20))
+                        : f.value}
+                    {f.env && <span className="integration__env">from environment</span>}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <button className="btn btn--sm" onClick={() => setEditing(group)}>Edit</button>
+          </div>
+        ))}
+      </div>
+
+      {editing && (
+        <SecretsDialog
+          group={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(next) => { setGroups(next); setEditing(null); }}
+        />
+      )}
+    </section>
+  );
+}
+
+function SecretsDialog({
+  group,
+  onClose,
+  onSaved,
+}: {
+  group: SecretGroup;
+  onClose: () => void;
+  onSaved: (groups: SecretGroup[]) => void;
+}) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Feedback>(null);
 
-  const load = useCallback(() => {
-    getSecrets().then((r) => setItems(r.secrets)).catch(() => setItems([]));
-  }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [onClose]);
 
-  const dirty = Object.values(draft).some((v) => v !== '');
+  const dirty = Object.values(draft).some((v) => v.trim() !== '');
 
   const save = async () => {
     setBusy(true);
     setMsg(null);
     try {
       const res = await saveSecrets(draft);
-      setItems(res.secrets);
-      setDraft({});
-      // Credentials are only really "saved" if they work. Checking now beats
-      // finding out mid-service on Sunday.
-      const check = await checkIntegrations().catch(() => null);
-      setMsg(check && check.planningCenter === false
-        ? { kind: 'err', text: 'Saved, but Planning Center rejected these credentials — double-check the App ID and Secret.' }
-        : ok('Saved.'));
+      // Credentials are only really saved if they work — finding out here
+      // beats finding out mid-service on Sunday.
+      if (group.id === 'planningCenter') {
+        const check = await checkIntegrations().catch(() => null);
+        if (check?.planningCenter === false) {
+          setMsg(fail('Saved, but Planning Center rejected these credentials. Double-check the Application ID and Secret.'));
+          setBusy(false);
+          return;
+        }
+      }
+      onSaved(res.secrets);
     } catch (err) {
       setMsg(fail(err));
-    } finally {
       setBusy(false);
     }
   };
 
-  if (!items) return null;
-
   return (
-    <section className="panel">
-      <p className="section-label">Credentials</p>
-      <h2 className="panel__title">
-        Integration secrets
-        <HelpTip text="Write-only: prodmesh never shows a saved secret back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
-      </h2>
-      <p className="settings__muted">
-        Paste a new value to replace what's stored. Leave a field blank to keep it.
-      </p>
+    <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="secret-title">
+      <div className="confirm__card secretdlg">
+        <p className="eyebrow">Credentials</p>
+        <h3 id="secret-title" className="secretdlg__title">{group.label}</h3>
+        <p className="settings__muted">{group.hint}</p>
 
-      <div className="secrets">
-        {items.map((item) => (
-          <label key={item.path} className="lfield secrets__row">
+        {group.fields.map((f) => (
+          <label key={f.path} className="lfield">
             <span>
-              {item.label}
-              <span className={`secrets__state secrets__state--${item.set ? 'on' : 'off'}`}>
-                {item.env ? 'set by environment' : item.set ? `set · ${item.length} chars` : 'not set'}
-              </span>
+              {f.label}
+              {f.set && <span className="secretdlg__kept">leave blank to keep</span>}
             </span>
             <input
               className="field"
-              type="password"
+              type={f.secret ? 'password' : 'text'}
               autoComplete="new-password"
-              placeholder={item.set ? '•••••••• (unchanged)' : 'not set'}
-              value={draft[item.path] ?? ''}
-              disabled={item.env}
-              onChange={(e) => setDraft((d) => ({ ...d, [item.path]: e.target.value }))}
+              placeholder={f.set ? (f.secret ? '••••••••' : f.value ?? '') : 'not set'}
+              value={draft[f.path] ?? ''}
+              disabled={f.env || busy}
+              onChange={(e) => setDraft((d) => ({ ...d, [f.path]: e.target.value }))}
             />
+            {f.env && <small className="settings__muted">Set by an environment variable — edit it there.</small>}
           </label>
         ))}
-      </div>
 
-      <div className="settings__actions">
-        <button className="btn btn--primary" disabled={!dirty || busy} onClick={save}>
-          {busy ? 'Saving…' : 'Save secrets'}
-        </button>
-        {msg && <span className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</span>}
+        {msg && <p className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</p>}
+
+        <div className="confirm__buttons">
+          <button className="confirm__cancel" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="confirm__ok" onClick={save} disabled={!dirty || busy}>
+            {busy ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -1213,22 +1277,47 @@ const moveIn = <T,>(arr: T[], from: number, dir: -1 | 1) => {
 
 // The overview: institution name, sites, and each site's rooms as rows that
 // link into their own configuration page.
-// The church's own mark, replacing the bundled ProdMesh default. Saves
-// immediately rather than joining the Campuses draft — a logo is a file, not a
-// field, and pretending it participates in "unsaved changes" would be a lie.
-function LogoField() {
+// Institution identity — name and logo. These are the two things every
+// installing church changes first, so they get a section of their own in
+// General rather than living inside the topology editor.
+function BrandingPanel() {
+  const [church, setChurch] = useState<Church | null>(null);
+  const [name, setName] = useState('');
   const [stamp, setStamp] = useState(() => Date.now());
-  const [hasLogo, setHasLogo] = useState(true); // assume, correct on 404
+  const [hasLogo, setHasLogo] = useState(true); // assume; the 404 corrects us
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Feedback>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    getConfig().then((c) => { setChurch(c); setName(c.name); }).catch(() => {});
+  }, []);
+
   const announce = () => {
     setStamp(Date.now());
-    window.dispatchEvent(new Event('prodmesh:config-changed')); // sidebar re-reads
+    window.dispatchEvent(new Event('prodmesh:config-changed'));
   };
 
-  const pick = async (file: File | undefined) => {
+  const saveName = async () => {
+    if (!church) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      // Re-read before writing: this endpoint takes the whole tree, and the
+      // Campuses editor may have changed rooms since we loaded.
+      const latest = await getConfig();
+      const saved = await saveConfig({ ...latest, name: name.trim() });
+      setChurch(saved);
+      announce();
+      setMsg(ok('Name updated.'));
+    } catch (err) {
+      setMsg(fail(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickLogo = async (file: File | undefined) => {
     if (!file) return;
     setBusy(true);
     setMsg(null);
@@ -1245,7 +1334,7 @@ function LogoField() {
     }
   };
 
-  const reset = async () => {
+  const resetLogo = async () => {
     setBusy(true);
     try {
       await clearLogo();
@@ -1259,37 +1348,72 @@ function LogoField() {
     }
   };
 
+  if (!church) return null;
+  const dirty = name.trim() !== church.name && name.trim().length > 0;
+
   return (
-    <div className="lfield campuses__logo">
-      <span>
-        Logo
-        <HelpTip text="PNG, JPEG, GIF or WebP, under 256 KB. Shown in the sidebar on every screen. SVG isn't accepted." />
-      </span>
-      <div className="logofield">
-        <img
-          className="logofield__preview"
-          src={logoSrc(stamp)}
-          alt=""
-          onError={(e) => { e.currentTarget.src = logoUrl; setHasLogo(false); }}
-        />
-        <div className="logofield__actions">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            className="logofield__input"
-            onChange={(e) => pick(e.target.files?.[0])}
-            disabled={busy}
-          />
-          {hasLogo && (
-            <button className="btn btn--ghost btn--sm" onClick={reset} disabled={busy}>
-              Use default
+    <section className="panel">
+      <p className="section-label">Identity</p>
+      <h2 className="panel__title">
+        Branding
+        <HelpTip text="Shown on every screen — the sidebar mark and the name above it." />
+      </h2>
+
+      <div className="branding">
+        <div className="branding__logo">
+          {/* Two previews: the logo at the size it actually renders in the
+              sidebar, and larger. A mark that reads fine big can turn to mush
+              at 32px, which is the size that matters. */}
+          <div className="branding__previews">
+            <img
+              className="branding__big"
+              src={logoSrc(stamp)}
+              alt=""
+              onError={(e) => { e.currentTarget.src = logoUrl; setHasLogo(false); }}
+            />
+            <div className="branding__actual">
+              <img src={logoSrc(stamp)} alt="" onError={(e) => { e.currentTarget.src = logoUrl; }} />
+              <span>actual size</span>
+            </div>
+          </div>
+          <div className="branding__logoactions">
+            <button className="btn btn--sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+              Upload logo
             </button>
-          )}
+            {hasLogo && (
+              <button className="btn btn--ghost btn--sm" disabled={busy} onClick={resetLogo}>
+                Use default
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              hidden
+              onChange={(e) => pickLogo(e.target.files?.[0])}
+            />
+            <p className="branding__hint">PNG, JPEG, GIF or WebP · under 256 KB</p>
+          </div>
+        </div>
+
+        <div className="branding__name">
+          <label className="lfield">
+            <span>Institution name</span>
+            <input
+              className="field"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && dirty) saveName(); }}
+            />
+          </label>
+          <button className="btn btn--primary btn--sm" disabled={!dirty || busy} onClick={saveName}>
+            {dirty ? 'Save name' : 'Saved'}
+          </button>
         </div>
       </div>
+
       {msg && <p className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</p>}
-    </div>
+    </section>
   );
 }
 
@@ -1321,14 +1445,6 @@ export function CampusesPanel() {
       </div>
 
 
-      <div className="campuses__brand">
-        <label className="lfield campuses__institution">
-          <span>Institution name</span>
-          <input className="field" value={draft.name}
-            onChange={(e) => update((n) => { n.name = e.target.value; })} />
-        </label>
-        <LogoField />
-      </div>
 
       <div className="campuses__sitebar">
         {draft.sites.map((s) => (

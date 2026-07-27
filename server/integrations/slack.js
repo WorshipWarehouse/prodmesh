@@ -6,9 +6,14 @@
 //  posting returns the message ts, so dismissing a request can ✅ the original
 //  message and the channel stays readable as a live status board.
 //
-//  Credentials live in secrets.json under slack.<env>.*; `slack.use` (or the
-//  PRODMESH_SLACK_ENV env var) picks the test or prod app so development can
-//  never ping the real team channel by accident.
+//  Credentials live in secrets.json under `slack.botOauthToken` / `slack.channel`.
+//
+//  They used to be split into slack.test.* and slack.prod.* with `slack.use`
+//  choosing between them. That was a development convenience that every
+//  installing church had to understand, so it collapsed to one set. Existing
+//  installs are read through the legacy shape below and keep working
+//  untouched; PRODMESH_SLACK_ENV still forces a legacy branch for anyone who
+//  genuinely runs two apps.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getSecret } from '../secrets.js';
@@ -17,16 +22,22 @@ import { report } from '../health.js';
 const BASE = process.env.PRODMESH_SLACK_API ?? 'https://slack.com/api'; // test override
 const TIMEOUT_MS = 6000;
 
-const env = () => process.env.PRODMESH_SLACK_ENV ?? getSecret('slack.use') ?? 'prod';
-const cfg = (key) => getSecret(`slack.${env()}.${key}`);
+const legacyEnv = () => process.env.PRODMESH_SLACK_ENV ?? getSecret('slack.use') ?? 'prod';
+
+/**
+ * Flat key first; fall back to the old nested one. An install configured
+ * before the simplification keeps working with no migration step and no
+ * silent loss of its Slack setup.
+ */
+const cfg = (key) => getSecret(`slack.${key}`) ?? getSecret(`slack.${legacyEnv()}.${key}`);
 
 export function isConfigured() {
   return Boolean(cfg('botOauthToken') && cfg('channel'));
 }
 
-/** Which app is live ('test' | 'prod') — surfaced in logs, never secrets. */
+/** Which credentials are live — 'default', or the legacy branch in use. */
 export function activeEnv() {
-  return env();
+  return getSecret('slack.botOauthToken') ? 'default' : legacyEnv();
 }
 
 async function slackApi(method, payload) {
