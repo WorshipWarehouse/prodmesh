@@ -704,6 +704,9 @@ export interface TimingReport {
   startedAt?: number | null;
   completedAt?: number | null;
   spl?: SplReport | null;
+  /** Server withheld the analysis: reports.view required. Timestamps still
+   *  come through so Run of Show can show a finished service. */
+  restricted?: boolean;
 }
 
 export const getReport = (id: string, planId: string, timeId?: string | null) =>

@@ -74,7 +74,13 @@ export function ServiceReport() {
         </div>
       </div>
 
-      {!report || (report.items.length === 0 && !report.spl) ? (
+      {report?.restricted ? (
+        <p className="settings__muted">
+          Sign in to see how this service ran. Show reports are limited to
+          people with the “View reports” permission — the live Run of Show,
+          including song leaders, stays open to everyone.
+        </p>
+      ) : !report || (report.items.length === 0 && !report.spl) ? (
         <p className="settings__muted">
           Nothing recorded yet. Timing and loudness build automatically while a
           show is live.

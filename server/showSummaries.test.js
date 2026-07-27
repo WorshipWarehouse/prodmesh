@@ -8,6 +8,7 @@ import { join } from 'node:path';
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-summaries-'));
 const { app } = await import('./index.js');
 const timeline = await import('./timeline.js');
+const auth = await import('./authStore.js');
 const splStore = await import('./splStore.js');
 const summaries = await import('./showSummaries.js');
 
@@ -16,9 +17,24 @@ const T0 = Date.now() - 3_600_000; // "an hour ago" — inside any retention win
 
 let base;
 let server;
-before(() => {
+// After-action reports are behind reports.view (operational plan notes stay
+// open — camera ops need to know who is next; retrospective analysis doesn't
+// need to be public). These tests read them, so they read them as someone who
+// is allowed to.
+const viewerGroup = auth.createGroup({ name: 'Report Viewers', permissions: ['reports.view'] });
+auth.createUser({ username: 'reportviewer', displayName: 'Report Viewer', pin: '8642', groupIds: [viewerGroup.id] });
+const viewerStation = auth.registerStation({ name: 'Report Viewer Station' });
+let viewer; // headers
+
+before(async () => {
   server = app.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Prodmesh-Station': viewerStation.token },
+    body: JSON.stringify({ username: 'reportviewer', pin: '8642' }),
+  });
+  viewer = { headers: { Authorization: `Bearer ${(await login.json()).token}` } };
 });
 after(() => server.close());
 
@@ -68,7 +84,7 @@ test('GET /api/history serves the summary rows, newest first', async () => {
   timeline.finalize('plan-sum2__time-1', T0 + 560_000);
   summaries.refresh('plan-sum2__time-1');
 
-  const res = await fetch(`${base}/api/history`);
+  const res = await fetch(`${base}/api/history`, viewer);
   assert.equal(res.status, 200);
   const { shows } = await res.json();
 
@@ -118,7 +134,7 @@ test('pruned SPL samples: report falls back to the summary aggregate', async () 
   assert.equal(splStore.aggregate('plan-old__default'), null);
 
   // The report still carries the SPL block, served from the summary row.
-  const res = await fetch(`${base}/api/rooms/${ROOM}/plan/plan-old/report`);
+  const res = await fetch(`${base}/api/rooms/${ROOM}/plan/plan-old/report`, viewer);
   const report = await res.json();
   assert.equal(report.spl.count, 2);
   assert.equal(report.spl.peak, 92);
@@ -157,7 +173,7 @@ test('rehearsal start records under a synthetic rehearsal timeId, flagged in his
   const ended = await fetch(`${base}/api/rooms/${ROOM}/show/end`, { method: 'POST', headers: authed });
   assert.equal(ended.status, 200);
 
-  const { shows } = await (await fetch(`${base}/api/history`)).json();
+  const { shows } = await (await fetch(`${base}/api/history`, viewer)).json();
   const rehearsalRow = shows.find((s) => s.timeId === state.timeId);
   assert.equal(rehearsalRow.rehearsal, true);
   assert.ok(rehearsalRow.completedAt, 'rehearsal completes like any show');
@@ -200,7 +216,7 @@ test('DELETE /api/history/:instanceId erases a run (gated, audited, refuses live
   assert.equal(summaries.get('plan-old__default'), null);
   assert.equal(timeline.get('plan-old__default'), null);
   assert.equal(splStore2.aggregate('plan-old__default'), null);
-  const { shows } = await (await fetch(`${base}/api/history`)).json();
+  const { shows } = await (await fetch(`${base}/api/history`, viewer)).json();
   assert.ok(!shows.some((s) => s.instanceId === 'plan-old__default'));
 
   // Deleting it again → 404.
