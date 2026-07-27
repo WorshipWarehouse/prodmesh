@@ -10,6 +10,7 @@ import { Field } from '../components/form/Field';
 import { FormRow } from '../components/form/FormRow';
 import { useDraft } from '../components/form/useDraft';
 import { useChurch } from '../layout/church';
+import { allIds, slugId } from '../lib/topology';
 import {
   getAuthStatus,
   loginAdmin,
@@ -64,7 +65,7 @@ import {
   type SecretGroup,
 } from '../api';
 import type { Church, Site, Tile } from '../types';
-import logoUrl from '../assets/logo.png';
+import logoUrl from '../assets/prodmesh-logo.svg';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -746,7 +747,7 @@ function SecretsPanel() {
       <p className="section-label">Credentials</p>
       <h2 className="panel__title">
         Integrations
-        <HelpTip text="Write-only: prodmesh never shows a saved credential back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
+        <HelpTip text="Write-only: ProdMesh never shows a saved credential back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
       </h2>
 
       <div className="integrations">
@@ -1089,7 +1090,7 @@ function ServerLogViewer() {
 
       {log && !log.exists && (
         <p className="settings__muted">
-          No log file yet at <code>{log.file}</code> — it appears when prodmesh runs as the
+          No log file yet at <code>{log.file}</code> — it appears when ProdMesh runs as the
           installed service (deploy/install-service.sh).
         </p>
       )}
@@ -1204,26 +1205,6 @@ const TILE_ICONS: Array<[string, string]> = [
   ['🖥️', 'Computer'],
   ['🌐', 'Network device'],
 ];
-
-function slugId(label: string, taken: Set<string>) {
-  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
-  let id = base;
-  for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`;
-  taken.add(id);
-  return id;
-}
-
-function allIds(church: Church) {
-  const ids = new Set<string>();
-  for (const site of church.sites) {
-    ids.add(site.id);
-    for (const room of site.auditoriums) {
-      ids.add(room.id);
-      for (const tile of room.tiles) ids.add(tile.id);
-    }
-  }
-  return ids;
-}
 
 // Shared draft plumbing: both the overview and the room page edit a local
 // copy of the whole tree and save it transactionally (PUT /api/config).
@@ -1396,7 +1377,10 @@ function BrandingPanel() {
               hidden
               onChange={(e) => pickLogo(e.target.files?.[0])}
             />
-            <p className="branding__hint">PNG, JPEG, GIF or WebP · under 256 KB</p>
+            <p className="branding__hint">
+              PNG, JPEG, GIF or WebP · under 256 KB. The sidebar is dark, so a
+              light or full-colour mark reads best.
+            </p>
           </div>
         </div>
 

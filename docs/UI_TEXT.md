@@ -22,3 +22,14 @@ accumulated explanatory paragraphs that age badly.
    "Loading…" — not apologies or instructions.
 7. **Status feedback is one word where possible.** "Saved." Present tense,
    no exclamation points.
+
+## The one exception: first-run setup
+
+`src/pages/Setup.tsx` is a guided flow, not a control surface, and it is the
+only screen whose reader has never seen the app before. It may open a step with
+a sentence of orientation (rules 1–2 are relaxed there). Everything else still
+holds — supplementary knowledge goes in a HelpTip, must-know consequences stay
+inline (the admin PIN's "resetting it means editing a file on the server"), and
+the copy stays timeless. Note the step-title tips pass `place="below"`: a
+tooltip above a title that near the top of the window is clipped by the
+viewport.

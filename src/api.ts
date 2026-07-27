@@ -378,6 +378,24 @@ export const getVersion = () => getJson<Version>('/api/system/version');
 // ADR 0009; the Admin → Campuses editor saves the whole tree transactionally.
 export const getConfig = () => getJson<Church>('/api/config');
 
+// ── First-run setup ──────────────────────────────────────────────────────────
+
+/** Whether the setup wizard still owns this install, and how far it got. */
+export interface SetupState {
+  needed: boolean;
+  completedAt: number | null;
+  adminPinSet: boolean;
+  hasCampus: boolean;
+}
+
+export const getSetupState = () => getJson<SetupState>('/api/setup');
+
+export async function completeSetup(): Promise<SetupState> {
+  const res = await fetch('/api/setup/complete', { method: 'POST', headers: requestHeaders() });
+  await requireOk(res);
+  return res.json();
+}
+
 // ── Secrets (write-only) ─────────────────────────────────────────────────────
 
 /** What is configured — deliberately never the credential itself. */

@@ -11,11 +11,30 @@ import * as appConfig from '../appConfig.js';
 import * as connectivity from '../connectivity.js';
 import * as branding from '../branding.js';
 import * as secrets from '../secrets.js';
+import * as setup from '../setup.js';
 import * as pco from '../integrations/planningCenter.js';
 import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 
 const router = express.Router();
+
+// ── First-run setup ───────────────────────────────────────────────────────────
+
+// Public, like /api/auth/status and /api/config: the browser has to know
+// whether to render the wizard before anyone can possibly be signed in, and
+// every fact here is already readable from those two endpoints.
+router.get('/api/setup', (_req, res) => {
+  res.json(setup.getState());
+});
+
+// Finishing is an admin action — by this point the wizard has set the PIN and
+// signed in, so there is no bootstrap exception to make. '*' rather than
+// config.manage: dismissing setup is a one-way door for the whole install.
+router.post('/api/setup/complete', requirePermission('*'), (req, res) => {
+  const state = setup.complete();
+  auditSuccess(req, '*', { resourceType: 'setup', resourceId: 'wizard', details: { completedAt: state.completedAt } });
+  res.json(state);
+});
 
 // ── Secrets (write-only) ──────────────────────────────────────────────────────
 //

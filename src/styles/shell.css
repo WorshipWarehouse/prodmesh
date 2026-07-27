@@ -59,8 +59,10 @@
   width: 30px;
   object-fit: contain;
   flex-shrink: 0;
-  /* Logo art is dark on transparent — tint it white for the dark surface. */
-  filter: brightness(0) invert(1);
+  /* Deliberately NOT tinted. This used to be `brightness(0) invert(1)`, which
+     suited the one dark-on-transparent mark the app shipped with but flattened
+     every colour a church uploaded into a white silhouette — and the Branding
+     preview, which has no filter, showed them the logo they expected. */
 }
 
 .sidebar__brandtext {

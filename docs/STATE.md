@@ -174,6 +174,28 @@ Notes:
   comes from the server, refreshed live after a save. Since 2026-07-23 the
   server's own rooms map is built from these same tables (`server/
   roomsStore.js`), so a room created here is immediately a full server room.
+- **First-run setup** (2026-07-27): a fresh install has no admin PIN and no
+  campuses, so `SetupGate` sends every route to `/setup` — a four-step wizard
+  outside the app shell (admin PIN → name + logo → first campus and its rooms →
+  Planning Center/Slack, all skippable) that ends by stamping
+  `settings.setupCompletedAt`. Each new room is given a Room Status tile so its
+  Home card opens onto something. **Existing installs never see it:**
+  `server/setup.js` stamps any box that already has a PIN and campuses complete
+  once, at boot, so an `update.sh` restart can't drop a running church into
+  first-run setup. Setup state is deliberately stored, not inferred from "is
+  there a PIN?" — the PIN is step one, so inferring would end setup while the
+  church is still on step two. `GET /api/setup` is public (both facts already
+  are); `POST /api/setup/complete` needs `*`.
+- **Bundled logo** (2026-07-27): the default mark is `src/assets/prodmesh-logo.svg`
+  (the prodmesh icon). It used to be `logo.png` — Grace Community's mountain, present
+  since the initial commit — so every church installing prodmesh saw another
+  church's logo until they uploaded their own. The sidebar's
+  `filter: brightness(0) invert(1)` went with it: it suited that one
+  dark-on-transparent mark but flattened every uploaded colour logo into a white
+  silhouette, while the Branding preview (no filter) showed the admin the logo
+  they expected. **Grace Community's own install now shows the prodmesh mark until
+  they upload their logo** via Admin → General → Branding; the file is in git
+  history (`git show 9fe09e1:src/assets/logo.png > chills-logo.png`).
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is
