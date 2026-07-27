@@ -363,3 +363,38 @@ test('requests with a foreign Host header are refused (DNS rebinding)', async ()
   assert.equal(await withHost('prodmesh.local'), 200);
   assert.equal(await withHost('localhost'), 200);
 });
+
+// ── reports.view: operational context open, retrospective analysis gated ─────
+//  the maintainer's rule: leader names on the Run of Show are a MUST for volunteers —
+//  camera ops, switchers and FOH read them to know who is next, with nobody
+//  logged in. After-action reports are a different thing and are gated.
+
+test('plan notes and leaders stay anonymous; after-action reports do not', async () => {
+  // Operational: the room, its plans, and the order of service with leaders.
+  for (const path of [`/api/rooms/${ROOM}/service`, `/api/rooms/${ROOM}/show`, '/api/rooms', '/api/config']) {
+    assert.equal((await fetch(base + path)).status, 200, `${path} must stay anonymous`);
+  }
+
+  // Retrospective: the cross-room history list is refused outright.
+  const history = await fetch(`${base}/api/history`);
+  assert.equal(history.status, 401);
+  assert.equal((await history.json()).permission, 'reports.view');
+
+  // The per-service report still answers — the Run of Show page needs to know
+  // whether a service finished — but hands back no analysis.
+  const report = await (await fetch(`${base}/api/rooms/${ROOM}/plan/whatever/report`)).json();
+  assert.equal(report.restricted, true);
+  assert.deepEqual(report.items, []);
+  assert.equal(report.spl, null);
+  assert.ok('completedAt' in report, 'completion stamp survives for the live page');
+
+  // With the permission, the detail comes back and the flag is gone.
+  const g = auth.createGroup({ name: 'Report Readers', permissions: ['reports.view'] });
+  auth.createUser({ username: 'reader', displayName: 'Reader', pin: '3141', groupIds: [g.id] });
+  const token = (await (await post('/api/auth/login', { username: 'reader', pin: '3141' }, null, station.token)).json()).token;
+  const full = await (await fetch(`${base}/api/rooms/${ROOM}/plan/whatever/report`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })).json();
+  assert.equal(full.restricted, undefined);
+  assert.equal((await fetch(`${base}/api/history`, { headers: { Authorization: `Bearer ${token}` } })).status, 200);
+});

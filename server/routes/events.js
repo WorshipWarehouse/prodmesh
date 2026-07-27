@@ -215,11 +215,29 @@ router.post('/api/rooms/:id/event/:planId/checklist/:itemId', requirePermission(
 
 // Timing report for a service instance (planned vs actual per item), plus the
 // SPL block (avg Leq / peak vs the room's targets) when loudness was captured.
+// The after-action detail (per-item planned-vs-actual, loudness) is gated
+// behind reports.view — it is a review artefact, not something the room needs
+// during a service. But the Run of Show page reads this same endpoint just to
+// learn whether the service has FINISHED, and that page has to work for an
+// anonymous booth screen. So anonymous callers keep the timestamps and lose
+// the analysis, rather than losing the endpoint.
 router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   const timeId = String(req.query.time || 'default');
   const instance = `${req.params.planId}__${timeId}`;
   const report =
     timeline.getReport(instance) ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } };
+
+  if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'reports.view')) {
+    return res.json({
+      items: [],
+      totals: { planned: 0, actual: 0, delta: 0 },
+      startedAt: report.startedAt ?? null,
+      completedAt: report.completedAt ?? null,
+      spl: null,
+      restricted: true, // the UI says "sign in to see how it ran"
+    });
+  }
+
   const analysisCfg = rooms[req.params.id]?.analysis;
   // Raw samples are pruned after the retention window; the summary row keeps
   // the aggregated block, so old reports still show their SPL numbers.

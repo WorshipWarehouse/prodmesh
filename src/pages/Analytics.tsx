@@ -35,13 +35,17 @@ export function Analytics() {
   const { campusId } = useCampus();
   const church = useChurch();
   const [shows, setShows] = useState<HistoryShow[] | null>(null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'permission' | 'error' | null>(null);
   const [toDelete, setToDelete] = useState<HistoryShow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   useEffect(() => {
-    getHistory().then((h) => setShows(h.shows)).catch(() => setError(true));
+    getHistory()
+      .then((h) => setShows(h.shows))
+      // 401/403 here means "not signed in / no reports.view", which is a
+      // different message from "the server is unhappy".
+      .catch((err) => setError(/40[13]/.test(String(err)) ? 'permission' : 'error'));
   }, []);
 
   const confirmDelete = async () => {
@@ -69,7 +73,14 @@ export function Analytics() {
         </div>
       </div>
 
-      {error && <p className="pagemsg">Couldn’t load history.</p>}
+      {error === 'permission' ? (
+        <p className="pagemsg">
+          Sign in to view show history. This page needs the “View reports”
+          permission.
+        </p>
+      ) : error ? (
+        <p className="pagemsg">Couldn’t load history.</p>
+      ) : null}
       {shows !== null && visible.length === 0 && (
         <div className="hist__empty">
           <BarChart3 size={28} />

@@ -58,7 +58,12 @@ async function backfillLabels(row) {
 // Served from show_summaries (one indexed query); live shows get their row
 // refreshed first so mid-show history stays current. Labels (planTitle etc.)
 // are stamped at show start; unlabeled rows get a backfill attempt above.
-router.get('/api/history', async (_req, res) => {
+// After-action reports across every room. Gated: this is the review surface,
+// and it also drives outbound Planning Center calls via backfillLabels.
+// Deliberately NOT gated alongside it: plan notes and song leaders on the Run
+// of Show, which camera ops, switchers and FOH read anonymously to know who
+// is next. Operational context stays open; retrospective analysis does not.
+router.get('/api/history', requirePermission('reports.view'), async (_req, res) => {
   summaries.syncFromTimelines(); // once per boot: legacy timelines → rows
   for (const id of show.activeInstanceIds()) summaries.refresh(id);
   await Promise.all(summaries.listAll().map(backfillLabels));
