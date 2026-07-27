@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { hhmmss } from '../lib/duration';
 import {
   BarChart3,
   CheckCircle2,
@@ -35,13 +36,6 @@ function timeLabel(t: PlanTime | null) {
     ? new Date(t.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     : '';
   return [t.name, clock].filter(Boolean).join(' · ');
-}
-
-function hhmmss(totalSeconds: number) {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${h ? `${h}:` : ''}${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 }
 
 function fmtSecondsOfDay(sec: number) {

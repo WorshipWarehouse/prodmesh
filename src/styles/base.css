@@ -182,8 +182,10 @@ button:focus-visible,
   width: 160px;
 }
 
+/* Wide enough for "07:00 AM" AND the native picker icon beside it. At 120px
+   Chrome clipped the meridiem, so every schedule window read "07:00 AI". */
 .field--time {
-  width: 120px;
+  width: 152px;
 }
 
 /* Inputs signal interactivity like selects do (see .selectfield__control). */
