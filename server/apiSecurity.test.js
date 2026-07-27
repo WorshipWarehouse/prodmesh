@@ -62,17 +62,55 @@ test('admin-PIN bootstrap: open exactly once, admin field only', async () => {
   assert.equal((await post('/api/settings/pins', { override: '9999' })).status, 401);
 
   // First-run setup: the first anonymous admin-PIN set is allowed…
-  assert.equal((await post('/api/settings/pins', { admin: '1234' })).status, 200);
+  assert.equal((await post('/api/settings/pins', { admin: 'admin1234' })).status, 200);
   assert.equal(settings.isAdminSetupNeeded(), false);
 
   // …and never again: anonymous → 401, an authed non-admin → 403.
-  assert.equal((await post('/api/settings/pins', { admin: '5678' })).status, 401);
-  const denied = await post('/api/settings/pins', { admin: '5678' }, operatorToken, station.token);
+  assert.equal((await post('/api/settings/pins', { admin: 'admin5678' })).status, 401);
+  const denied = await post('/api/settings/pins', { admin: 'admin5678' }, operatorToken, station.token);
   assert.equal(denied.status, 403);
 
   // The refused attempts changed nothing.
-  assert.equal((await post('/api/auth/admin', { pin: '5678' })).status, 401);
-  assert.equal((await post('/api/auth/admin', { pin: '1234' })).status, 200);
+  assert.equal((await post('/api/auth/admin', { pin: 'admin5678' })).status, 401);
+  assert.equal((await post('/api/auth/admin', { pin: 'admin1234' })).status, 200);
+});
+
+test('bootstrap sets ONLY the admin PIN, never the override alongside it', async () => {
+  // The exception exists to let first-run setup name an admin. It used to pass
+  // `override` through in the same call, so an anonymous caller who won the
+  // race took the room-mode override PIN too.
+  const s = await import('./settings.js');
+  assert.equal(s.getPublicSettings().pins.overrideSet, false, 'no override yet');
+  assert.equal(s.isAdminSetupNeeded(), false, 'admin already bootstrapped above');
+});
+
+test('weak PINs are refused: the admin PIN gates a permission bypass', async () => {
+  const s = await import('./settings.js');
+  assert.throws(() => s.setPins({ admin: '1234' }), /at least 6/);
+  assert.throws(() => s.setPins({ override: '12' }), /at least 4/);
+  // Clearing stays possible, and valid PINs still set.
+  s.setPins({ admin: 'admin1234', override: '9999' });
+});
+
+test('admin PIN guessing is throttled and audited', async () => {
+  // Unthrottled this endpoint was remote code execution: its token sets
+  // legacyAdmin, which bypasses every permission check including
+  // POST /api/system/update. ~40 guesses/second exhausts a 4-digit PIN.
+  const statuses = [];
+  for (let i = 0; i < 8; i++) {
+    statuses.push((await post('/api/auth/admin', { pin: `wrong${i}` })).status);
+  }
+  assert.ok(statuses.includes(429), `expected a lockout, got ${statuses.join(',')}`);
+
+  // Locked out, the CORRECT PIN is refused too — no bypass by knowing it.
+  const locked = await post('/api/auth/admin', { pin: 'admin1234' });
+  assert.equal(locked.status, 429);
+  assert.equal((await locked.json()).error, 'temporarily_locked');
+
+  // Every failure is on the record; before this there was no trace at all.
+  const denied = auth.listAudit({ limit: 200 })
+    .filter((e) => e.action === 'auth.admin' && e.result === 'denied');
+  assert.ok(denied.length >= 5, `expected audited denials, got ${denied.length}`);
 });
 
 test('show start/end/current require shows.operate; reads stay public', async () => {
@@ -109,7 +147,7 @@ test('checklist mode actions enforce mode permission and lockouts', async () => 
   assert.equal((await noMode.json()).permission, 'rooms.mode.change');
 
   // A locked mode can't be sidestepped through the checklist…
-  settings.setPins({ admin: '1234', override: '9999' });
+  settings.setPins({ admin: 'admin1234', override: '9999' });
   settings.setSchedules({
     [ROOM]: [{ id: 'w', label: 'Always', days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', lock: ['sunday'] }],
   });
@@ -126,7 +164,7 @@ test('checklist mode actions enforce mode permission and lockouts', async () => 
   settings.setSchedules({});
 });
 
-test('login lockout: 5 failures lock the station+username pair', async () => {
+test('login lockout: 5 failures lock the ip+username pair', async () => {
   // No station header → explicit station_required, not a silent 401.
   assert.equal((await post('/api/auth/login', { username: 'lockme', pin: '1111' })).status, 400);
 
@@ -143,9 +181,19 @@ test('login lockout: 5 failures lock the station+username pair', async () => {
   assert.equal(body.error, 'temporarily_locked');
   assert.ok(body.retryAfter > 0 && body.retryAfter <= 60_000);
 
-  // The lock is keyed per station+username — other users are unaffected.
+  // Keyed per username — one locked account must not lock a shared booth out
+  // of every account.
   const other = await post('/api/auth/login', { username: 'operator', pin: '2468' }, null, station.token);
   assert.equal(other.status, 200);
+
+  // The bypass this replaced: the counter used to be keyed on station id, and
+  // station registration is unauthenticated and uncapped — so a fresh station
+  // per attempt reset it every time (reproduced: 20 tries, zero lockouts).
+  for (let i = 0; i < 6; i++) {
+    const fresh = auth.registerStation({ name: `Rotating Station ${i}` });
+    const res = await post('/api/auth/login', { username: 'lockme', pin: '0000' }, null, fresh.token);
+    assert.equal(res.status, 429, `rotating stations must not reset the lockout (attempt ${i + 1})`);
+  }
 });
 
 // ── Planning Center path injection ───────────────────────────────────────────

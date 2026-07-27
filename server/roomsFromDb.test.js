@@ -12,7 +12,7 @@ const { app } = await import('./index.js');
 const settings = await import('./settings.js');
 const auth = await import('./authStore.js');
 
-settings.setPins({ admin: '1234' });
+settings.setPins({ admin: 'admin1234' });
 const group = auth.createGroup({ name: 'Mode Operators', permissions: ['rooms.mode.change'] });
 auth.createUser({ username: 'operator', displayName: 'Operator', pin: '2468', groupIds: [group.id] });
 const station = auth.registerStation({ name: 'Rooms Test Station' });
@@ -26,7 +26,7 @@ let operatorToken;
 before(async () => {
   server = app.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
-  adminToken = (await (await post('/api/auth/admin', { pin: '1234' })).json()).token;
+  adminToken = (await (await post('/api/auth/admin', { pin: 'admin1234' })).json()).token;
   const login = await post('/api/auth/login', { username: 'operator', pin: '2468' }, null, station.token);
   operatorToken = (await login.json()).token;
 });

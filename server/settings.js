@@ -88,7 +88,26 @@ export const isOverrideSet = () => load().pins.override != null;
  *   - the empty string '' clears it (null)
  *   - undefined leaves it unchanged
  */
+// The admin PIN gates a token that bypasses every permission check, so it gets
+// a real floor. The override PIN only unlocks a room-mode change in front of a
+// person standing at the booth, so it stays short enough to type under
+// pressure. Neither had ANY minimum before — a one-character admin PIN was
+// accepted, which made the brute-force path trivial.
+const MIN_ADMIN_PIN = 6;
+const MIN_OVERRIDE_PIN = 4;
+
 export function setPins({ admin, override } = {}) {
+  const check = (value, min, what) => {
+    if (value === undefined || value === '') return;
+    if (String(value).length < min) {
+      const err = new Error(`${what} must be at least ${min} characters`);
+      err.code = 'weak_pin';
+      throw err;
+    }
+  };
+  check(admin, MIN_ADMIN_PIN, 'Admin PIN');
+  check(override, MIN_OVERRIDE_PIN, 'Override PIN');
+
   const s = load();
   if (admin !== undefined) s.pins.admin = admin === '' ? null : hashPin(admin);
   if (override !== undefined) s.pins.override = override === '' ? null : hashPin(override);

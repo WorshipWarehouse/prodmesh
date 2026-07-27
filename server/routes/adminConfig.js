@@ -29,7 +29,20 @@ router.post('/api/settings/pins', (req, res) => {
       return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission: 'settings.manage' });
     }
   }
-  settings.setPins({ admin: req.body?.admin, override: req.body?.override });
+  try {
+    // During bootstrap, set ONLY the field the exception justifies. It used to
+    // pass `override` through as well, so an anonymous first-run caller took
+    // the room-mode override PIN along with admin in the same request.
+    settings.setPins(bootstrapping
+      ? { admin: req.body.admin }
+      : { admin: req.body?.admin, override: req.body?.override });
+  } catch (err) {
+    if (err.code === 'weak_pin') return res.status(400).json({ error: String(err.message) });
+    throw err;
+  }
+  if (bootstrapping) {
+    auth.audit({ action: 'settings.bootstrap', result: 'allowed', details: { ip: req.ip ?? null } });
+  }
   res.json({ ok: true, ...settings.getPublicSettings().pins });
 });
 

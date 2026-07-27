@@ -10,9 +10,9 @@ const settings = await import('./settings.js');
 
 test('PIN hashing verifies correct PINs and rejects wrong ones', () => {
   assert.equal(settings.isAdminSetupNeeded(), true);
-  settings.setPins({ admin: '1234', override: '9999' });
+  settings.setPins({ admin: 'admin1234', override: '9999' });
   assert.equal(settings.isAdminSetupNeeded(), false);
-  assert.equal(settings.verifyAdmin('1234'), true);
+  assert.equal(settings.verifyAdmin('admin1234'), true);
   assert.equal(settings.verifyAdmin('0000'), false);
   assert.equal(settings.verifyOverride('9999'), true);
   assert.equal(settings.verifyOverride(''), false);
