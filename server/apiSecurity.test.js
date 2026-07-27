@@ -147,3 +147,64 @@ test('login lockout: 5 failures lock the station+username pair', async () => {
   const other = await post('/api/auth/login', { username: 'operator', pin: '2468' }, null, station.token);
   assert.equal(other.status, 200);
 });
+
+// ── Planning Center path injection ───────────────────────────────────────────
+//  A planId is persisted and later replayed into PC request paths by
+//  backfillLabels. Before this guard, "1/../../../people/v2/people" escaped
+//  the /services/v2 prefix (fetch normalizes `..`) and reached the People API
+//  with the church's PAT — congregant names, emails and addresses, readable by
+//  anyone holding only shows.operate. Reproduce the exact payload, not a
+//  sanitized stand-in: this is the kind of bug that returns during a refactor.
+
+test('show start rejects plan ids that could reshape a Planning Center path', async () => {
+  const runner = auth.createGroup({ name: 'PC Injection Ops', permissions: ['shows.operate'] });
+  auth.createUser({ username: 'pcinj', displayName: 'PC Inj', pin: '9182', groupIds: [runner.id] });
+  const res0 = await post('/api/auth/login', { username: 'pcinj', pin: '9182' }, null, station.token);
+  const token = (await res0.json()).token;
+
+  const payloads = [
+    '1/../../../people/v2/people?per_page=100', // the reproduced escape
+    '../../people/v2/people',
+    '1%2F..%2F..%2Fpeople',                     // pre-encoded traversal
+    '1?filter=x',                               // query injection
+    '1#frag',                                   // fragment truncation
+    '1/notes',                                  // extra path segment
+  ];
+  for (const planId of payloads) {
+    const res = await post(`/api/rooms/${ROOM}/show/start`, { planId, timeId: 't1' }, token, station.token);
+    assert.equal(res.status, 400, `planId ${JSON.stringify(planId)} must be refused`);
+    assert.equal((await res.json()).error, 'Invalid plan id');
+  }
+
+  // Demo-mode ids (no PC credentials) must still be accepted — the charset
+  // guard blocks URL metacharacters, it does not require digits.
+  const ok = await post(`/api/rooms/${ROOM}/show/start`, { planId: 'mock-st1-0', timeId: 't1' }, token, station.token);
+  assert.equal(ok.status, 200, 'demo-mode plan ids must keep working');
+  await post(`/api/rooms/${ROOM}/show/end`, {}, token, station.token);
+});
+
+test('the Planning Center id guard refuses anything that is not a bare number', async () => {
+  // Second line of defence, unit-tested directly: with no PC credentials the
+  // client short-circuits to mock data before building a URL, so the guard is
+  // unreachable through the public functions in this environment. It still has
+  // to hold for installs that ARE configured, where a planId poisoned before
+  // the route guard existed gets replayed by backfillLabels.
+  const { pcId } = await import('./integrations/planningCenter.js');
+
+  assert.equal(pcId('12345', 'plan id'), '12345');
+  for (const bad of [
+    '1/../../../people/v2/people?per_page=100',
+    '../../people/v2/people',
+    '1%2F..%2Fpeople',
+    '1?filter=x',
+    '1#frag',
+    '1/notes',
+    'mock-st1-0', // demo ids are fine to STORE but must never reach a real URL
+    '',
+    null,
+    undefined,
+  ]) {
+    assert.throws(() => pcId(bad, 'plan id'), /Invalid Planning Center plan id/,
+      `${JSON.stringify(bad)} must be refused`);
+  }
+});

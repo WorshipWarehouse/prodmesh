@@ -37,7 +37,17 @@ router.post('/api/rooms/:id/show/start', requirePermission('shows.operate'), asy
     const timeId = req.body?.rehearsal
       ? `rehearsal-${Date.now()}`
       : String(req.body?.timeId || 'default');
-    res.json(await show.startShow(req.params.id, req.body?.planId, timeId));
+    // planId is persisted (timeline JSON, show_summaries) and later replayed
+    // into Planning Center request paths by backfillLabels, so it has to be
+    // clean before it is STORED, not just before it is used. Charset rather
+    // than digits-only: demo mode (no PC credentials) mints ids like
+    // "mock-st1-0" and must keep working. This blocks every character that
+    // could reshape a URL path; planningCenter.js then enforces digits-only
+    // at the point a real request is actually built.
+    const planId = String(req.body?.planId ?? '');
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(planId)) return res.status(400).json({ error: 'Invalid plan id' });
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(timeId)) return res.status(400).json({ error: 'Invalid time id' });
+    res.json(await show.startShow(req.params.id, planId, timeId));
   } catch (err) {
     res.status(err.code === 'conflict' ? 409 : 400).json({ error: String(err.message ?? err) });
   }
