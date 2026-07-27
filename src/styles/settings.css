@@ -795,3 +795,52 @@
 @keyframes connstatus-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Institution branding (name + logo) ─────────────────────────────────── */
+.campuses__brand {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .campuses__brand { grid-template-columns: 1fr; }
+}
+
+.logofield {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Checkerboard so a transparent PNG reads as transparent, not as white. */
+.logofield__preview {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border);
+  padding: 4px;
+  background-color: var(--bg-tile);
+  background-image:
+    linear-gradient(45deg, rgba(127, 127, 127, 0.12) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(127, 127, 127, 0.12) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(127, 127, 127, 0.12) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(127, 127, 127, 0.12) 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+}
+
+.logofield__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.logofield__input {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  max-width: 220px;
+}

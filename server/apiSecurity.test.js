@@ -398,3 +398,48 @@ test('plan notes and leaders stay anonymous; after-action reports do not', async
   assert.equal(full.restricted, undefined);
   assert.equal((await fetch(`${base}/api/history`, { headers: { Authorization: `Bearer ${token}` } })).status, 200);
 });
+
+// ── Logo upload (the app's only file-upload path) ────────────────────────────
+
+test('logo upload: gated, sniffed by bytes, size-capped, served with nosniff', async () => {
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 7)]);
+  const put = (body, token) => fetch(`${base}/api/branding/logo`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body,
+  });
+
+  // Anonymous cannot brand the church.
+  assert.equal((await put(png)).status, 401);
+
+  // A config.manage user rather than the legacy admin PIN: the throttle test
+  // above deliberately locks admin logins from this IP, and depending on it
+  // here would couple these tests by execution order.
+  const g = auth.createGroup({ name: 'Branders', permissions: ['config.manage'] });
+  auth.createUser({ username: 'brander', displayName: 'Brander', pin: '2718', groupIds: [g.id] });
+  const admin = (await (await post('/api/auth/login', { username: 'brander', pin: '2718' }, null, station.token)).json()).token;
+
+  // An SVG is refused however it is labelled — the decision is on bytes, and
+  // a same-origin SVG would execute in the origin holding the admin token.
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+  assert.equal((await put(svg, admin)).status, 400);
+  // …as is HTML wearing an image Content-Type.
+  assert.equal((await put(Buffer.from('<!doctype html><script>x</script>'), admin)).status, 400);
+
+  // Oversized uploads are cut off mid-stream, not buffered then rejected.
+  assert.equal((await put(Buffer.alloc(300 * 1024, 1), admin)).status, 413);
+
+  // A real PNG lands, and comes back with the SNIFFED type plus nosniff.
+  assert.equal((await put(png, admin)).status, 200);
+  const served = await fetch(`${base}/api/branding/logo`);
+  assert.equal(served.status, 200);
+  assert.equal(served.headers.get('content-type'), 'image/png');
+  assert.equal(served.headers.get('x-content-type-options'), 'nosniff');
+  assert.ok(Buffer.from(await served.arrayBuffer()).equals(png));
+
+  // Clearing reverts to "no override", which the client reads as 404.
+  assert.equal((await fetch(`${base}/api/branding/logo`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${admin}` },
+  })).status, 200);
+  assert.equal((await fetch(`${base}/api/branding/logo`)).status, 404);
+});

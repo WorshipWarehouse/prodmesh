@@ -9,10 +9,68 @@ import * as show from '../showManager.js';
 import * as auth from '../authStore.js';
 import * as appConfig from '../appConfig.js';
 import * as connectivity from '../connectivity.js';
+import * as branding from '../branding.js';
 import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 
 const router = express.Router();
+
+// ── Branding (institution logo) ───────────────────────────────────────────────
+
+// Public read: every page renders it, including anonymous booth screens.
+// 404 means "no override" and the client falls back to the bundled default.
+// The Content-Type is the type SNIFFED at upload, never anything the uploader
+// claimed, and nosniff stops the browser second-guessing it.
+router.get('/api/branding/logo', (_req, res) => {
+  const logo = branding.readLogo();
+  if (!logo) return res.status(404).end();
+  res.set({
+    'Content-Type': logo.type,
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+    'Cache-Control': 'no-cache',
+    ETag: `"${logo.updatedAt}"`,
+  });
+  res.end(logo.buffer);
+});
+
+// Raw body, capped, no multipart parser: this is one file, and every parser is
+// more attack surface than `PUT the bytes` deserves. express.json() is already
+// mounted, so this route takes the stream itself.
+router.put('/api/branding/logo', requirePermission('config.manage'), (req, res) => {
+  const chunks = [];
+  let size = 0;
+  let aborted = false;
+  req.on('data', (chunk) => {
+    if (aborted) return;
+    size += chunk.length;
+    // Abort mid-upload rather than buffering the whole thing and then
+    // complaining about its size.
+    if (size > branding.MAX_LOGO_BYTES) {
+      aborted = true;
+      res.status(413).json({ error: `Logo must be under ${Math.floor(branding.MAX_LOGO_BYTES / 1024)} KB` });
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on('end', () => {
+    if (aborted) return;
+    try {
+      const meta = branding.setLogo(Buffer.concat(chunks));
+      auditSuccess(req, 'config.manage', { resourceType: 'branding', resourceId: 'logo', details: { bytes: meta.bytes } });
+      res.json({ ok: true, ...meta });
+    } catch (err) {
+      res.status(err.code === 'too_large' ? 413 : 400).json({ error: String(err.message ?? err) });
+    }
+  });
+});
+
+router.delete('/api/branding/logo', requirePermission('config.manage'), (req, res) => {
+  branding.clearLogo();
+  auditSuccess(req, 'config.manage', { resourceType: 'branding', resourceId: 'logo', details: { operation: 'clear' } });
+  res.json({ ok: true });
+});
 
 // ── Settings ───────────────────────────────────────────────────────────────────
 

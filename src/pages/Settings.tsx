@@ -55,8 +55,12 @@ import {
   type TemplateItem,
   type UserDirectory,
   type ManagedStation,
+  logoSrc,
+  uploadLogo,
+  clearLogo,
 } from '../api';
 import type { Church, Site, Tile } from '../types';
+import logoUrl from '../assets/logo.png';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -1123,6 +1127,86 @@ const moveIn = <T,>(arr: T[], from: number, dir: -1 | 1) => {
 
 // The overview: institution name, sites, and each site's rooms as rows that
 // link into their own configuration page.
+// The church's own mark, replacing the bundled ProdMesh default. Saves
+// immediately rather than joining the Campuses draft — a logo is a file, not a
+// field, and pretending it participates in "unsaved changes" would be a lie.
+function LogoField() {
+  const [stamp, setStamp] = useState(() => Date.now());
+  const [hasLogo, setHasLogo] = useState(true); // assume, correct on 404
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Feedback>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const announce = () => {
+    setStamp(Date.now());
+    window.dispatchEvent(new Event('prodmesh:config-changed')); // sidebar re-reads
+  };
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await uploadLogo(file);
+      setHasLogo(true);
+      announce();
+      setMsg(ok('Logo updated.'));
+    } catch (err) {
+      setMsg(fail(err));
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const reset = async () => {
+    setBusy(true);
+    try {
+      await clearLogo();
+      setHasLogo(false);
+      announce();
+      setMsg(ok('Reverted to the default logo.'));
+    } catch (err) {
+      setMsg(fail(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="lfield campuses__logo">
+      <span>
+        Logo
+        <HelpTip text="PNG, JPEG, GIF or WebP, under 256 KB. Shown in the sidebar on every screen. SVG isn't accepted." />
+      </span>
+      <div className="logofield">
+        <img
+          className="logofield__preview"
+          src={logoSrc(stamp)}
+          alt=""
+          onError={(e) => { e.currentTarget.src = logoUrl; setHasLogo(false); }}
+        />
+        <div className="logofield__actions">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="logofield__input"
+            onChange={(e) => pick(e.target.files?.[0])}
+            disabled={busy}
+          />
+          {hasLogo && (
+            <button className="btn btn--ghost btn--sm" onClick={reset} disabled={busy}>
+              Use default
+            </button>
+          )}
+        </div>
+      </div>
+      {msg && <p className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</p>}
+    </div>
+  );
+}
+
 export function CampusesPanel() {
   const { draft, baseline, dirty, msg, err, update, save } = useChurchDraft();
   const [selectedSite, setSelectedSite] = useState('');
@@ -1151,11 +1235,14 @@ export function CampusesPanel() {
       </div>
 
 
-      <label className="lfield campuses__institution">
-        <span>Institution name</span>
-        <input className="field" value={draft.name}
-          onChange={(e) => update((n) => { n.name = e.target.value; })} />
-      </label>
+      <div className="campuses__brand">
+        <label className="lfield campuses__institution">
+          <span>Institution name</span>
+          <input className="field" value={draft.name}
+            onChange={(e) => update((n) => { n.name = e.target.value; })} />
+        </label>
+        <LogoField />
+      </div>
 
       <div className="campuses__sitebar">
         {draft.sites.map((s) => (
