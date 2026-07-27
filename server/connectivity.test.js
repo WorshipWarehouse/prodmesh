@@ -88,7 +88,7 @@ test('logControl is Smaart-only and stored as a clean boolean', () => {
 });
 
 test('first boot seeds ProPresenter from rooms.config.js', () => {
-  assert.deepEqual(conn.getProPresenter('north-main'), { host: '192.0.2.74', port: 62202 });
+  assert.deepEqual(conn.getProPresenter('north-main'), { host: '192.0.2.74', port: 1025 });
   assert.deepEqual(conn.getProPresenter('local-test'), { host: '127.0.0.1', port: 62202 });
   assert.equal(conn.getProPresenter('north-youth'), null);
 });

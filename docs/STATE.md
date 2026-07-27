@@ -188,7 +188,9 @@ Notes:
    **62202** (not 49310 = legacy WS). Mapping is by playlist index (PC push
    preserves order) with tolerant name fallback. See ADR 0003.
    - Verified: triggering slides moves the highlight (~1s). Note: PP's
-     `?chunked=true` does NOT push item changes, so we poll `/v1/playlist/active`.
+     `?chunked=true` streaming is version-dependent (21.4 pushes, older builds
+     send one snapshot), so `pollRunState` auto-detects it and falls back to
+     polling — see ARCHITECTURE.md. Not yet verified on the church's 21.1.
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
      port per machine); wire Youth (PP host TBD).
 2. ~~Connectivity migration into the room page~~ **Complete 2026-07-21** (page

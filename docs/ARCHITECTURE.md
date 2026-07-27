@@ -115,11 +115,20 @@ Express server (server/)
   Midweek/Evening). Map rooms to an array and merge.
 - **Song key** is `item.key_name`; **item "Leader"** is not a field — it's an
   *item note* in the "Leader" category (fetch items with `include=item_notes`).
-- **ProPresenter API is on its own port** (62202 here; 49310 is the legacy WS,
-  won't speak HTTP). The active item's fields nest under `playlist_item.id`. And
-  `/v1/playlist/active?chunked=true` only sends the INITIAL state — it does NOT
-  push item changes — so we **poll** `/v1/playlist/active` (~1s) and push to the
-  browser via SSE. For slide totals, the active arrangement comes from the
+- **ProPresenter API is on its own port**, and it is **per-machine and
+  ephemeral** — ProPresenter picks one and it can change across restarts unless
+  pinned in its Network preferences (church Booth-Mac has answered on
+  1025, a dev laptop on 62201; 62202 is only this module's fallback default).
+  49310 is the legacy WS and won't speak HTTP. The active item's fields nest under `playlist_item.id`. And
+  `?chunked=true` support is **version-dependent**: on 21.4 both
+  `/v1/presentation/slide_index` and `/v1/playlist/active` hold the connection
+  open and push on change (verified live 2026-07-26), while older builds answer
+  the initial snapshot and close. So `pollRunState` runs both sources — it
+  streams `slide_index` and, because every build sends an opening snapshot,
+  treats only a SUBSEQUENT push as proof of streaming. Until proven (and again
+  if the stream drops or is caught missing a change) it polls at the full rate,
+  exactly as before streaming existed. Browsers get the result via SSE either
+  way. For slide totals, the active arrangement comes from the
   playlist item's `presentation_info.arrangement_name/uuid` — the presentation's
   own `current_arrangement` is unreliable (often empty), and arrangements have
   different slide counts (songs repeat groups).

@@ -90,7 +90,11 @@ export const rooms = {
       ],
     },
     // Fresh-install seed only — after first boot the database owns this.
-    proPresenter: { host: '192.0.2.74', port: 62202 }, // ProPresenter (confirm port on-site)
+    // ProPresenter. Port is a guess by nature: PP picks an ephemeral API
+    // port per machine and can change it across restarts unless pinned in its
+    // Network preferences. Observed 1025 on-site 2026-07-24; the DB value is
+    // what actually runs, so fix it there (Admin → Campuses), not here.
+    proPresenter: { host: '192.0.2.74', port: 1025 },
     // Analysis source (SPL) — Smaart on the FOH Mac ("FOH-Soundgrid"), Smaart
     // v8 8.5.2.2, API v3 (the transport negotiates the path automatically;
     // verified live 2026-07-14). `source: 'rta'` points at a ProdMesh Remote
