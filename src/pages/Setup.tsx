@@ -128,7 +128,7 @@ export function Setup() {
       <div className="setup setup--plain">
         <div className="setup__hero">
           <img className="setup__herologo" src={logoUrl} alt="" />
-          <p className="eyebrow">Welcome to prodmesh</p>
+          <p className="eyebrow">Welcome to ProdMesh</p>
           <h1 className="setup__herotitle">Let's set up your church.</h1>
           <p className="setup__herolede">
             Four steps: an admin PIN, your name and logo, your first campus, and the
@@ -155,7 +155,7 @@ export function Setup() {
       <aside className="setup__rail">
         <div className="setup__railbrand">
           <img src={logoUrl} alt="" />
-          <span>prodmesh</span>
+          <span>ProdMesh</span>
         </div>
         <ol className="setup__steps">
           {STEPS.map((s, i) => {
@@ -535,7 +535,7 @@ function CampusStep({
 // ── 4 · Integrations (optional) ──────────────────────────────────────────────
 const GROUP_HELP: Record<string, string> = {
   planningCenter:
-    'Create a Personal Access Token at planningcenteronline.com → Developer → Personal Access Tokens. It reads service plans; prodmesh never writes to Planning Center.',
+    'Create a Personal Access Token at planningcenteronline.com → Developer → Personal Access Tokens. It reads service plans; ProdMesh never writes to Planning Center.',
   slack: 'Create an app at api.slack.com, give it chat:write, install it to your workspace, then invite the bot to the channel you name here.',
 };
 
@@ -567,7 +567,7 @@ function IntegrationsStep({ onBack, onNext }: { onBack: () => void; onNext: () =
   return (
     <Step
       title="Connect your services"
-      help="Every one of these is optional and can be added later in Admin → General. prodmesh runs without them; you just won't see service plans or get Slack alerts."
+      help="Every one of these is optional and can be added later in Admin → General. ProdMesh runs without them; you just won't see service plans or get Slack alerts."
       footer={
         <>
           <button className="btn btn--ghost" onClick={onBack} disabled={busy}><ArrowLeft size={16} /> Back</button>
@@ -615,7 +615,7 @@ function IntegrationsStep({ onBack, onNext }: { onBack: () => void; onNext: () =
 // ── Done ─────────────────────────────────────────────────────────────────────
 const NEXT_STOPS = [
   { to: '/admin/users', icon: Users, label: 'Add your team', note: 'Logins and what each person may change' },
-  { to: '/admin/stations', icon: MonitorCog, label: 'Name your stations', note: 'Each booth machine that opens prodmesh' },
+  { to: '/admin/stations', icon: MonitorCog, label: 'Name your stations', note: 'Each booth machine that opens ProdMesh' },
   { to: '/admin/campuses', icon: Building2, label: 'Connect each room', note: 'ProPresenter, Companion, Planning Center' },
   { to: '/admin/checklists', icon: ClipboardList, label: 'Build a checklist', note: 'What the team runs before a service' },
 ];
@@ -646,7 +646,7 @@ function DoneStep({
 
       <p className="setup__note">
         The first thing you'll see is a prompt to name this machine as a station —
-        that's how prodmesh tells the booth from the office.
+        that's how ProdMesh tells the booth from the office.
       </p>
 
       <div className="setup__body">

@@ -747,7 +747,7 @@ function SecretsPanel() {
       <p className="section-label">Credentials</p>
       <h2 className="panel__title">
         Integrations
-        <HelpTip text="Write-only: prodmesh never shows a saved credential back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
+        <HelpTip text="Write-only: ProdMesh never shows a saved credential back, so a stolen admin session can't read them. To check a value, open server/data/secrets.json on the server." />
       </h2>
 
       <div className="integrations">
@@ -1090,7 +1090,7 @@ function ServerLogViewer() {
 
       {log && !log.exists && (
         <p className="settings__muted">
-          No log file yet at <code>{log.file}</code> — it appears when prodmesh runs as the
+          No log file yet at <code>{log.file}</code> — it appears when ProdMesh runs as the
           installed service (deploy/install-service.sh).
         </p>
       )}
