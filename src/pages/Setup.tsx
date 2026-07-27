@@ -32,7 +32,7 @@ import {
   type SecretGroup,
   type SetupState,
 } from '../api';
-import logoUrl from '../assets/logo.png';
+import logoUrl from '../assets/prodmesh-logo.svg';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FIRST-RUN SETUP  —  the first thing a church sees.
@@ -430,7 +430,10 @@ function IdentityStep({
           )}
           <input ref={fileRef} type="file" hidden accept="image/png,image/jpeg,image/gif,image/webp"
             onChange={(e) => pick(e.target.files?.[0])} />
-          <p className="setup__note">PNG, JPEG, GIF or WebP · under 256 KB. Optional — you can add it later.</p>
+          <p className="setup__note">
+            PNG, JPEG, GIF or WebP · under 256 KB. The sidebar is dark, so a light
+            or full-colour mark reads best. Optional — you can add it later.
+          </p>
         </div>
       </div>
       <Err text={err} />

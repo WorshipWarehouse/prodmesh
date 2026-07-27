@@ -29,7 +29,7 @@ import type { Church } from '../types';
 import { Clock } from '../components/Clock';
 import { SelectField } from '../components/SelectField';
 import { IdentityDialog } from '../components/IdentityDialog';
-import logoUrl from '../assets/logo.png';
+import logoUrl from '../assets/prodmesh-logo.svg';
 
 const NAV = [
   { to: '/', label: 'Home', icon: HomeIcon, end: true },

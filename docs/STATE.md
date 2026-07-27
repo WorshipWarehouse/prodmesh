@@ -186,6 +186,16 @@ Notes:
   there a PIN?" — the PIN is step one, so inferring would end setup while the
   church is still on step two. `GET /api/setup` is public (both facts already
   are); `POST /api/setup/complete` needs `*`.
+- **Bundled logo** (2026-07-27): the default mark is `src/assets/prodmesh-logo.svg`
+  (the prodmesh icon). It used to be `logo.png` — Grace Community's mountain, present
+  since the initial commit — so every church installing prodmesh saw another
+  church's logo until they uploaded their own. The sidebar's
+  `filter: brightness(0) invert(1)` went with it: it suited that one
+  dark-on-transparent mark but flattened every uploaded colour logo into a white
+  silhouette, while the Branding preview (no filter) showed the admin the logo
+  they expected. **Grace Community's own install now shows the prodmesh mark until
+  they upload their logo** via Admin → General → Branding; the file is in git
+  history (`git show 9fe09e1:src/assets/logo.png > chills-logo.png`).
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is

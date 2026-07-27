@@ -65,7 +65,7 @@ import {
   type SecretGroup,
 } from '../api';
 import type { Church, Site, Tile } from '../types';
-import logoUrl from '../assets/logo.png';
+import logoUrl from '../assets/prodmesh-logo.svg';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -1377,7 +1377,10 @@ function BrandingPanel() {
               hidden
               onChange={(e) => pickLogo(e.target.files?.[0])}
             />
-            <p className="branding__hint">PNG, JPEG, GIF or WebP · under 256 KB</p>
+            <p className="branding__hint">
+              PNG, JPEG, GIF or WebP · under 256 KB. The sidebar is dark, so a
+              light or full-colour mark reads best.
+            </p>
           </div>
         </div>
 
