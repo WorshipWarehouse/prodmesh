@@ -25,8 +25,17 @@ router.get('/api/settings', requirePermission('settings.manage'), (_req, res) =>
 router.post('/api/settings/pins', (req, res) => {
   const bootstrapping = settings.isAdminSetupNeeded() && req.body?.admin;
   if (!bootstrapping) {
-    if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'settings.manage')) {
-      return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission: 'settings.manage' });
+    // Changing the ADMIN PIN is a superuser action, not an operational one:
+    // the PIN it sets mints a token that bypasses every permission check, so
+    // settings.manage — labelled "Edit operational settings and schedules" —
+    // was silently a path to full control. Reproduced: a settings.manage user
+    // overwrote the admin PIN, logged in with it, and created users.
+    // The OVERRIDE PIN stays under settings.manage; it only unlocks a room
+    // mode change for someone already standing at the booth.
+    const wantsAdminPin = req.body?.admin !== undefined;
+    const permission = wantsAdminPin ? '*' : 'settings.manage';
+    if (!req.legacyAdmin && !auth.hasPermission(req.auth, permission)) {
+      return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission });
     }
   }
   try {

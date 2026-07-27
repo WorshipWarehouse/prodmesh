@@ -11,10 +11,34 @@ import { bearer, requirePermission, auditSuccess } from '../httpAuth.js';
 const router = express.Router();
 
 // Station registration is deliberately unauthenticated: it identifies the
-// browser installation, but grants no authority. Naming a machine is not login.
+// browser installation, but grants no authority. Naming a machine is not login,
+// and a booth display has to come up without anyone signing in.
+//
+// It was, however, unbounded — which made it the enabler for two other
+// problems: free identities to rotate through (the old station-keyed login
+// lockout, now IP-keyed) and unlimited Slack posts via /api/assistance, whose
+// idempotency is per-station. Registration stays open; it just isn't free
+// any more. A real install registers a handful of stations, ever.
+const REGISTER_LIMIT = 10; // per IP per window
+const REGISTER_WINDOW_MS = 60 * 60 * 1000;
+const registrations = new Map(); // ip → { count, resetAt }
+
 router.post('/api/stations/register', (req, res) => {
+  const ip = sourceIp(req);
+  const now = Date.now();
+  const seen = registrations.get(ip);
+  const window = !seen || seen.resetAt <= now ? { count: 0, resetAt: now + REGISTER_WINDOW_MS } : seen;
+  if (window.count >= REGISTER_LIMIT) {
+    return res.status(429).json({ error: 'too_many_registrations', retryAfter: window.resetAt - now });
+  }
   try {
-    res.status(201).json({ station: auth.registerStation(req.body ?? {}) });
+    const station = auth.registerStation(req.body ?? {});
+    window.count += 1;
+    registrations.set(ip, window);
+    if (registrations.size > 1000) {
+      for (const [k, v] of registrations) if (v.resetAt <= now) registrations.delete(k);
+    }
+    res.status(201).json({ station });
   } catch (err) {
     res.status(400).json({ error: String(err.message ?? err) });
   }
@@ -232,7 +256,25 @@ router.post('/api/groups', requirePermission('users.manage'), (req, res) => {
 
 router.put('/api/users/:userId/groups', requirePermission('users.manage'), (req, res) => {
   try {
-    const user = auth.updateUserGroups(req.params.userId, req.body?.groupIds ?? []);
+    const groupIds = req.body?.groupIds ?? [];
+    // No self-promotion, and no granting authority you do not hold. Without
+    // this, users.manage was a one-request path to '*': add your own account
+    // to Administrators. Full admins ('*') are exempt — a superuser granting
+    // a subset of their own powers is the whole point of the screen.
+    if (!req.legacyAdmin && !auth.hasPermission(req.auth, '*')) {
+      if (req.auth?.user?.id === req.params.userId) {
+        return res.status(403).json({ error: 'cannot_change_own_groups' });
+      }
+      const mine = new Set(req.auth?.permissions ?? []);
+      const granting = auth.listDirectory().groups
+        .filter((g) => groupIds.includes(g.id))
+        .flatMap((g) => g.permissions ?? []);
+      const over = granting.filter((p) => !mine.has(p));
+      if (over.length) {
+        return res.status(403).json({ error: 'cannot_grant_unheld_permissions', permissions: over });
+      }
+    }
+    const user = auth.updateUserGroups(req.params.userId, groupIds);
     auditSuccess(req, 'users.manage', { resourceType: 'user', resourceId: user.id, details: { operation: 'groups' } });
     res.json({ user });
   } catch (err) {

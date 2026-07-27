@@ -11,6 +11,11 @@ const router = express.Router();
 // Room-level show state stream (SSE). Browsers are pure views into this.
 router.get('/api/rooms/:id/show/stream', (req, res) => {
   const roomId = req.params.id;
+  // Unlike every sibling route this never checked the room existed, so any
+  // string opened a stream — and subscribing starts the per-room timer
+  // watcher, which polls that room's ProPresenter once a second for as long
+  // as the connection is held. Unknown rooms are refused before any of that.
+  if (!rooms[roomId]) return res.status(404).json({ error: 'Unknown room' });
   res.set({
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',

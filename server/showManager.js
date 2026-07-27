@@ -82,6 +82,10 @@ export function unsubscribe(roomId, res) {
   if (subs(roomId).size === 0) {
     stopTimerWatcher(roomId);
     stopSplWatcher(roomId);
+    // Drop the entry too. subs() creates a Set for ANY key, so leaving empty
+    // ones behind meant one permanent Map entry per distinct roomId ever
+    // requested — unbounded growth driven by an unauthenticated endpoint.
+    subscribers.delete(roomId);
   }
 }
 

@@ -256,3 +256,63 @@ test('the Planning Center id guard refuses anything that is not a bare number', 
       `${JSON.stringify(bad)} must be refused`);
   }
 });
+
+// ── Privilege escalation ─────────────────────────────────────────────────────
+
+test('settings.manage cannot overwrite the admin PIN (it would mint a superuser)', async () => {
+  const g = auth.createGroup({ name: 'Ops Settings', permissions: ['settings.manage'] });
+  auth.createUser({ username: 'opsset', displayName: 'Ops', pin: '5150', groupIds: [g.id] });
+  const token = (await (await post('/api/auth/login', { username: 'opsset', pin: '5150' }, null, station.token)).json()).token;
+
+  // Reproduced escalation: set the admin PIN, log in with it, get '*'.
+  const denied = await post('/api/settings/pins', { admin: 'newadmin1' }, token, station.token);
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).permission, '*');
+
+  // The operational half of the same screen still works for them.
+  const allowed = await post('/api/settings/pins', { override: '4321' }, token, station.token);
+  assert.equal(allowed.status, 200);
+});
+
+test('users.manage cannot promote itself or grant permissions it lacks', async () => {
+  const dir = auth.listDirectory();
+  const adminGroup = dir.groups.find((x) => x.systemKey === 'admin');
+  const g = auth.createGroup({ name: 'User Admins', permissions: ['users.manage'] });
+  const me = auth.createUser({ username: 'useradm', displayName: 'User Admin', pin: '6161', groupIds: [g.id] });
+  const victim = auth.createUser({ username: 'victim', displayName: 'Victim', pin: '7171', groupIds: [] });
+  const token = (await (await post('/api/auth/login', { username: 'useradm', pin: '6161' }, null, station.token)).json()).token;
+
+  const put = (userId, groupIds) => fetch(`${base}/api/users/${userId}/groups`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Prodmesh-Station': station.token },
+    body: JSON.stringify({ groupIds }),
+  });
+
+  // Self-promotion to Administrators — the one-request path to '*'.
+  const selfRes = await put(me.id, [adminGroup.id]);
+  assert.equal(selfRes.status, 403);
+  assert.equal((await selfRes.json()).error, 'cannot_change_own_groups');
+
+  // Promoting someone ELSE beyond your own authority is refused too.
+  const overRes = await put(victim.id, [adminGroup.id]);
+  assert.equal(overRes.status, 403);
+  assert.equal((await overRes.json()).error, 'cannot_grant_unheld_permissions');
+
+  // Granting what you DO hold is still allowed — this screen must stay usable.
+  assert.equal((await put(victim.id, [g.id])).status, 200);
+});
+
+test('station registration is rate limited (it gated the lockout bypass)', async () => {
+  const codes = [];
+  for (let i = 0; i < 14; i++) {
+    const res = await post('/api/stations/register', { name: `Flood Station ${i}` });
+    codes.push(res.status);
+  }
+  assert.ok(codes.includes(429), `expected a cap, got ${codes.join(',')}`);
+});
+
+test('the SSE stream refuses unknown rooms instead of leaking a map entry', async () => {
+  const res = await fetch(`${base}/api/rooms/${'Z'.repeat(200)}/show/stream`);
+  assert.equal(res.status, 404);
+  await res.body?.cancel?.();
+});
