@@ -101,6 +101,11 @@
   grid-template-columns: 1fr;
   max-height: 235px;
   overflow: auto;
+  /* This list is taller than its box, and a row sliced clean through reads as
+     a rendering bug rather than "scroll for more". Fade the cut edge, and pad
+     the end so the last permission clears the fade once you reach it. */
+  padding-bottom: 22px;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
 }
 
 .users__checks--permissions .checkbox__label {
@@ -222,7 +227,9 @@
 
 .stations__fields {
   display: grid;
-  grid-template-columns: 1.25fr 0.8fr 1fr;
+  /* The campus column used to be 0.8fr, which left "Unassigned" clipped behind
+     the select's chevron. Floors keep every column readable as the row narrows. */
+  grid-template-columns: minmax(140px, 1.25fr) minmax(130px, 1fr) minmax(130px, 1fr);
   gap: 8px;
 }
 
@@ -797,16 +804,15 @@
 }
 
 /* ── Branding (institution name + logo) ─────────────────────────────────── */
+/* auto-fit rather than a viewport media query: the old `auto 1fr` + 760px
+   breakpoint left the institution-name field about 110px wide on an iPad,
+   showing "Produc". This collapses on the width the panel actually has. */
 .branding {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 28px;
   align-items: start;
   margin-top: 8px;
-}
-
-@media (max-width: 760px) {
-  .branding { grid-template-columns: 1fr; }
 }
 
 .branding__logo {
