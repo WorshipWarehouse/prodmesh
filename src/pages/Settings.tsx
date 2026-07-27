@@ -110,7 +110,8 @@ function SetupForm({ onDone }: { onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    if (pin.length < 4) return setErr('Use at least 4 digits.');
+    // First-run sets the ADMIN PIN, which gates a full permission bypass.
+    if (pin.length < 6) return setErr('Use at least 6 characters.');
     if (pin !== confirm) return setErr('PINs do not match.');
     await setPins({ admin: pin });
     await loginAdmin(pin);
@@ -659,7 +660,11 @@ function SecurityPanel() {
   }, []);
 
   const saveAdmin = async () => {
-    if (adminPin.length < 4) return setMsg(fail('Admin PIN must be ≥ 4 digits.'));
+    // Longer than the override PIN on purpose: this one unlocks a token that
+    // bypasses every permission check, while the override only clears a room
+    // mode change for someone already standing at the booth. Server enforces
+    // the same floor — this is just a faster, kinder error.
+    if (adminPin.length < 6) return setMsg(fail('Admin PIN must be at least 6 characters.'));
     try {
       await setPins({ admin: adminPin });
       setAdminPin(''); setMsg(ok('Admin PIN updated.'));

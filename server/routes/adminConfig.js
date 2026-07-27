@@ -25,11 +25,33 @@ router.get('/api/settings', requirePermission('settings.manage'), (_req, res) =>
 router.post('/api/settings/pins', (req, res) => {
   const bootstrapping = settings.isAdminSetupNeeded() && req.body?.admin;
   if (!bootstrapping) {
-    if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'settings.manage')) {
-      return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission: 'settings.manage' });
+    // Changing the ADMIN PIN is a superuser action, not an operational one:
+    // the PIN it sets mints a token that bypasses every permission check, so
+    // settings.manage — labelled "Edit operational settings and schedules" —
+    // was silently a path to full control. Reproduced: a settings.manage user
+    // overwrote the admin PIN, logged in with it, and created users.
+    // The OVERRIDE PIN stays under settings.manage; it only unlocks a room
+    // mode change for someone already standing at the booth.
+    const wantsAdminPin = req.body?.admin !== undefined;
+    const permission = wantsAdminPin ? '*' : 'settings.manage';
+    if (!req.legacyAdmin && !auth.hasPermission(req.auth, permission)) {
+      return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission });
     }
   }
-  settings.setPins({ admin: req.body?.admin, override: req.body?.override });
+  try {
+    // During bootstrap, set ONLY the field the exception justifies. It used to
+    // pass `override` through as well, so an anonymous first-run caller took
+    // the room-mode override PIN along with admin in the same request.
+    settings.setPins(bootstrapping
+      ? { admin: req.body.admin }
+      : { admin: req.body?.admin, override: req.body?.override });
+  } catch (err) {
+    if (err.code === 'weak_pin') return res.status(400).json({ error: String(err.message) });
+    throw err;
+  }
+  if (bootstrapping) {
+    auth.audit({ action: 'settings.bootstrap', result: 'allowed', details: { ip: req.ip ?? null } });
+  }
   res.json({ ok: true, ...settings.getPublicSettings().pins });
 });
 
@@ -84,7 +106,12 @@ function redactAnalysis(cfg) {
   return { ...rest, hasPassword: Boolean(password) };
 }
 
-router.get('/api/config/rooms/:roomId/connectivity', (req, res) => {
+// Behind config.manage: this is the room-configuration editor's own read, and
+// it returns the production network map — ProPresenter/Companion/analysis
+// host:port plus the Companion button coordinates that roomModel.js
+// deliberately withholds from the public /api/rooms. Anonymous callers were
+// getting a pre-built inventory of every device on the church's VLAN.
+router.get('/api/config/rooms/:roomId/connectivity', requirePermission('config.manage'), (req, res) => {
   if (!rooms[req.params.roomId]) {
     return res.json({
       hasServerRoom: false, planningCenter: null, analysis: null, proPresenter: null, companion: null,

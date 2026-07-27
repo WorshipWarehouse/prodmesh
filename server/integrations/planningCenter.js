@@ -101,6 +101,26 @@ function normalizeItem(it, notesById = new Map()) {
   };
 }
 
+/**
+ * Guard every id interpolated into a Planning Center path.
+ *
+ * PC ids are numeric. Anything else is a bug or an injection attempt: a planId
+ * of "1/../../../people/v2/people?per_page=100" would otherwise reshape the
+ * request — fetch normalizes the `..` segments — and reach the People API with
+ * the church's PAT, returning congregant names, emails and addresses to a
+ * caller who only holds shows.operate.
+ *
+ * Deliberately REJECTS rather than encodes. planIds are persisted (show
+ * timelines, show_summaries) and replayed later by backfillLabels, so a value
+ * poisoned before this guard existed must fail loudly rather than quietly
+ * fetch the wrong resource. Callers already treat a throw as "plan unavailable".
+ */
+export function pcId(value, what) {
+  const s = String(value ?? '');
+  if (!/^[0-9]{1,20}$/.test(s)) throw new Error(`Invalid Planning Center ${what}`);
+  return s;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /** Upcoming plans for a service type ({ id, name }). Summaries — times/items
@@ -108,7 +128,7 @@ function normalizeItem(it, notesById = new Map()) {
 export function getUpcomingPlans(serviceType, limit = 3) {
   return cached(`plans:${serviceType.id}:${limit}`, async () => {
     if (!isConfigured()) return mockPlans(serviceType, limit);
-    const body = await pcGet(`/service_types/${serviceType.id}/plans?filter=future&order=sort_date&per_page=${limit}`);
+    const body = await pcGet(`/service_types/${pcId(serviceType.id, 'service type id')}/plans?filter=future&order=sort_date&per_page=${Number(limit) || 3}`);
     return (body.data ?? []).map((d) => normalizePlan(serviceType, d));
   });
 }
@@ -124,7 +144,7 @@ export function getPlan(serviceType, planId) {
   return cached(`plan:${serviceType.id}:${planId}`, async () => {
     if (!isConfigured()) return null; // never fabricate labels for real history
     try {
-      const body = await pcGet(`/service_types/${serviceType.id}/plans/${planId}`);
+      const body = await pcGet(`/service_types/${pcId(serviceType.id, 'service type id')}/plans/${pcId(planId, 'plan id')}`);
       return body?.data ? normalizePlan(serviceType, body.data) : null;
     } catch {
       return null;
@@ -161,7 +181,7 @@ export function getPersonProfile(personId) {
 export function getPlanTimes(serviceType, planId) {
   return cached(`times:${planId}`, async () => {
     if (!isConfigured()) return mockTimes();
-    const body = await pcGet(`/service_types/${serviceType.id}/plans/${planId}/plan_times`);
+    const body = await pcGet(`/service_types/${pcId(serviceType.id, 'service type id')}/plans/${pcId(planId, 'plan id')}/plan_times`);
     return (body.data ?? [])
       .filter((t) => SHOWN_TIME_TYPES.has(t.attributes?.time_type))
       .map(normalizeTime)
@@ -174,7 +194,7 @@ export function getPlanItems(serviceType, planId) {
   return cached(`items:${planId}`, async () => {
     if (!isConfigured()) return mockItems();
     const body = await pcGet(
-      `/service_types/${serviceType.id}/plans/${planId}/items?per_page=100&order=sequence&include=item_notes`,
+      `/service_types/${pcId(serviceType.id, 'service type id')}/plans/${pcId(planId, 'plan id')}/items?per_page=100&order=sequence&include=item_notes`,
     );
     const notesById = new Map(
       (body.included ?? []).filter((i) => i.type === 'ItemNote').map((n) => [n.id, n.attributes]),
@@ -190,8 +210,8 @@ export function getPlanDetail(serviceType, planId) {
   return cached(`detail:${planId}`, async () => {
     if (!isConfigured()) return mockDetail();
     const [planBody, notesBody] = await Promise.all([
-      pcGet(`/service_types/${serviceType.id}/plans/${planId}?include=series`),
-      pcGet(`/service_types/${serviceType.id}/plans/${planId}/notes`),
+      pcGet(`/service_types/${pcId(serviceType.id, 'service type id')}/plans/${pcId(planId, 'plan id')}?include=series`),
+      pcGet(`/service_types/${pcId(serviceType.id, 'service type id')}/plans/${pcId(planId, 'plan id')}/notes`),
     ]);
     const series = (planBody.included ?? []).find((i) => i.type === 'Series');
     const sa = series?.attributes ?? {};

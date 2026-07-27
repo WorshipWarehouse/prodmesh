@@ -71,14 +71,26 @@ export async function request(station, userName = null, message = null) {
   const existing = requests.get(station.id);
   if (existing) return existing;
 
-  // Slack's mrkdwn control characters; user text passes through otherwise.
-  const escaped = message
-    ? message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    : null;
+  // Everything interpolated here is attacker-supplied. `message` was already
+  // escaped, but the station NAME was not — and station registration is
+  // unauthenticated, so anyone who can reach the port could name a station
+  // `Booth <https://evil.example|Click to approve>` and have the church's own
+  // Slack bot post that link into the tech channel. A link from the trusted
+  // bot in the team's own channel is a far better phish than an external DM.
+  //
+  // Also neutralize @here/@channel: a broadcast ping is its own kind of abuse.
+  const clean = (s) =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/@(here|channel|everyone)\b/gi, '@​$1');
+
+  const escaped = message ? clean(message) : null;
   const text =
     `:red_circle: ${
-      userName ? `*${userName}* has requested` : 'Someone has requested'
-    } technical assistance at *${station.name}*` +
+      userName ? `*${clean(userName)}* has requested` : 'Someone has requested'
+    } technical assistance at *${clean(station.name)}*` +
     (escaped ? `\n${escaped.split('\n').map((l) => `> ${l}`).join('\n')}` : '');
 
   let posted = null;

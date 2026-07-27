@@ -62,17 +62,55 @@ test('admin-PIN bootstrap: open exactly once, admin field only', async () => {
   assert.equal((await post('/api/settings/pins', { override: '9999' })).status, 401);
 
   // First-run setup: the first anonymous admin-PIN set is allowed…
-  assert.equal((await post('/api/settings/pins', { admin: '1234' })).status, 200);
+  assert.equal((await post('/api/settings/pins', { admin: 'admin1234' })).status, 200);
   assert.equal(settings.isAdminSetupNeeded(), false);
 
   // …and never again: anonymous → 401, an authed non-admin → 403.
-  assert.equal((await post('/api/settings/pins', { admin: '5678' })).status, 401);
-  const denied = await post('/api/settings/pins', { admin: '5678' }, operatorToken, station.token);
+  assert.equal((await post('/api/settings/pins', { admin: 'admin5678' })).status, 401);
+  const denied = await post('/api/settings/pins', { admin: 'admin5678' }, operatorToken, station.token);
   assert.equal(denied.status, 403);
 
   // The refused attempts changed nothing.
-  assert.equal((await post('/api/auth/admin', { pin: '5678' })).status, 401);
-  assert.equal((await post('/api/auth/admin', { pin: '1234' })).status, 200);
+  assert.equal((await post('/api/auth/admin', { pin: 'admin5678' })).status, 401);
+  assert.equal((await post('/api/auth/admin', { pin: 'admin1234' })).status, 200);
+});
+
+test('bootstrap sets ONLY the admin PIN, never the override alongside it', async () => {
+  // The exception exists to let first-run setup name an admin. It used to pass
+  // `override` through in the same call, so an anonymous caller who won the
+  // race took the room-mode override PIN too.
+  const s = await import('./settings.js');
+  assert.equal(s.getPublicSettings().pins.overrideSet, false, 'no override yet');
+  assert.equal(s.isAdminSetupNeeded(), false, 'admin already bootstrapped above');
+});
+
+test('weak PINs are refused: the admin PIN gates a permission bypass', async () => {
+  const s = await import('./settings.js');
+  assert.throws(() => s.setPins({ admin: '1234' }), /at least 6/);
+  assert.throws(() => s.setPins({ override: '12' }), /at least 4/);
+  // Clearing stays possible, and valid PINs still set.
+  s.setPins({ admin: 'admin1234', override: '9999' });
+});
+
+test('admin PIN guessing is throttled and audited', async () => {
+  // Unthrottled this endpoint was remote code execution: its token sets
+  // legacyAdmin, which bypasses every permission check including
+  // POST /api/system/update. ~40 guesses/second exhausts a 4-digit PIN.
+  const statuses = [];
+  for (let i = 0; i < 8; i++) {
+    statuses.push((await post('/api/auth/admin', { pin: `wrong${i}` })).status);
+  }
+  assert.ok(statuses.includes(429), `expected a lockout, got ${statuses.join(',')}`);
+
+  // Locked out, the CORRECT PIN is refused too — no bypass by knowing it.
+  const locked = await post('/api/auth/admin', { pin: 'admin1234' });
+  assert.equal(locked.status, 429);
+  assert.equal((await locked.json()).error, 'temporarily_locked');
+
+  // Every failure is on the record; before this there was no trace at all.
+  const denied = auth.listAudit({ limit: 200 })
+    .filter((e) => e.action === 'auth.admin' && e.result === 'denied');
+  assert.ok(denied.length >= 5, `expected audited denials, got ${denied.length}`);
 });
 
 test('show start/end/current require shows.operate; reads stay public', async () => {
@@ -109,7 +147,7 @@ test('checklist mode actions enforce mode permission and lockouts', async () => 
   assert.equal((await noMode.json()).permission, 'rooms.mode.change');
 
   // A locked mode can't be sidestepped through the checklist…
-  settings.setPins({ admin: '1234', override: '9999' });
+  settings.setPins({ admin: 'admin1234', override: '9999' });
   settings.setSchedules({
     [ROOM]: [{ id: 'w', label: 'Always', days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', lock: ['sunday'] }],
   });
@@ -126,7 +164,7 @@ test('checklist mode actions enforce mode permission and lockouts', async () => 
   settings.setSchedules({});
 });
 
-test('login lockout: 5 failures lock the station+username pair', async () => {
+test('login lockout: 5 failures lock the ip+username pair', async () => {
   // No station header → explicit station_required, not a silent 401.
   assert.equal((await post('/api/auth/login', { username: 'lockme', pin: '1111' })).status, 400);
 
@@ -143,7 +181,138 @@ test('login lockout: 5 failures lock the station+username pair', async () => {
   assert.equal(body.error, 'temporarily_locked');
   assert.ok(body.retryAfter > 0 && body.retryAfter <= 60_000);
 
-  // The lock is keyed per station+username — other users are unaffected.
+  // Keyed per username — one locked account must not lock a shared booth out
+  // of every account.
   const other = await post('/api/auth/login', { username: 'operator', pin: '2468' }, null, station.token);
   assert.equal(other.status, 200);
+
+  // The bypass this replaced: the counter used to be keyed on station id, and
+  // station registration is unauthenticated and uncapped — so a fresh station
+  // per attempt reset it every time (reproduced: 20 tries, zero lockouts).
+  for (let i = 0; i < 6; i++) {
+    const fresh = auth.registerStation({ name: `Rotating Station ${i}` });
+    const res = await post('/api/auth/login', { username: 'lockme', pin: '0000' }, null, fresh.token);
+    assert.equal(res.status, 429, `rotating stations must not reset the lockout (attempt ${i + 1})`);
+  }
+});
+
+// ── Planning Center path injection ───────────────────────────────────────────
+//  A planId is persisted and later replayed into PC request paths by
+//  backfillLabels. Before this guard, "1/../../../people/v2/people" escaped
+//  the /services/v2 prefix (fetch normalizes `..`) and reached the People API
+//  with the church's PAT — congregant names, emails and addresses, readable by
+//  anyone holding only shows.operate. Reproduce the exact payload, not a
+//  sanitized stand-in: this is the kind of bug that returns during a refactor.
+
+test('show start rejects plan ids that could reshape a Planning Center path', async () => {
+  const runner = auth.createGroup({ name: 'PC Injection Ops', permissions: ['shows.operate'] });
+  auth.createUser({ username: 'pcinj', displayName: 'PC Inj', pin: '9182', groupIds: [runner.id] });
+  const res0 = await post('/api/auth/login', { username: 'pcinj', pin: '9182' }, null, station.token);
+  const token = (await res0.json()).token;
+
+  const payloads = [
+    '1/../../../people/v2/people?per_page=100', // the reproduced escape
+    '../../people/v2/people',
+    '1%2F..%2F..%2Fpeople',                     // pre-encoded traversal
+    '1?filter=x',                               // query injection
+    '1#frag',                                   // fragment truncation
+    '1/notes',                                  // extra path segment
+  ];
+  for (const planId of payloads) {
+    const res = await post(`/api/rooms/${ROOM}/show/start`, { planId, timeId: 't1' }, token, station.token);
+    assert.equal(res.status, 400, `planId ${JSON.stringify(planId)} must be refused`);
+    assert.equal((await res.json()).error, 'Invalid plan id');
+  }
+
+  // Demo-mode ids (no PC credentials) must still be accepted — the charset
+  // guard blocks URL metacharacters, it does not require digits.
+  const ok = await post(`/api/rooms/${ROOM}/show/start`, { planId: 'mock-st1-0', timeId: 't1' }, token, station.token);
+  assert.equal(ok.status, 200, 'demo-mode plan ids must keep working');
+  await post(`/api/rooms/${ROOM}/show/end`, {}, token, station.token);
+});
+
+test('the Planning Center id guard refuses anything that is not a bare number', async () => {
+  // Second line of defence, unit-tested directly: with no PC credentials the
+  // client short-circuits to mock data before building a URL, so the guard is
+  // unreachable through the public functions in this environment. It still has
+  // to hold for installs that ARE configured, where a planId poisoned before
+  // the route guard existed gets replayed by backfillLabels.
+  const { pcId } = await import('./integrations/planningCenter.js');
+
+  assert.equal(pcId('12345', 'plan id'), '12345');
+  for (const bad of [
+    '1/../../../people/v2/people?per_page=100',
+    '../../people/v2/people',
+    '1%2F..%2Fpeople',
+    '1?filter=x',
+    '1#frag',
+    '1/notes',
+    'mock-st1-0', // demo ids are fine to STORE but must never reach a real URL
+    '',
+    null,
+    undefined,
+  ]) {
+    assert.throws(() => pcId(bad, 'plan id'), /Invalid Planning Center plan id/,
+      `${JSON.stringify(bad)} must be refused`);
+  }
+});
+
+// ── Privilege escalation ─────────────────────────────────────────────────────
+
+test('settings.manage cannot overwrite the admin PIN (it would mint a superuser)', async () => {
+  const g = auth.createGroup({ name: 'Ops Settings', permissions: ['settings.manage'] });
+  auth.createUser({ username: 'opsset', displayName: 'Ops', pin: '5150', groupIds: [g.id] });
+  const token = (await (await post('/api/auth/login', { username: 'opsset', pin: '5150' }, null, station.token)).json()).token;
+
+  // Reproduced escalation: set the admin PIN, log in with it, get '*'.
+  const denied = await post('/api/settings/pins', { admin: 'newadmin1' }, token, station.token);
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).permission, '*');
+
+  // The operational half of the same screen still works for them.
+  const allowed = await post('/api/settings/pins', { override: '4321' }, token, station.token);
+  assert.equal(allowed.status, 200);
+});
+
+test('users.manage cannot promote itself or grant permissions it lacks', async () => {
+  const dir = auth.listDirectory();
+  const adminGroup = dir.groups.find((x) => x.systemKey === 'admin');
+  const g = auth.createGroup({ name: 'User Admins', permissions: ['users.manage'] });
+  const me = auth.createUser({ username: 'useradm', displayName: 'User Admin', pin: '6161', groupIds: [g.id] });
+  const victim = auth.createUser({ username: 'victim', displayName: 'Victim', pin: '7171', groupIds: [] });
+  const token = (await (await post('/api/auth/login', { username: 'useradm', pin: '6161' }, null, station.token)).json()).token;
+
+  const put = (userId, groupIds) => fetch(`${base}/api/users/${userId}/groups`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Prodmesh-Station': station.token },
+    body: JSON.stringify({ groupIds }),
+  });
+
+  // Self-promotion to Administrators — the one-request path to '*'.
+  const selfRes = await put(me.id, [adminGroup.id]);
+  assert.equal(selfRes.status, 403);
+  assert.equal((await selfRes.json()).error, 'cannot_change_own_groups');
+
+  // Promoting someone ELSE beyond your own authority is refused too.
+  const overRes = await put(victim.id, [adminGroup.id]);
+  assert.equal(overRes.status, 403);
+  assert.equal((await overRes.json()).error, 'cannot_grant_unheld_permissions');
+
+  // Granting what you DO hold is still allowed — this screen must stay usable.
+  assert.equal((await put(victim.id, [g.id])).status, 200);
+});
+
+test('station registration is rate limited (it gated the lockout bypass)', async () => {
+  const codes = [];
+  for (let i = 0; i < 14; i++) {
+    const res = await post('/api/stations/register', { name: `Flood Station ${i}` });
+    codes.push(res.status);
+  }
+  assert.ok(codes.includes(429), `expected a cap, got ${codes.join(',')}`);
+});
+
+test('the SSE stream refuses unknown rooms instead of leaking a map entry', async () => {
+  const res = await fetch(`${base}/api/rooms/${'Z'.repeat(200)}/show/stream`);
+  assert.equal(res.status, 404);
+  await res.body?.cancel?.();
 });

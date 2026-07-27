@@ -12,7 +12,7 @@ const { app } = await import('./index.js');
 const settings = await import('./settings.js');
 const auth = await import('./authStore.js');
 
-settings.setPins({ admin: '1234' });
+settings.setPins({ admin: 'admin1234' });
 const group = auth.createGroup({ name: 'Mode Operators', permissions: ['rooms.mode.change'] });
 auth.createUser({ username: 'operator', displayName: 'Operator', pin: '2468', groupIds: [group.id] });
 const station = auth.registerStation({ name: 'Rooms Test Station' });
@@ -26,7 +26,7 @@ let operatorToken;
 before(async () => {
   server = app.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
-  adminToken = (await (await post('/api/auth/admin', { pin: '1234' })).json()).token;
+  adminToken = (await (await post('/api/auth/admin', { pin: 'admin1234' })).json()).token;
   const login = await post('/api/auth/login', { username: 'operator', pin: '2468' }, null, station.token);
   operatorToken = (await login.json()).token;
 });
@@ -53,7 +53,12 @@ function put(path, body, token) {
 }
 
 const getRooms = async () => (await fetch(`${base}/api/rooms`)).json();
-const getConn = async (id) => (await fetch(`${base}/api/config/rooms/${id}/connectivity`)).json();
+// The connectivity read is gated behind config.manage (it returns device
+// addresses), so this carries the admin token like the writes do.
+const getConn = async (id) =>
+  (await fetch(`${base}/api/config/rooms/${id}/connectivity`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  })).json();
 const getChurch = async () => (await fetch(`${base}/api/config`)).json();
 
 // Fetch the tree, apply an edit to the north site, and save it back.

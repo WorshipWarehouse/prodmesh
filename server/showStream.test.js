@@ -18,7 +18,7 @@ const settings = await import('./settings.js');
 // watchers, so the stream test observes pure fan-out.
 const ROOM = 'north-youth';
 const PLAN = 'mock-500005-0';
-settings.setPins({ admin: '1234', override: '9999' });
+settings.setPins({ admin: 'admin1234', override: '9999' });
 
 let server;
 let base;
@@ -167,7 +167,7 @@ test('Companion down: mode change → 502, state read → 200 with mock fallback
       await fetch(`${base}/api/auth/admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: '1234' }),
+        body: JSON.stringify({ pin: 'admin1234' }),
       })
     ).json();
     const modeRes = await fetch(`${base}/api/rooms/${ROOM}/mode`, {

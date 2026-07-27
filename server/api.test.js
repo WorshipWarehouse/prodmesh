@@ -17,7 +17,7 @@ const auth = await import('./authStore.js');
 
 // north-youth is mock:true, so mode presses resolve in-memory (no Companion).
 const ROOM = 'north-youth';
-settings.setPins({ admin: '1234', override: '9999' });
+settings.setPins({ admin: 'admin1234', override: '9999' });
 settings.setSchedules({
   [ROOM]: [{ id: 't', label: 'Test Lock', days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', lock: ['standby'] }],
 });
@@ -62,7 +62,7 @@ function apiRequest(path, { method = 'GET', body, token, stationToken } = {}) {
 
 test('admin login rejects a wrong PIN and accepts the right one', async () => {
   assert.equal((await post('/api/auth/admin', { pin: '0000' })).status, 401);
-  const res = await post('/api/auth/admin', { pin: '1234' });
+  const res = await post('/api/auth/admin', { pin: 'admin1234' });
   assert.equal(res.status, 200);
   const { token } = await res.json();
   assert.ok(token);
@@ -70,13 +70,13 @@ test('admin login rejects a wrong PIN and accepts the right one', async () => {
 
 test('settings endpoint requires an admin token', async () => {
   assert.equal((await fetch(base + '/api/settings')).status, 401);
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
   const ok = await fetch(base + '/api/settings', { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(ok.status, 200);
 });
 
 test('user directory includes the avatar contract', async () => {
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
   const res = await fetch(base + '/api/users', { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(res.status, 200);
   const directory = await res.json();
@@ -86,7 +86,7 @@ test('user directory includes the avatar contract', async () => {
 
 test('admins can rename, assign, and revoke a station', async () => {
   const managed = auth.registerStation({ name: 'Temporary Booth' });
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
 
   const list = await apiRequest('/api/stations', { token, stationToken: managed.token });
   assert.equal(list.status, 200);
@@ -148,7 +148,7 @@ test('config is public to read, config.manage to write', async () => {
   });
   assert.equal(denied.status, 403);
 
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
   const edited = structuredClone(church);
   edited.name = 'Renamed Institution';
   const saved = await apiRequest('/api/config', { method: 'PUT', body: edited, token });
@@ -160,14 +160,21 @@ test('config is public to read, config.manage to write', async () => {
   assert.equal(bad.status, 400);
 });
 
-test('room connectivity: public read, config.manage write, live effect', async () => {
-  const read = await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`);
+test('room connectivity: config.manage to read AND write, live effect', async () => {
+  // The read returns the production network map (device host:port, Companion
+  // button coordinates), so it is gated like the writes. It used to be public.
+  const anon = await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`);
+  assert.equal(anon.status, 401);
+  assert.equal((await anon.json()).permission, 'config.manage');
+
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  const read = await apiRequest(`/api/config/rooms/${ROOM}/connectivity`, { token });
   assert.equal(read.status, 200);
   const before = await read.json();
   assert.equal(before.hasServerRoom, true);
   assert.ok(before.planningCenter.serviceTypes.length > 0);
 
-  const ghost = await (await fetch(`${base}/api/config/rooms/ghost-room/connectivity`)).json();
+  const ghost = await (await apiRequest('/api/config/rooms/ghost-room/connectivity', { token })).json();
   assert.equal(ghost.hasServerRoom, false);
 
   const denied = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/planning-center`, {
@@ -175,7 +182,6 @@ test('room connectivity: public read, config.manage write, live effect', async (
   });
   assert.equal(denied.status, 403);
 
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
   const next = [{ id: '500005', name: 'Youth Service' }, { id: '424242', name: 'Youth Retreat' }];
   const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/planning-center`, {
     method: 'PUT', body: { serviceTypes: next }, token,
@@ -199,7 +205,7 @@ test('analysis source: config.manage write, password never read back', async () 
   });
   assert.equal(denied.status, 403);
 
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
   const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/analysis`, {
     method: 'PUT',
     body: { analysis: { source: 'smaart', host: '10.0.0.5', target: 90, limit: 95, password: 'hunter2' } },
@@ -211,7 +217,7 @@ test('analysis source: config.manage write, password never read back', async () 
   assert.equal(stored.hasPassword, true);
 
   // Public read is redacted the same way.
-  const read = await (await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`)).json();
+  const read = await (await apiRequest(`/api/config/rooms/${ROOM}/connectivity`, { token })).json();
   assert.equal(read.analysis.host, '10.0.0.5');
   assert.equal(read.analysis.password, undefined);
   assert.equal(read.analysis.hasPassword, true);
@@ -246,8 +252,8 @@ test('Companion connectivity: config.manage write, decomposes live, never clears
   });
   assert.equal(denied.status, 403);
 
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
-  const original = (await (await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`)).json()).companion;
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  const original = (await (await apiRequest(`/api/config/rooms/${ROOM}/connectivity`, { token })).json()).companion;
   assert.ok(original.modes.length >= 1);
 
   const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/companion`, {
@@ -292,7 +298,7 @@ test('ProPresenter connectivity: config.manage write, public read, clear', async
   });
   assert.equal(denied.status, 403);
 
-  const { token } = await (await post('/api/auth/admin', { pin: '1234' })).json();
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
   const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/propresenter`, {
     method: 'PUT',
     body: { proPresenter: { host: '10.0.0.9', port: '62202', timer: 'Service Start' } },
@@ -301,7 +307,7 @@ test('ProPresenter connectivity: config.manage write, public read, clear', async
   assert.equal(saved.status, 200);
   assert.deepEqual((await saved.json()).proPresenter, { host: '10.0.0.9', port: 62202, timer: 'Service Start' });
 
-  const read = await (await fetch(`${base}/api/config/rooms/${ROOM}/connectivity`)).json();
+  const read = await (await apiRequest(`/api/config/rooms/${ROOM}/connectivity`, { token })).json();
   assert.deepEqual(read.proPresenter, { host: '10.0.0.9', port: 62202, timer: 'Service Start' });
 
   const bad = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/propresenter`, {
