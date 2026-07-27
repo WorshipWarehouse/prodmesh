@@ -76,6 +76,23 @@ export const SECRET_GROUPS = [
     fields: [
       { path: 'slack.botOauthToken', label: 'Bot token' },
       { path: 'slack.channel', label: 'Channel', secret: false },
+      // Not read by anything yet. Kept because both are needed the moment
+      // Slack can TRIGGER actions rather than only receive them: the signing
+      // secret verifies inbound requests, the app token opens Socket Mode.
+      // Marked optional so a church that only wants notifications still reads
+      // as fully configured.
+      {
+        path: 'slack.signingSecret',
+        label: 'Signing secret',
+        optional: true,
+        note: 'Needed to verify requests from Slack — for actions triggered from Slack (not used yet).',
+      },
+      {
+        path: 'slack.appToken',
+        label: 'App-level token',
+        optional: true,
+        note: 'Socket Mode token (starts xapp-) — for actions triggered from Slack (not used yet).',
+      },
     ],
   },
 ];
@@ -90,7 +107,7 @@ const isSecretKey = (path) => SECRET_KEYS.some((k) => k.path === path);
  */
 export function describeSecrets() {
   const file = load();
-  const describeField = ({ path, label, secret = true }) => {
+  const describeField = ({ path, label, secret = true, optional = false, note = null }) => {
     const envKey = `PRODMESH_SECRET_${path.replace(/\./g, '_').toUpperCase()}`;
     const fromEnv = Boolean(process.env[envKey]);
     const fileValue = path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), file);
@@ -99,6 +116,8 @@ export function describeSecrets() {
       path,
       label,
       secret, // false = safe to show (a channel name is not a credential)
+      optional, // stored for a feature that does not exist yet
+      note,
       set: Boolean(value),
       length: value ? String(value).length : 0,
       // Non-secret values are echoed so the UI can show which channel is
@@ -112,7 +131,10 @@ export function describeSecrets() {
     label: g.label,
     hint: g.hint,
     fields: g.fields.map(describeField),
-    configured: g.fields.every((f) => describeField(f).set),
+    // Only the fields the app actually uses decide this — a church that wants
+    // notifications and nothing else is fully configured without the
+    // Slack-triggered-actions credentials.
+    configured: g.fields.filter((f) => !f.optional).every((f) => describeField(f).set),
   }));
 }
 

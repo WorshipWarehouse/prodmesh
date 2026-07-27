@@ -386,6 +386,9 @@ export interface SecretField {
   label: string;
   /** false = not a credential (a channel name), so `value` is populated. */
   secret: boolean;
+  /** Stored for a feature that doesn't exist yet — excluded from `configured`. */
+  optional: boolean;
+  note: string | null;
   set: boolean;
   length: number;
   value: string | null;

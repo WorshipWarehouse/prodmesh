@@ -19,7 +19,8 @@ test('describeSecrets reports set/length but never the value', () => {
   const serialized = JSON.stringify(described);
   assert.ok(!serialized.includes('app-12345'), 'a value leaked into the description');
   for (const entry of described) {
-    assert.deepEqual(Object.keys(entry).sort(), ['env', 'label', 'length', 'path', 'secret', 'set', 'value']);
+    assert.deepEqual(Object.keys(entry).sort(),
+      ['env', 'label', 'length', 'note', 'optional', 'path', 'secret', 'set', 'value']);
     // Only explicitly non-secret fields (a channel name) ever carry a value.
     if (entry.secret) assert.equal(entry.value, null, `${entry.path} echoed a value`);
   }
@@ -88,4 +89,28 @@ test('an install configured with the old test/prod Slack shape keeps working', a
   secrets.setSecrets({ 'slack.botOauthToken': 'xoxb-new', 'slack.channel': '#new' });
   assert.equal(slack.activeEnv(), 'default');
   assert.equal(secrets.getSecret('slack.prod.botOauthToken'), 'xoxb-legacy-prod', 'legacy block preserved');
+});
+
+test('optional credentials are storable but do not gate "configured"', async () => {
+  // signingSecret and appToken are read by nothing today — they are kept for
+  // Slack-TRIGGERED actions (inbound request verification and Socket Mode).
+  // A church that only wants notifications must still read as configured.
+  secrets.setSecrets({
+    'slack.botOauthToken': 'xoxb-t', 'slack.channel': '#tech',
+    'slack.signingSecret': '', 'slack.appToken': '',
+  });
+  const slack = () => secrets.describeSecrets().find((g) => g.id === 'slack');
+  assert.equal(slack().configured, true, 'notifications-only is fully configured');
+  assert.deepEqual(
+    slack().fields.filter((f) => f.optional).map((f) => f.path),
+    ['slack.signingSecret', 'slack.appToken'],
+  );
+
+  // They still store and read back, ready for the feature that will use them.
+  secrets.setSecrets({ 'slack.signingSecret': 'sig-value', 'slack.appToken': 'xapp-value' });
+  assert.equal(secrets.getSecret('slack.signingSecret'), 'sig-value');
+  assert.equal(secrets.getSecret('slack.appToken'), 'xapp-value');
+  assert.equal(slack().fields.find((f) => f.path === 'slack.appToken').set, true);
+  // …and are still never echoed back.
+  assert.ok(!JSON.stringify(slack()).includes('xapp-value'));
 });

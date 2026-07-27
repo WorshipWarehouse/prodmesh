@@ -761,7 +761,10 @@ function SecretsPanel() {
             <dl className="integration__fields">
               {group.fields.map((f) => (
                 <div key={f.path} className="integration__field">
-                  <dt>{f.label}</dt>
+                  <dt>
+                    {f.label}
+                    {f.optional && <span className="integration__opt">optional</span>}
+                  </dt>
                   <dd className={f.set ? '' : 'integration__unset'}>
                     {!f.set
                       ? 'not set'
@@ -854,6 +857,7 @@ function SecretsDialog({
               disabled={f.env || busy}
               onChange={(e) => setDraft((d) => ({ ...d, [f.path]: e.target.value }))}
             />
+            {f.note && <small className="settings__muted">{f.note}</small>}
             {f.env && <small className="settings__muted">Set by an environment variable — edit it there.</small>}
           </label>
         ))}
