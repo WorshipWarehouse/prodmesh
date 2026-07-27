@@ -119,14 +119,31 @@ test('GET /api/system/health: starts empty, shows a dead Companion after a faile
     });
     assert.equal(modeRes.status, 502); // the press failed…
 
-    // …and the failure is now visible on the health surface, keyed by host.
-    const body = await (await fetch(`${base}/api/system/health`)).json();
+    // …and the failure is visible to an authorized reader, keyed by host.
+    const body = await (await fetch(`${base}/api/system/health`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })).json();
+    assert.equal(body.redacted, false);
     const entry = body.integrations[`companion@127.0.0.1:${deadPort}`];
     assert.ok(entry, `expected companion@127.0.0.1:${deadPort} in ${JSON.stringify(Object.keys(body.integrations))}`);
     assert.equal(entry.ok, false);
     assert.ok(entry.consecutiveFailures >= 1);
     assert.equal(entry.lastSuccess, null);
     assert.ok(entry.lastError.message);
+
+    // Anonymous callers still get the diagnosis — is Companion up? — but not
+    // the address book. Keys carry no host:port and errors carry no text,
+    // since a failed fetch can echo a prefix of the device's response body.
+    const open = await (await fetch(`${base}/api/system/health`)).json();
+    assert.equal(open.redacted, true);
+    assert.ok(open.integrations.companion, 'integration is still named');
+    assert.equal(open.integrations.companion.ok, false, 'and still reports the outage');
+    assert.equal(open.integrations[`companion@127.0.0.1:${deadPort}`], undefined);
+    assert.equal(open.integrations.companion.lastError.message, undefined);
+    assert.ok(open.integrations.companion.lastError.ts > 0, 'when, but not what');
+    for (const key of Object.keys(open.integrations)) {
+      assert.ok(!key.includes('@'), `key ${key} still carries an address`);
+    }
   } finally {
     conn.setCompanion(ROOM, original); // back to simulated
   }

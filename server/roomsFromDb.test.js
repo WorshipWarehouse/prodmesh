@@ -53,7 +53,12 @@ function put(path, body, token) {
 }
 
 const getRooms = async () => (await fetch(`${base}/api/rooms`)).json();
-const getConn = async (id) => (await fetch(`${base}/api/config/rooms/${id}/connectivity`)).json();
+// The connectivity read is gated behind config.manage (it returns device
+// addresses), so this carries the admin token like the writes do.
+const getConn = async (id) =>
+  (await fetch(`${base}/api/config/rooms/${id}/connectivity`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  })).json();
 const getChurch = async () => (await fetch(`${base}/api/config`)).json();
 
 // Fetch the tree, apply an edit to the north site, and save it back.

@@ -97,7 +97,12 @@ function redactAnalysis(cfg) {
   return { ...rest, hasPassword: Boolean(password) };
 }
 
-router.get('/api/config/rooms/:roomId/connectivity', (req, res) => {
+// Behind config.manage: this is the room-configuration editor's own read, and
+// it returns the production network map — ProPresenter/Companion/analysis
+// host:port plus the Companion button coordinates that roomModel.js
+// deliberately withholds from the public /api/rooms. Anonymous callers were
+// getting a pre-built inventory of every device on the church's VLAN.
+router.get('/api/config/rooms/:roomId/connectivity', requirePermission('config.manage'), (req, res) => {
   if (!rooms[req.params.roomId]) {
     return res.json({
       hasServerRoom: false, planningCenter: null, analysis: null, proPresenter: null, companion: null,

@@ -118,9 +118,41 @@ router.get('/api/system/version', (_req, res) => {
 });
 
 // Per-integration transport health (recorded by the integration clients).
-// Public read like the connectivity GET — keys carry hostnames, nothing secret.
-router.get('/api/system/health', (_req, res) => {
-  res.json({ integrations: health.snapshot(), now: Date.now() });
+//
+// Deliberately still readable without a login — it is the first diagnostic
+// when a room misbehaves, and a booth screen or a phone on the LAN should be
+// able to answer "is Planning Center up?" without anyone signing in. But the
+// keys are `proPresenter@192.0.2.74:1025`, i.e. a free inventory of the
+// production VLAN, and lastError can carry a prefix of a device's response
+// body. So anonymous callers get status without addresses; system.logs gets
+// the detail (`?detail=1` to be explicit about wanting it).
+function redactHealth(snap) {
+  const out = {};
+  for (const [key, entry] of Object.entries(snap)) {
+    const name = key.split('@')[0]; // proPresenter@host:port → proPresenter
+    // Several rooms can share an integration name once the host is dropped;
+    // collapse to the worst state rather than letting one mask another.
+    const prev = out[name];
+    const merged = {
+      ok: prev ? (prev.ok === false || entry.ok === false ? false : prev.ok ?? entry.ok) : entry.ok,
+      lastSuccess: Math.max(prev?.lastSuccess ?? 0, entry.lastSuccess ?? 0) || null,
+      consecutiveFailures: Math.max(prev?.consecutiveFailures ?? 0, entry.consecutiveFailures),
+      // Keep the fact of an error and when, never its text.
+      lastError: entry.lastError ? { ts: entry.lastError.ts } : (prev?.lastError ?? null),
+    };
+    out[name] = merged;
+  }
+  return out;
+}
+
+router.get('/api/system/health', (req, res) => {
+  const detailed = auth.hasPermission(req.auth, 'system.logs') || req.legacyAdmin;
+  const snap = health.snapshot();
+  res.json({
+    integrations: detailed ? snap : redactHealth(snap),
+    redacted: !detailed,
+    now: Date.now(),
+  });
 });
 
 // Trigger a self-update (git pull + build + service restart). Runs detached so
