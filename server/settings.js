@@ -187,13 +187,22 @@ export function checkSession(token) {
 export const destroySession = (token) => sessions.delete(token);
 
 // ── App version (current git commit) ──────────────────────────────────────────
+//  Cached for the life of the process. This ran TWO synchronous `git` forks per
+//  call, on an unauthenticated endpoint — measured ~29ms of fully blocked event
+//  loop each time, so a request flood froze every SSE stream and poller while
+//  the box forked git. The commit cannot change without a restart anyway:
+//  update.sh restarts the service, which is exactly when this is recomputed.
+let versionCache = null;
+
 export function getVersion() {
+  if (versionCache) return versionCache;
   try {
     const root = join(__dirname, '..');
     const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
     const subject = execFileSync('git', ['log', '-1', '--format=%s'], { cwd: root }).toString().trim();
-    return { commit, subject };
+    versionCache = { commit, subject };
   } catch {
-    return { commit: 'unknown', subject: '' };
+    versionCache = { commit: 'unknown', subject: '' };
   }
+  return versionCache;
 }

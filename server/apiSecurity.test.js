@@ -316,3 +316,50 @@ test('the SSE stream refuses unknown rooms instead of leaking a map entry', asyn
   assert.equal(res.status, 404);
   await res.body?.cancel?.();
 });
+
+// ── Device address validation (user-directed SSRF) ───────────────────────────
+
+test('device hosts must be bare hostnames or IPs, not URLs', async () => {
+  const conn = await import('./connectivity.js');
+  // A trailing # turned the appended fixed path into a fragment, handing the
+  // operator the entire URL — config.manage became an authenticated
+  // read-anything primitive, with the body echoed back via the status chip.
+  const hostile = [
+    '127.0.0.1:9/latest/meta-data/#',
+    'user:pw@internal-admin.local/#',
+    '10.0.0.5:8006/api2/json/access/ticket?x=',
+    'evil.example/path',
+    'host with spaces',
+    '',
+  ];
+  for (const host of hostile) {
+    assert.throws(() => conn.validateProPresenter({ host }), /host|hostname/i, `PP host ${JSON.stringify(host)}`);
+    assert.throws(() => conn.validateAnalysis({ source: 'smaart', host }), /host|hostname/i, `analysis host ${JSON.stringify(host)}`);
+  }
+  // Real addresses still work, including hostnames and IPv6 literals.
+  for (const host of ['192.0.2.74', 'pcr-propresenter.local', 'FOH-Soundgrid', '[fe80::1]']) {
+    assert.equal(conn.validateProPresenter({ host }).host, host);
+  }
+});
+
+test('requests with a foreign Host header are refused (DNS rebinding)', async () => {
+  // Auth is a header token, so ordinary cross-origin pages cannot forge a
+  // request — but rebinding makes an attacker page same-origin, at which point
+  // every unauthenticated endpoint is driveable from a link opened on the
+  // booth machine. The Host header is what gives it away.
+  // fetch() silently drops Host (a forbidden header), so drive it raw.
+  const http = await import('node:http');
+  const withHost = (host) => new Promise((resolve) => {
+    const req = http.request(
+      { host: '127.0.0.1', port: server.address().port, path: '/api/rooms', headers: { Host: host } },
+      (res) => { res.resume(); resolve(res.statusCode); },
+    );
+    req.end();
+  });
+
+  assert.equal(await withHost('evil.example'), 403);
+  // The addresses real clients actually use keep working.
+  assert.equal(await withHost(`127.0.0.1:${server.address().port}`), 200);
+  assert.equal(await withHost('prodmesh.local'), 200);
+  assert.equal(await withHost('localhost'), 200);
+});

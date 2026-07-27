@@ -36,6 +36,40 @@ const PORT = process.env.PORT ?? (process.env.NODE_ENV === 'production' ? 8080 :
 validateRooms(rooms);
 
 const app = express();
+
+/**
+ * Reject requests whose Host header isn't an address this box actually answers
+ * to. This is the DNS-rebinding guard.
+ *
+ * Auth here is a bearer token in a header, never a cookie, so a normal
+ * cross-origin page cannot forge a request. Rebinding removes that protection:
+ * an external page re-resolves its own hostname to this LAN IP, after which
+ * the browser treats it as same-origin and can read responses. All it takes is
+ * someone opening a link on the booth machine — no network foothold at all.
+ *
+ * Allowed: localhost, any literal IP (how every real client reaches it), and
+ * anything in PRODMESH_ALLOWED_HOSTS for installs behind a hostname or proxy.
+ */
+const EXTRA_HOSTS = new Set(
+  String(process.env.PRODMESH_ALLOWED_HOSTS ?? '')
+    .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
+);
+const LITERAL_IP = /^(\d{1,3}(\.\d{1,3}){3}|\[[0-9a-f:.]+\])$/i;
+
+app.use((req, res, next) => {
+  const host = String(req.headers.host ?? '').toLowerCase();
+  const name = host.replace(/:\d+$/, ''); // strip port
+  const ok =
+    !host || // some health checkers omit it; nothing sensitive is host-derived
+    name === 'localhost' ||
+    name.endsWith('.local') ||
+    LITERAL_IP.test(name) ||
+    EXTRA_HOSTS.has(name) ||
+    EXTRA_HOSTS.has(host);
+  if (!ok) return res.status(403).json({ error: 'host_not_allowed' });
+  next();
+});
+
 app.use(express.json());
 app.use(resolveIdentity);
 
