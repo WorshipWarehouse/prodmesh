@@ -4,7 +4,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readActive, readSlide, readTimers, readPlaylistItems, pollRunState } from './proPresenter.js';
+import {
+  readActive, readSlide, readTimers, readPlaylistItems, pollRunState, streamSlideIndex,
+} from './proPresenter.js';
 import { fakeProPresenter } from './fakeProPresenter.js';
 
 const pp = (srv) => ({ host: '127.0.0.1', port: srv.port() });
@@ -283,6 +285,113 @@ test('readPlaylistItems without a plan falls back to the focused playlist on PP 
     assert.equal(got.matched, false);
     assert.deepEqual(got.items.map((it) => it.name), ['Pre-Service Slides']);
   } finally {
+    await srv.close();
+  }
+});
+
+// ── Slide streaming (?chunked=true) ──────────────────────────────────────────
+//  Verified pushing on PP 21.4; older builds answer once and close. pollRunState
+//  must be correct on both, and must fall back when a stream misbehaves.
+
+test('streamSlideIndex yields each pushed slide body', async () => {
+  const srv = await fakeProPresenter({ chunked: true });
+  const ctl = new AbortController();
+  const got = [];
+  try {
+    srv.setActive(2, 'Riverside');
+    srv.setTotalCues(35);
+    srv.setSlide(0);
+    const done = streamSlideIndex(pp(srv), (s) => got.push(s), ctl.signal);
+
+    await waitFor(() => got.length >= 1, 'the opening snapshot');
+    srv.setSlide(1);
+    srv.setSlide(2);
+    await waitFor(() => got.length >= 3, 'two pushed updates');
+
+    assert.deepEqual(got.at(-1), {
+      slideIndex: 2, presUuid: 'pres-2', presName: 'Riverside', totalCues: 35,
+    });
+    ctl.abort();
+    await done.catch(() => {});
+  } finally {
+    ctl.abort();
+    await srv.close();
+  }
+});
+
+test('pollRunState reports stream pushes without waiting for the poll interval', async () => {
+  const srv = await fakeProPresenter({ chunked: true });
+  const ctl = new AbortController();
+  const states = [];
+  try {
+    srv.setActive(0, 'Countdown');
+    srv.setSlide(0);
+    srv.setSlideCount(4);
+    // Poll interval far longer than the test: any timely update MUST come
+    // from the stream waking the loop, not from the timer.
+    const done = pollRunState(pp(srv), (s) => states.push(s), ctl.signal, 30_000);
+
+    await waitFor(() => states.length >= 1, 'the initial state');
+    srv.setSlide(1);
+    await waitFor(() => states.at(-1).slideIndex === 1, 'a stream-driven update', 3000);
+    srv.setSlide(2);
+    await waitFor(() => states.at(-1).slideIndex === 2, 'a second stream-driven update', 3000);
+
+    ctl.abort();
+    await done;
+  } finally {
+    ctl.abort();
+    await srv.close();
+  }
+});
+
+test('pollRunState falls back to polling when the stream dies mid-run', async () => {
+  const srv = await fakeProPresenter({ chunked: true });
+  const ctl = new AbortController();
+  const states = [];
+  try {
+    srv.setActive(0, 'Countdown');
+    srv.setSlide(0);
+    srv.setSlideCount(4);
+    const done = pollRunState(pp(srv), (s) => states.push(s), ctl.signal, 40);
+
+    await waitFor(() => states.length >= 1, 'the initial state');
+    srv.setSlide(1);
+    await waitFor(() => states.at(-1).slideIndex === 1, 'the stream-driven update');
+
+    // ProPresenter restarts / the socket drops: the run must continue on the timer.
+    srv.dropStreams();
+    srv.setSlide(3);
+    await waitFor(() => states.at(-1).slideIndex === 3, 'polling to carry the run');
+
+    ctl.abort();
+    await done;
+  } finally {
+    ctl.abort();
+    await srv.close();
+  }
+});
+
+test('pollRunState polls normally against a build that accepts chunked but never pushes', async () => {
+  // chunked:false = the endpoint answers the snapshot and closes, as older
+  // builds do. The run must be indistinguishable from pure polling.
+  const srv = await fakeProPresenter({ chunked: false });
+  const ctl = new AbortController();
+  const states = [];
+  try {
+    srv.setActive(0, 'Countdown');
+    srv.setSlide(0);
+    srv.setSlideCount(4);
+    const done = pollRunState(pp(srv), (s) => states.push(s), ctl.signal, 30);
+
+    await waitFor(() => states.length >= 1, 'the initial state');
+    srv.setSlide(2);
+    await waitFor(() => states.at(-1).slideIndex === 2, 'the polled update');
+
+    ctl.abort();
+    await done;
+  } finally {
+    ctl.abort();
     await srv.close();
   }
 });

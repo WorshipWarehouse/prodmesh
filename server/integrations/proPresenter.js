@@ -2,8 +2,9 @@
 //  INTEGRATION: ProPresenter (official API, 7.9+)  —  live Run of Show tracking
 //
 //  The PC plan is pushed into ProPresenter as a playlist, so the active playlist
-//  item maps 1:1 (by index) to our PC order of service. We stream the active
-//  item via /v1/playlist/active?chunked=true and relay it to browsers over SSE.
+//  item maps 1:1 (by index) to our PC order of service. Run state comes from a
+//  chunked slide stream where the PP build supports it, with polling as the
+//  watchdog and fallback (see pollRunState); browsers get it over our SSE.
 //
 //  Per-room host/port (ProPresenter picks an ephemeral API port). No auth (LAN).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -303,14 +304,19 @@ export async function ping(pp, signal) {
  * the source (needed because 21.4 dropped presentation_info from the active
  * playlist item, taking the reliable arrangement read with it).
  */
-export async function readSlide(pp, signal) {
-  const pi = (await ppGet(pp, '/v1/presentation/slide_index', signal)).presentation_index;
+/** Shape a /v1/presentation/slide_index body (same shape when streamed). */
+export function parseSlide(body) {
+  const pi = body?.presentation_index;
   return {
     slideIndex: pi?.index ?? null,
     presUuid: pi?.presentation_id?.uuid ?? null,
     presName: pi?.presentation_id?.name ?? null,
     totalCues: pi?.total_cues ?? null,
   };
+}
+
+export async function readSlide(pp, signal) {
+  return parseSlide(await ppGet(pp, '/v1/presentation/slide_index', signal));
 }
 
 /**
@@ -411,11 +417,95 @@ function sleep(ms, signal) {
   });
 }
 
+// ── Slide streaming ──────────────────────────────────────────────────────────
+//
+//  `?chunked=true` holds the connection open and emits a JSON body on every
+//  change. Support is version-dependent and undocumented as such: verified
+//  pushing on 21.4 (2026-07-26), while older builds answered once and went
+//  quiet — which is why this is never the only source of truth. It feeds
+//  pollRunState, which keeps its own timer as a watchdog and takes over the
+//  moment the stream stops being trustworthy. Worst case = pure polling.
+
+/** Split a growing buffer into complete top-level JSON objects. */
+function takeJsonObjects(buf) {
+  const out = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < buf.length; i += 1) {
+    const c = buf[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{') { if (depth === 0) start = i; depth += 1; }
+    else if (c === '}') {
+      depth -= 1;
+      if (depth === 0 && start >= 0) { out.push(buf.slice(start, i + 1)); start = -1; }
+    }
+  }
+  // Keep any partial object for the next chunk.
+  return { objects: out, rest: start >= 0 ? buf.slice(start) : '' };
+}
+
 /**
- * Poll the active item + slide progress, calling onState(state) whenever any of
- * them changes, until the signal aborts. We poll (rather than stream) because
- * /v1/playlist/active's chunked response only sends the initial state. The
- * browser still gets real-time push, via our SSE.
+ * Hold open /v1/presentation/slide_index?chunked=true, calling onSlide(slide)
+ * for each pushed body. Resolves when the connection closes or the signal
+ * aborts; rejects if it never opened. No health reporting — an unsupported
+ * PP build closing the stream is an expected answer, not an outage.
+ */
+export async function streamSlideIndex(pp, onSlide, signal) {
+  // Deliberately NOT withTimeout(): this connection is meant to stay open.
+  const res = await fetch(`${baseUrl(pp)}/v1/presentation/slide_index?chunked=true`, { signal });
+  if (!res.ok || !res.body) throw new Error(`ProPresenter ${res.status}`);
+  const decoder = new TextDecoder();
+  let buf = '';
+  for await (const chunk of res.body) {
+    buf += decoder.decode(chunk, { stream: true });
+    const { objects, rest } = takeJsonObjects(buf);
+    buf = rest;
+    for (const raw of objects) {
+      let body;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        continue; // framing noise — the next chunk usually completes it
+      }
+      onSlide(parseSlide(body));
+    }
+  }
+}
+
+/** sleep(), but the caller gets a handle to cut it short (a stream push). */
+function sleepUntil(ms, signal, giveWake) {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      signal?.removeEventListener('abort', finish);
+      resolve();
+    };
+    const t = setTimeout(finish, ms);
+    signal?.addEventListener('abort', finish, { once: true });
+    giveWake(finish);
+  });
+}
+
+/**
+ * Track the active item + slide progress, calling onState(state) whenever any
+ * of them changes, until the signal aborts.
+ *
+ * Two sources, deliberately overlapping. The chunked slide stream (when the PP
+ * build supports it) makes updates immediate; the timer below is the watchdog
+ * that both fills in what the stream doesn't carry (the playlist item) and
+ * catches anything it misses. While the stream is trusted the timer relaxes to
+ * WATCHDOG_MS; if the stream drops, goes quiet through a real change, or was
+ * never supported, the timer returns to `intervalMs` — i.e. exactly the
+ * behavior that shipped before streaming existed.
  *
  * state = { itemIndex, itemName, slideIndex, slideCount, presName }
  */
@@ -423,6 +513,47 @@ export async function pollRunState(pp, onState, signal, intervalMs = 800) {
   let lastKey;
   let fails = 0;
   const countCache = { key: null, count: null };
+
+  const WATCHDOG_MS = Math.max(intervalMs, 5000);
+  const stream = { open: false, trusted: false, lastSlideIndex: null };
+  let wake = null; // set while the loop sleeps, so a push can cut it short
+
+  // Supervise the stream for the life of the run: reconnect while it is
+  // supported, and stop trying once a build proves it is not.
+  (async () => {
+    let attempts = 0;
+    while (!signal.aborted && attempts < 3) {
+      // EVERY build answers the initial request with a snapshot, so one body
+      // proves nothing — only a SUBSEQUENT push proves this build streams.
+      let pushes = 0;
+      try {
+        attempts += 1;
+        await streamSlideIndex(
+          pp,
+          (slide) => {
+            pushes += 1;
+            stream.lastSlideIndex = slide.slideIndex;
+            if (pushes < 2) return; // the opening snapshot
+            attempts = 0; // proven: stop counting this against the retry budget
+            stream.open = true;
+            stream.trusted = true;
+            wake?.(); // refresh the full state now, not on the next tick
+          },
+          signal,
+        );
+      } catch {
+        /* unsupported or unreachable — the watchdog carries the run */
+      }
+      // The stream just ended. Wake the loop rather than let it finish a
+      // relaxed watchdog sleep — fast polling must resume immediately.
+      const wasTrusted = stream.trusted;
+      stream.open = false;
+      stream.trusted = false;
+      if (wasTrusted) wake?.();
+      if (!signal.aborted) await sleep(1000, signal);
+    }
+  })();
+
   while (!signal.aborted) {
     try {
       const slide = await readSlide(pp, signal);
@@ -458,9 +589,16 @@ export async function pollRunState(pp, onState, signal, intervalMs = 800) {
         lastKey = key;
         onState(state);
       }
+      // Divergence check: the watchdog found a slide the stream never pushed,
+      // so the connection is open but lying (half-open socket, or a build that
+      // streams selectively). Stop trusting it and go back to fast polling.
+      if (stream.trusted && state.slideIndex !== stream.lastSlideIndex) {
+        stream.trusted = false;
+      }
     } catch (err) {
       if (++fails >= 3) throw err; // sustained failure → SSE shows offline
     }
-    await sleep(intervalMs, signal);
+    await sleepUntil(stream.trusted ? WATCHDOG_MS : intervalMs, signal, (fn) => { wake = fn; });
+    wake = null;
   }
 }

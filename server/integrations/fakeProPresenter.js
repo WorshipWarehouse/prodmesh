@@ -20,6 +20,12 @@
 //   srv.setPlaylistItems(names)  — the playlist's items (pp21 resolution)
 //   srv.setFocusedIndex(i)       — which item the pp21 UI has selected (null = none)
 //   srv.failNextRequests(n)      — next n requests answer HTTP 500 (Infinity = forever)
+//   srv.dropStreams()            — kill open chunked streams (PP restart/blip)
+//
+// The `chunked` option models the version split on slide streaming: true =
+// PP 21.4+, where slide_index?chunked=true holds the connection open and
+// pushes on every setSlide(); false (default) = older builds, which answer
+// the initial snapshot and close.
 
 import http from 'node:http';
 
@@ -27,6 +33,7 @@ export async function fakeProPresenter({
   playlistUuid = 'pl-1',
   playlistName = 'Sunday - Weekend Service',
   pp21 = false,
+  chunked = false, // true = slide_index?chunked=true pushes on every setSlide
 } = {}) {
   const state = {
     active: null, // { index, name, uuid }
@@ -39,10 +46,22 @@ export async function fakeProPresenter({
   };
   const seen = { requests: 0, paths: [] };
   let failRemaining = 0;
+  const streamers = new Set(); // open chunked slide_index responses
 
   // Distinct presentation uuid per playlist item, so the poller's slide-count
   // cache refreshes when the active item changes (as it does live).
   const presUuid = (index) => (index == null ? null : `pres-${index}`);
+
+  const slideBody = () => ({
+    presentation_index: state.active
+      ? {
+          index: state.slideIndex,
+          presentation_id: { uuid: presUuid(state.active.index), name: state.active.name },
+          // PP 21.4+ reports the arrangement-aware total here.
+          ...(state.totalCues != null ? { total_cues: state.totalCues } : {}),
+        }
+      : null,
+  });
 
   const playlistItem = ({ index, name }) => ({
     id: { uuid: `item-${index}`, name, index },
@@ -65,6 +84,21 @@ export async function fakeProPresenter({
     };
     const a = state.active;
     const playlistId = { uuid: playlistUuid, name: playlistName, index: 0 };
+
+    // Chunked slide stream (PP 21.4+). `chunked: false` models the older
+    // builds that accept the parameter but never push.
+    if (req.url === '/v1/presentation/slide_index?chunked=true') {
+      if (!chunked) {
+        res.setHeader('content-type', 'application/json');
+        return res.end(JSON.stringify(slideBody()));
+      }
+      res.setHeader('content-type', 'application/json');
+      res.setHeader('transfer-encoding', 'chunked');
+      res.write(JSON.stringify(slideBody()));
+      streamers.add(res);
+      req.on('close', () => streamers.delete(res));
+      return;
+    }
     const playlistBody = () => json({ id: playlistId, items: state.items.map(playlistItem) });
 
     // PP 21 addresses playlists by index path; PP 7 by uuid.
@@ -116,16 +150,7 @@ export async function fakeProPresenter({
           },
         ]);
       case '/v1/presentation/slide_index':
-        return json({
-          presentation_index: a
-            ? {
-                index: state.slideIndex,
-                presentation_id: { uuid: presUuid(a.index), name: a.name },
-                // PP 21.4+ reports the arrangement-aware total here.
-                ...(state.totalCues != null ? { total_cues: state.totalCues } : {}),
-              }
-            : null,
-        });
+        return json(slideBody());
       case '/v1/presentation/active':
         return json({
           presentation: {
@@ -153,7 +178,14 @@ export async function fakeProPresenter({
     },
     setSlide(i) {
       state.slideIndex = i;
+      for (const res of streamers) res.write(JSON.stringify(slideBody()));
     },
+    /** Drop every open stream, as a PP restart or network blip would. */
+    dropStreams() {
+      for (const res of streamers) res.end();
+      streamers.clear();
+    },
+    streamCount: () => streamers.size,
     setSlideCount(n) {
       state.slideCount = n;
     },
@@ -174,6 +206,8 @@ export async function fakeProPresenter({
     },
     port: () => srv.address().port,
     close: () => {
+      for (const res of streamers) res.end();
+      streamers.clear();
       srv.closeAllConnections?.();
       return new Promise((r) => srv.close(r));
     },
