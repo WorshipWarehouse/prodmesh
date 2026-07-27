@@ -14,6 +14,7 @@
 import { getDb } from './db.js';
 import { validateChurch } from './validate.js';
 import { seedChurch } from './topologySeed.js';
+import { wantsDemoSeed } from './seedMode.js';
 
 const INSTITUTION_KEY = 'institution';
 
@@ -79,26 +80,11 @@ export function replaceChurch(input) {
   return getChurch();
 }
 
-/**
- * Should first boot install the demo topology?
- *
- * It must NOT for a real install. topologySeed.js is Grace Community's actual
- * campuses, rooms and device addresses, so a church installing prodmesh was
- * getting a site called "North" containing someone else's IPs — and the
- * first-run wizard has nothing to do if a campus already exists.
- *
- * It must for tests and dev, which are built on that fixture (north-youth is
- * the mock room every server test uses).
- *
- * PRODMESH_SEED=demo|empty forces it either way; otherwise "am I a real
- * install?" is NODE_ENV=production without the local-test flag.
- */
-function wantsDemoSeed() {
-  const explicit = String(process.env.PRODMESH_SEED ?? '').toLowerCase();
-  if (explicit === 'demo') return true;
-  if (explicit === 'empty' || explicit === 'none') return false;
-  return process.env.PRODMESH_LOCAL_TEST === '1' || process.env.NODE_ENV !== 'production';
-}
+// Whether first boot installs the demo topology (Grace Community's real campuses,
+// rooms and device IPs — the fixture every server test is built on) is the
+// same question several stores ask, so it lives in seedMode.js. A church
+// installing prodmesh must never inherit someone else's campuses, and the
+// first-run wizard has nothing to do if a campus already exists.
 
 // First boot: an existing installation keeps looking exactly the way its static
 // config did. A fresh real install starts EMPTY, so setup can ask the church

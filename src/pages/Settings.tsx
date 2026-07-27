@@ -10,6 +10,7 @@ import { Field } from '../components/form/Field';
 import { FormRow } from '../components/form/FormRow';
 import { useDraft } from '../components/form/useDraft';
 import { useChurch } from '../layout/church';
+import { allIds, slugId } from '../lib/topology';
 import {
   getAuthStatus,
   loginAdmin,
@@ -1204,26 +1205,6 @@ const TILE_ICONS: Array<[string, string]> = [
   ['🖥️', 'Computer'],
   ['🌐', 'Network device'],
 ];
-
-function slugId(label: string, taken: Set<string>) {
-  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
-  let id = base;
-  for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`;
-  taken.add(id);
-  return id;
-}
-
-function allIds(church: Church) {
-  const ids = new Set<string>();
-  for (const site of church.sites) {
-    ids.add(site.id);
-    for (const room of site.auditoriums) {
-      ids.add(room.id);
-      for (const tile of room.tiles) ids.add(tile.id);
-    }
-  }
-  return ids;
-}
 
 // Shared draft plumbing: both the overview and the room page edit a local
 // copy of the whole tree and save it transactionally (PUT /api/config).

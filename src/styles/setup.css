@@ -1,0 +1,468 @@
+/* First-run setup wizard (src/pages/Setup.tsx). Renders outside the shell and
+   owns the whole window — the only screen in the app with no sidebar. */
+
+.setup {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  min-height: 100%;
+  background: var(--bg);
+}
+
+.setup--plain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+/* ── Welcome ──────────────────────────────────────────────────────────────── */
+.setup__hero {
+  max-width: 520px;
+  text-align: center;
+}
+
+.setup__herologo {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 22px;
+  object-fit: contain;
+}
+
+.setup__herotitle {
+  margin: 8px 0 0;
+  font-size: clamp(1.7rem, 4vw, 2.3rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.setup__herolede {
+  margin: 14px 0 0;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.setup__herolist {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 26px 0 30px;
+  padding: 0;
+  list-style: none;
+}
+
+.setup__herolist li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.setup__herolist svg {
+  color: var(--text-faint);
+}
+
+/* ── Step rail ────────────────────────────────────────────────────────────── */
+.setup__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  padding: 30px 26px;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-sidebar);
+}
+
+.setup__railbrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.setup__railbrand img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.setup__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.setup__step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 0.83rem;
+}
+
+/* The number badge doubles as the progress marker: outlined ahead, filled
+   while you're on it, checked once it's behind you. */
+.setup__stepmark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.setup__step--next {
+  color: var(--text-faint);
+}
+
+.setup__step--now {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.setup__step--now .setup__stepmark {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.setup__step--done {
+  color: var(--text-dim);
+}
+
+.setup__step--done .setup__stepmark {
+  border-color: var(--ok-border);
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+/* ── Step body ────────────────────────────────────────────────────────────── */
+/* Top-aligned rather than vertically centred: steps differ in height, and
+   centring makes the title jump every time you advance. */
+.setup__main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 9vh 48px 48px;
+}
+
+.setup__col {
+  width: 100%;
+  max-width: 560px;
+}
+
+.setup__count {
+  margin: 0 0 10px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.setup__card {
+  width: 100%;
+}
+
+.setup__title {
+  margin: 0;
+  font-size: clamp(1.3rem, 2.6vw, 1.7rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.setup__lede {
+  margin: 12px 0 0;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.setup__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.setup__note {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.setup__err {
+  margin: 0;
+}
+
+.setup__settled {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ok-border);
+  border-radius: var(--radius);
+  background: var(--ok-soft);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.setup__settled svg {
+  color: var(--ok);
+}
+
+.setup__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Back sits left, the way forward sits right. */
+.setup__foot .btn--primary {
+  margin-left: auto;
+}
+
+.btn--lg {
+  padding: 10px 20px;
+  font-size: 0.92rem;
+}
+
+/* ── Logo + sidebar preview ───────────────────────────────────────────────── */
+.setup__logorow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+}
+
+.setup__preview .section-label {
+  margin-bottom: 8px;
+}
+
+/* A mock of the real sidebar header: a mark that reads fine on a laptop can
+   turn to mush at the size it actually renders. */
+.setup__previewbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--bg-sidebar);
+}
+
+.setup__previewbar img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.setup__previewbar div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.setup__previewbar strong {
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup__previewbar small {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+}
+
+.setup__logoactions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 190px;
+}
+
+/* ── Rooms ────────────────────────────────────────────────────────────────── */
+.setup__rooms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.setup__rooms .section-label {
+  margin-bottom: 2px;
+}
+
+.setup__roomrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.setup__roomrow .field {
+  flex: 1;
+}
+
+/* ── Integrations ─────────────────────────────────────────────────────────── */
+.setup__integration {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+}
+
+.setup__intname {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* ── Done ─────────────────────────────────────────────────────────────────── */
+.setup__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+/* The note after the summary is prose, not a third checked item. */
+.setup__summary + .setup__note {
+  margin-top: 16px;
+}
+
+.setup__summary li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup__summary svg {
+  color: var(--ok);
+}
+
+.setup__next {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.setup__nextcard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-tile);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.setup__nextcard:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--bg-tile-hover);
+}
+
+.setup__nextcard:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.setup__nextcard svg {
+  margin-top: 2px;
+  color: var(--accent-text);
+}
+
+.setup__nextcard span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setup__nextcard strong {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.setup__nextcard small {
+  color: var(--text-faint);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
+/* Narrow windows (a booth iPad, a half-screen browser): the rail becomes a
+   horizontal strip rather than eating a third of the width. */
+@media (max-width: 720px) {
+  .setup {
+    grid-template-columns: 1fr;
+  }
+
+  .setup__rail {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    overflow-x: auto;
+  }
+
+  .setup__steps {
+    flex-direction: row;
+  }
+
+  .setup__step--next .setup__steplabel,
+  .setup__step--done .setup__steplabel {
+    display: none;
+  }
+
+  .setup__main {
+    padding: 28px 20px 36px;
+  }
+
+  .setup__logorow {
+    grid-template-columns: 1fr;
+  }
+}

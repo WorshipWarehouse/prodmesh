@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
+import { SetupGate } from './layout/SetupGate';
 import { Home } from './pages/Home';
 import { Services } from './pages/Services';
 import { Calendar } from './pages/Calendar';
@@ -10,11 +11,16 @@ import { RoomShowRedirect } from './pages/RoomShowRedirect';
 import { RunOfShow } from './pages/RunOfShow';
 import { ServiceReport } from './pages/ServiceReport';
 import { Settings } from './pages/Settings';
+import { Setup } from './pages/Setup';
 import './styles/index.css';
 
 export default function App() {
   return (
+    <SetupGate>
     <Routes>
+      {/* First run — deliberately outside the shell: an unclaimed install has
+          no campuses to navigate and no station to identify yet. */}
+      <Route path="/setup" element={<Setup />} />
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
@@ -39,5 +45,6 @@ export default function App() {
         <Route path="/settings" element={<Navigate to="/admin/general" replace />} />
       </Route>
     </Routes>
+    </SetupGate>
   );
 }

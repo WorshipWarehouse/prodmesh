@@ -15,29 +15,38 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { validateSchedules } from './validate.js';
 import { writeJsonAtomic } from './atomicFile.js';
+import { wantsDemoSeed } from './seedMode.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Overridable so tests (and alternate deployments) can point at their own dir.
 const DATA_DIR = process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data');
 const FILE = join(DATA_DIR, 'settings.json');
 
-// First-run defaults. A Sunday lock on the Auditorium is pre-seeded as an
-// example (it only takes effect once an Override PIN is set).
+// The example Sunday lock that ships with the demo topology. It is keyed to
+// "north-main", so a real church's fresh install would open Settings to a
+// protection window on a room they have never heard of — the same
+// someone-else's-data problem the topology seed has, answered the same way
+// (seedMode.js). It only takes effect once an Override PIN is set.
+const DEMO_SCHEDULES = {
+  'north-main': [
+    {
+      id: 'sun-services',
+      label: 'Sunday Services',
+      days: [0], // 0 = Sunday
+      start: '07:00',
+      end: '13:30',
+      lock: ['standby'], // mode ids that require the Override PIN in this window
+    },
+  ],
+};
+
+// First-run defaults.
 const DEFAULTS = {
   version: 1,
   pins: { admin: null, override: null }, // hashed "salt:hash" strings, or null
-  schedules: {
-    'north-main': [
-      {
-        id: 'sun-services',
-        label: 'Sunday Services',
-        days: [0], // 0 = Sunday
-        start: '07:00',
-        end: '13:30',
-        lock: ['standby'], // mode ids that require the Override PIN in this window
-      },
-    ],
-  },
+  // When the wizard finished, or null while this install is unclaimed.
+  setupCompletedAt: null,
+  schedules: {},
 };
 
 let settings = null;
@@ -52,6 +61,7 @@ function load() {
     }
   } else {
     settings = structuredClone(DEFAULTS);
+    if (wantsDemoSeed()) settings.schedules = structuredClone(DEMO_SCHEDULES);
     persist();
   }
   return settings;
@@ -112,6 +122,23 @@ export function setPins({ admin, override } = {}) {
   if (admin !== undefined) s.pins.admin = admin === '' ? null : hashPin(admin);
   if (override !== undefined) s.pins.override = override === '' ? null : hashPin(override);
   persist();
+}
+
+// ── First-run setup ───────────────────────────────────────────────────────────
+//  Whether the setup wizard still has work to do. Kept here (rather than
+//  inferred from "is there an admin PIN?") because the PIN is set at the FIRST
+//  wizard step: inferring would declare setup finished while the church is
+//  still on step two, and a reload would drop them into an app with no
+//  campuses. setup.js owns the policy; this is just the stored fact.
+
+export const getSetupCompletedAt = () => load().setupCompletedAt ?? null;
+
+export function markSetupComplete(at = Date.now()) {
+  const s = load();
+  if (s.setupCompletedAt) return s.setupCompletedAt; // first stamp wins
+  s.setupCompletedAt = at;
+  persist();
+  return at;
 }
 
 export function setSchedules(schedules) {

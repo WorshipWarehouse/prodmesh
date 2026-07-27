@@ -464,7 +464,6 @@ input[type='time']::-webkit-calendar-picker-indicator {
 .helptip__bubble {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 8px);
   transform: translateX(-50%);
   width: max-content;
   max-width: 260px;
@@ -485,6 +484,16 @@ input[type='time']::-webkit-calendar-picker-indicator {
   transition: opacity 120ms ease;
   pointer-events: none;
   z-index: 30;
+}
+
+.helptip__bubble--above {
+  bottom: calc(100% + 8px);
+}
+
+/* Below the trigger, for a "?" near the top of the window where a bubble
+   above would be clipped by the viewport. */
+.helptip__bubble--below {
+  top: calc(100% + 8px);
 }
 
 .helptip:hover .helptip__bubble,
