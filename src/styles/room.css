@@ -188,3 +188,96 @@
   color: var(--text-dim);
   font-size: 0.85rem;
 }
+
+/* ── Room console accordions ──────────────────────────────────────────────
+   The room page doubles as a production computer's homepage, so panels
+   collapse rather than disappear: a closed header still answers its own
+   question (which mode, how many tiles). Future panels — device metrics,
+   SNMP alerts — drop in as more <Accordion>s with no layout rework. */
+.acc {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.acc__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 18px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+}
+
+.acc__head:hover { background: var(--bg-hover, rgba(127, 127, 127, 0.06)); }
+
+.acc__head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.acc__chev {
+  flex: none;
+  color: var(--text-faint);
+  transition: transform 120ms ease;
+}
+.acc--open .acc__chev { transform: rotate(180deg); }
+
+.acc__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* Everything after the title is the collapsed-state summary, pushed right. */
+.acc__summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.acc__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mode-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mode-color) 45%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.acc__count {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-sunken, rgba(127, 127, 127, 0.14));
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.acc__body {
+  padding: 0 18px 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+/* Full-width console layout wants a grid, not the home sidebar's tall list. */
+.roomtiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+}
+
+/* The service widget sits between accordions, so it needs their rhythm. */
+.status .widgets { margin-top: 16px; }
