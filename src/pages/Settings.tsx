@@ -64,6 +64,7 @@ import {
   saveSecrets,
   checkIntegrations,
   type SecretGroup,
+  type Version,
 } from '../api';
 import type { Church, Site, Tile } from '../types';
 import logoUrl from '../assets/prodmesh-logo.svg';
@@ -877,8 +878,8 @@ function SecretsDialog({
   );
 }
 
-function SystemPanel() {
-  const [version, setVersion] = useState<{ commit: string; subject: string } | null>(null);
+export function SystemPanel() {
+  const [version, setVersion] = useState<Version | null>(null);
   const [status, setStatus] = useState<Feedback>(null);
 
   const load = useCallback(() => getVersion().then(setVersion).catch(() => {}), []);
@@ -913,12 +914,26 @@ function SystemPanel() {
         <div>
           <div className="panel__label">Version</div>
           <div className="settings__muted">
-            {version ? <><code>{version.commit}</code> — {version.subject}</> : '…'}
+            {version
+              ? <>{version.version}{version.commit !== 'unknown' && <> · <code>{version.commit}</code></>}
+                {version.subject && <> — {version.subject}</>}</>
+              : '…'}
           </div>
+          {/* Sits with the version, not adrift below the row: it describes
+              this install, and a loose paragraph reads as an error. */}
+          {version && !version.update.supported && (
+            <div className="settings__muted">{version.update.reason}</div>
+          )}
         </div>
-        <div className="panel__controls">
-          <button className="btn btn--primary" onClick={update}>Update now</button>
-        </div>
+        {/* A button that cannot work is worse than no button: someone presses
+            it mid-service and reads the silence as a broken install. The slot
+            goes with it — an empty controls div leaves a gap where a control
+            visibly used to be. */}
+        {version?.update.supported && (
+          <div className="panel__controls">
+            <button className="btn btn--primary" onClick={update}>Update now</button>
+          </div>
+        )}
       </div>
       <Msg msg={status} />
     </section>
@@ -1091,8 +1106,7 @@ function ServerLogViewer() {
 
       {log && !log.exists && (
         <p className="settings__muted">
-          No log file yet at <code>{log.file}</code> — it appears when ProdMesh runs as the
-          installed service (deploy/install-service.sh).
+          No log file at <code>{log.file}</code>. {log.hint}
         </p>
       )}
       {log?.exists && (

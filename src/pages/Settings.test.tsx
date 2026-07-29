@@ -2,9 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { CampusesPanel, LogsPanel, RoomConfigPanel, StationsPanel, UserManagementPanel } from './Settings';
+import { CampusesPanel, LogsPanel, RoomConfigPanel, StationsPanel, SystemPanel, UserManagementPanel } from './Settings';
 
 const api = vi.hoisted(() => ({
+  getVersion: vi.fn(),
+  triggerUpdate: vi.fn(),
   getUserDirectory: vi.fn(),
   createUser: vi.fn(),
   createGroup: vi.fn(),
@@ -137,6 +139,56 @@ describe('Logs', () => {
     expect(await screen.findByText('rooms.mode.change')).toBeInTheDocument();
     expect(screen.getByText('the maintainer')).toBeInTheDocument();
     expect(screen.getByText('allowed')).toBeInTheDocument();
+  });
+});
+
+describe('System', () => {
+  const version = {
+    version: '1.0.0', commit: 'c5b551d', subject: 'Ship it', source: 'git' as const,
+    deployment: 'git' as const,
+    update: { supported: true, strategy: 'git' as const, reason: null },
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('offers an update on an install that can perform one', async () => {
+    api.getVersion.mockResolvedValue(version);
+    render(<SystemPanel />);
+
+    expect(await screen.findByText('c5b551d')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update now' })).toBeInTheDocument();
+  });
+
+  it('hides the update button where it cannot work, and says what to do instead', async () => {
+    // A button that does nothing is worse than no button: someone presses it
+    // mid-service and reads the silence as a broken install.
+    api.getVersion.mockResolvedValue({
+      ...version,
+      source: 'build' as const,
+      deployment: 'container' as const,
+      update: {
+        supported: false,
+        strategy: 'container' as const,
+        reason: 'Update by pulling a newer image and recreating the container.',
+      },
+    });
+    render(<SystemPanel />);
+
+    expect(await screen.findByText(/pulling a newer image/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Update now' })).not.toBeInTheDocument();
+  });
+
+  it('still names a version when there is no commit to show', async () => {
+    // A release archive: it knows what version it is, just not from which commit.
+    api.getVersion.mockResolvedValue({
+      ...version,
+      commit: 'unknown', subject: '', source: 'package' as const, deployment: 'package' as const,
+      update: { supported: false, strategy: 'manual' as const, reason: 'Install the new version the same way.' },
+    });
+    render(<SystemPanel />);
+
+    expect(await screen.findByText(/1\.0\.0/)).toBeInTheDocument();
+    expect(screen.queryByText('unknown')).not.toBeInTheDocument();
   });
 });
 

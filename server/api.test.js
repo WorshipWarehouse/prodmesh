@@ -84,6 +84,31 @@ test('user directory includes the avatar contract', async () => {
   assert.ok(directory.users.every((user) => Object.hasOwn(user, 'avatarUrl')));
 });
 
+test('version reports how this copy was installed, not just a commit', async () => {
+  const res = await fetch(base + '/api/system/version');
+  assert.equal(res.status, 200);
+  const version = await res.json();
+  assert.ok(version.version, 'a release version is always present');
+  assert.equal(version.deployment, 'git'); // the checkout these tests run in
+  assert.equal(version.update.supported, true);
+});
+
+test('a container refuses to self-update instead of spawning a script it lacks', async () => {
+  // An image has no deploy scripts and nothing to pull, and a container that
+  // rewrote its own code would silently lose the change on the next restart.
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  process.env.PRODMESH_CONTAINER = '1';
+  try {
+    const res = await apiRequest('/api/system/update', { method: 'POST', token });
+    assert.equal(res.status, 409); // authorized and well-formed — just not how this install works
+    const body = await res.json();
+    assert.equal(body.error, 'update_not_supported');
+    assert.match(body.reason, /image/i, 'says what to do instead');
+  } finally {
+    delete process.env.PRODMESH_CONTAINER;
+  }
+});
+
 test('person search says so when no Planning Center token is connected', async () => {
   // Not an error: an install with no token still creates users, it just types
   // the person ID by hand — so the UI has to be able to tell the difference.

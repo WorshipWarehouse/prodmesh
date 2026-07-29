@@ -383,8 +383,20 @@ export async function deleteChecklistTemplate(
 // ── System ────────────────────────────────────────────────────────────────────
 
 export interface Version {
+  /** Release version from package.json or the build stamp, e.g. "1.0.0". */
+  version: string;
   commit: string;
   subject: string;
+  /** Where commit/subject came from: a build stamp, git, or neither. */
+  source: 'build' | 'git' | 'package';
+  /** How this copy was installed — decides whether it can update itself. */
+  deployment: 'git' | 'container' | 'package';
+  update: {
+    supported: boolean;
+    strategy: 'git' | 'container' | 'manual';
+    /** What to do instead, when the app can't update itself. */
+    reason: string | null;
+  };
 }
 
 export const getVersion = () => getJson<Version>('/api/system/version');
@@ -627,6 +639,8 @@ export async function saveCompanion(
 export interface ServerLogTail {
   exists: boolean;
   file: string;
+  /** Where to look instead, when there's no file — differs per deployment. */
+  hint?: string;
   size?: number;
   mtime?: number;
   truncated?: boolean;
