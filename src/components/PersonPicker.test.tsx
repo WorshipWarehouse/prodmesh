@@ -90,6 +90,15 @@ describe('PersonPicker', () => {
     expect(api.searchPlanningCenterPeople).toHaveBeenCalledTimes(1); // the mount probe
   });
 
+  it('flags someone who no longer serves', async () => {
+    connected([{ ...MEGAN, inactive: true }]);
+    const user = userEvent.setup();
+    render(<PersonPicker value="" onChange={vi.fn()} />);
+
+    await user.type(await screen.findByRole('combobox'), 'avery');
+    expect(await screen.findByText('PCO 900001 · Inactive')).toBeInTheDocument();
+  });
+
   it('says nothing matched', async () => {
     connected([]);
     const user = userEvent.setup();

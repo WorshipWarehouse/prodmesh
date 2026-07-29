@@ -19,7 +19,7 @@ type Status = 'idle' | 'searching' | 'error';
 /** A hand-typed ID was never looked up, so there is no name to show — say that
  *  rather than dressing the row up as a confirmed person. */
 const identity = (person: PlanningCenterPerson) => (person.name
-  ? { title: person.name, sub: `PCO ${person.id}` }
+  ? { title: person.name, sub: `PCO ${person.id}${person.inactive ? ' · Inactive' : ''}` }
   : { title: `PCO ${person.id}`, sub: 'Name not checked' });
 
 export function PersonPicker({ value, onChange }: { value: string; onChange: (personId: string) => void }) {

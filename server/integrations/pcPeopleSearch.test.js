@@ -1,6 +1,11 @@
 // People search against the LIVE path — its own file because configuring
 // credentials flips isConfigured() for the whole module, and every other test
 // in planningCenter.test.js is written against mock mode.
+//
+// The stub below mimics what Services /people actually does, which is the
+// whole reason this code looks the way it does: it PAGES, and it IGNORES every
+// filter param it is given (verified live 2026-07-29 — where[…], ?q= and
+// ?search= all came back with an identical total_count).
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
@@ -31,17 +36,30 @@ const person = (id, fullName, extra = {}) => ({
   attributes: {
     full_name: fullName,
     photo_thumbnail_url: `https://pc.test/${id}.jpg`,
+    status: 'active',
+    archived_at: null,
     email_address: `${fullName.split(' ')[0].toLowerCase()}@church.test`,
     phone_number: '555-0100',
+    birthdate: '1988-04-02',
     ...extra,
   },
 });
 
 const calls = [];
-function stubFetch(people) {
+
+/** Serves `roster` the way Services does: 100 per page, filters ignored. */
+function stubPlanningCenter(roster) {
   globalThis.fetch = async (url) => {
     calls.push(String(url));
-    return { ok: true, status: 200, json: async () => ({ data: people }) };
+    const offset = Number(new URL(String(url)).searchParams.get('offset') ?? 0);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: roster.slice(offset, offset + 100),
+        meta: { total_count: roster.length },
+      }),
+    };
   };
 }
 
@@ -52,52 +70,83 @@ afterEach(() => {
   pco.clearCache();
 });
 
+test('finds someone past the first page of the roster', async () => {
+  // The reported bug: Grace Community has 139 people in Services and their tech
+  // director sat at #113, so a search that read one page found "some people"
+  // and silently missed the rest.
+  const roster = [
+    ...Array.from({ length: 112 }, (_, i) => person(`${1000 + i}`, `Volunteer ${i} Person`)),
+    person('142095475', 'Arturo Ortega'),
+    ...Array.from({ length: 26 }, (_, i) => person(`${2000 + i}`, `Later ${i} Person`)),
+  ];
+  stubPlanningCenter(roster);
+
+  const results = await pco.searchPeople('arturo');
+  assert.deepEqual(results.map((p) => p.id), ['142095475']);
+  assert.equal(calls.length, 2, 'paged through the whole roster');
+});
+
 test('a search returns names and photos — never contact details', async () => {
-  stubFetch([person('900001', 'Avery Stone')]);
+  stubPlanningCenter([person('900001', 'Avery Stone')]);
   const results = await pco.searchPeople('avery');
 
   assert.deepEqual(results, [
-    { id: '900001', name: 'Avery Stone', avatarUrl: 'https://pc.test/900001.jpg' },
+    { id: '900001', name: 'Avery Stone', avatarUrl: 'https://pc.test/900001.jpg', inactive: false },
   ]);
   // Explicit, because "it isn't in the assert above" is easy to regress into.
   const keys = Object.keys(results[0]);
   assert.ok(!keys.some((k) => /email|phone|address|birth/i.test(k)), keys.join());
 });
 
-test('the query travels as an encoded query param, never in the path', async () => {
-  stubFetch([]);
-  await pco.searchPeople('../../people/v2/people');
+test('nothing the admin types is ever sent to Planning Center', async () => {
+  stubPlanningCenter([person('1', 'Avery Stone')]);
+  await pco.searchPeople('../../people/v2/people?where[x]=1');
 
-  const url = new URL(calls[0]);
-  assert.equal(url.pathname, '/services/v2/people', 'path is fixed');
-  assert.equal(url.searchParams.get('where[search_name_or_email]'), '../../people/v2/people');
-});
-
-test('rows that do not match the typed name are dropped', async () => {
-  // PC ignores where[] params it does not recognize rather than erroring, so a
-  // wrong param name returns the first page of EVERYBODY. Matching locally as
-  // well turns that into "no results" instead of a wrong list of names.
-  stubFetch([person('1', 'Aaron Abbott'), person('2', 'Avery Stone'), person('3', 'Zoe Young')]);
-  const results = await pco.searchPeople('avery');
-  assert.deepEqual(results.map((p) => p.id), ['2']);
+  for (const call of calls) {
+    const url = new URL(call);
+    assert.equal(url.pathname, '/services/v2/people');
+    assert.deepEqual([...url.searchParams.keys()].sort(), ['offset', 'per_page']);
+  }
 });
 
 test('every word typed has to appear', async () => {
-  stubFetch([person('1', 'Avery Stone'), person('2', 'Avery Torres')]);
+  stubPlanningCenter([person('1', 'Avery Stone'), person('2', 'Avery Torres')]);
   assert.deepEqual((await pco.searchPeople('avery h')).map((p) => p.name), ['Avery Stone']);
 });
 
+test('people who still serve come first, and inactive ones say so', async () => {
+  // Only eight rows show, so ordering decides who is seen at all — but an
+  // inactive volunteer can still need a login, so they stay findable.
+  stubPlanningCenter([
+    person('1', 'Avery Zither', { status: 'inactive', archived_at: '2025-01-01T00:00:00Z' }),
+    person('2', 'Avery Stone'),
+  ]);
+  const results = await pco.searchPeople('avery');
+  assert.deepEqual(results.map((p) => p.name), ['Avery Stone', 'Avery Zither']);
+  assert.deepEqual(results.map((p) => p.inactive), [false, true]);
+});
+
 test('a one-letter query never reaches Planning Center', async () => {
-  stubFetch([person('1', 'Avery Stone')]);
+  stubPlanningCenter([person('1', 'Avery Stone')]);
   assert.deepEqual(await pco.searchPeople('m'), []);
   assert.deepEqual(await pco.searchPeople(''), []);
   assert.equal(calls.length, 0);
 });
 
-test('repeating a search is served from cache', async () => {
-  stubFetch([person('1', 'Avery Stone')]);
+test('the roster is fetched once, not per search', async () => {
+  stubPlanningCenter([person('1', 'Avery Stone'), person('2', 'Arturo Ortega')]);
   await pco.searchPeople('avery');
   await pco.searchPeople('Avery'); // same search, different shift key
+  await pco.searchPeople('arturo'); // different search, same roster
+  assert.equal(calls.length, 1);
+});
+
+test('a warm-up and a search that overlap share one fetch', async () => {
+  // The picker warms the roster as it mounts and searches a keystroke later,
+  // so these two genuinely overlap: caching the resolved value rather than the
+  // in-flight promise fetched the whole roster twice, every time.
+  stubPlanningCenter([person('1', 'Avery Stone')]);
+  await Promise.all([pco.getPeopleRoster(), pco.searchPeople('avery')]);
   assert.equal(calls.length, 1);
 });
 

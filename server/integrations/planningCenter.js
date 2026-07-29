@@ -39,13 +39,21 @@ function prune() {
   }
 }
 
-async function cached(key, fn) {
+// Caches the PROMISE, not the resolved value, so callers that arrive while a
+// fetch is in flight join it instead of starting their own. The people picker
+// makes that concrete: it warms the roster as it mounts and then searches a
+// moment later, which was two full roster fetches. Failures are evicted — a
+// cached rejection would persist an outage for the whole TTL.
+function cached(key, fn) {
   const hit = cache.get(key);
   if (hit && Date.now() < hit.expires) return hit.value;
-  const value = await fn();
+  const value = fn();
   if (cache.size >= CACHE_MAX) prune();
   cache.set(key, { expires: Date.now() + CACHE_TTL_MS, value });
-  return value;
+  return value.catch((err) => {
+    cache.delete(key);
+    throw err;
+  });
 }
 export function clearCache() {
   cache.clear();
@@ -204,6 +212,46 @@ export function getPersonProfile(personId) {
 
 const PEOPLE_SEARCH_LIMIT = 8;
 const MIN_QUERY_LENGTH = 2;
+const PEOPLE_PAGE_SIZE = 100; // PC's per-page maximum
+const PEOPLE_PAGE_CAP = 30; // 3000 people — a bound, not an expected limit
+
+const normalizePerson = (d) => ({
+  id: d.id,
+  name: d.attributes?.full_name || d.attributes?.name || '',
+  avatarUrl: d.attributes?.photo_thumbnail_url ?? null,
+  // Still findable, just flagged: someone who stopped serving can still need a
+  // login, and hiding them recreates "I can't find this person".
+  inactive: Boolean(d.attributes?.archived_at) || d.attributes?.status === 'inactive',
+});
+
+/**
+ * The whole Services roster, cached.
+ *
+ * Services /people IGNORES query filters — verified live 2026-07-29 against a
+ * 139-person roster: where[search_name_or_email], where[first_name], ?q= and
+ * ?search= all returned an identical total_count of 139. It answers a filtered
+ * request with an unfiltered page and no error, so asking it to search reads
+ * as "found some people, missing others" depending purely on who landed in the
+ * first page. Searching therefore means holding the list ourselves.
+ *
+ * Cheap: 139 people is two requests in about a second, then a cache hit for
+ * the next ten minutes. The page cap bounds a pathological roster rather than
+ * a realistic one.
+ */
+export function getPeopleRoster() {
+  return cached('people:roster', async () => {
+    const people = [];
+    let total = Infinity;
+    for (let page = 0; page < PEOPLE_PAGE_CAP && people.length < total; page++) {
+      const body = await pcGet(`/people?per_page=${PEOPLE_PAGE_SIZE}&offset=${people.length}`);
+      const rows = body.data ?? [];
+      if (!rows.length) break;
+      total = body.meta?.total_count ?? people.length + rows.length;
+      for (const row of rows) people.push(normalizePerson(row));
+    }
+    return people;
+  });
+}
 
 /**
  * Never mocks — an unconfigured install returns nothing.
@@ -212,33 +260,32 @@ const MIN_QUERY_LENGTH = 2;
  * a different thing entirely. It gets written into a user record and stays
  * there, so once a real token is connected that account would wear the photo
  * and identity of whoever genuinely owns that number.
+ *
+ * No part of the query is ever sent to Planning Center — the matching happens
+ * here, over a list fetched with a fixed path.
  */
-export function searchPeople(query) {
+export async function searchPeople(query) {
   const q = String(query ?? '').trim();
-  if (!isConfigured() || q.length < MIN_QUERY_LENGTH) return Promise.resolve([]);
-  return cached(`people:search:${q.toLowerCase()}`, async () => {
-    // ⓘ where[search_name_or_email] — confirm against live data. PC ignores
-    // where[] params it doesn't recognize rather than erroring, which would
-    // hand back the first page of everybody; matching locally as well makes
-    // that failure read as "no results" instead of a wrong list of names.
-    const body = await pcGet(
-      `/people?where[search_name_or_email]=${encodeURIComponent(q)}&per_page=${PEOPLE_SEARCH_LIMIT * 4}`,
-    );
-    return (body.data ?? [])
-      .map((d) => ({
-        id: d.id,
-        name: d.attributes?.full_name || d.attributes?.name || '',
-        avatarUrl: d.attributes?.photo_thumbnail_url ?? null,
-      }))
-      .filter((person) => person.name && matchesName(person.name, q))
-      .slice(0, PEOPLE_SEARCH_LIMIT);
-  });
+  if (!isConfigured() || q.length < MIN_QUERY_LENGTH) return [];
+  const roster = await getPeopleRoster();
+  return roster
+    .filter((person) => person.name && matchesName(person.name, q))
+    .sort(byRelevance(q))
+    .slice(0, PEOPLE_SEARCH_LIMIT);
 }
 
 /** Every word typed must appear: "meg h" finds Avery Stone, not every Avery. */
 function matchesName(name, query) {
   const haystack = name.toLowerCase();
   return query.toLowerCase().split(/\s+/).every((word) => haystack.includes(word));
+}
+
+/** Currently serving first, then the people whose name actually starts with
+ *  what was typed — only eight rows show, so the order decides what's seen. */
+function byRelevance(query) {
+  const q = query.toLowerCase();
+  const score = (p) => (p.inactive ? 2 : 0) + (p.name.toLowerCase().startsWith(q) ? 0 : 1);
+  return (a, b) => score(a) - score(b) || a.name.localeCompare(b.name);
 }
 
 /** A plan's service + rehearsal times, chronological. (Auditions/meetings out.) */

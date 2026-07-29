@@ -248,6 +248,8 @@ export interface PlanningCenterPerson {
   id: string;
   name: string;
   avatarUrl: string | null;
+  /** Archived or inactive in Services — still linkable, but worth flagging. */
+  inactive?: boolean;
 }
 
 /** Name search over Planning Center Services people. `configured: false` means

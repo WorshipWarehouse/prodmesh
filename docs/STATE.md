@@ -201,12 +201,19 @@ Notes:
   nine-digit id (`PersonPicker`, `GET /api/planning-center/people`, gated on
   `users.manage`). It searches **Services** people — the team that serves —
   never the People product, which holds the whole congregation; results carry
-  id, name and photo only, never email or phone. Unlike plans, it **never
-  mocks**: with no token connected the control is the id field it replaced,
-  because a fabricated id gets written into a user record and would later wear
-  the identity of whoever really owns that number. A typed id still links
-  directly when a token *is* connected — the way through when search is down —
-  and shows as "Name not checked", since nothing looked it up.
+  id, name and photo only, never email or phone. **Services /people ignores
+  query filters** (verified live against a 139-person roster: `where[…]`, `?q=`
+  and `?search=` all returned an identical `total_count`, unfiltered, with no
+  error) — so the server caches the whole roster and matches locally, and no
+  part of what an admin types is ever sent to Planning Center. Asking PC to
+  search instead looked like it worked: it found whoever happened to fall in
+  the first page and silently missed everyone after them. Currently-serving
+  people sort first; archived ones stay findable but are marked `Inactive`.
+  Unlike plans, it **never mocks**: with no token connected the control is the
+  id field it replaced, because a fabricated id gets written into a user record
+  and would later wear the identity of whoever really owns that number. A typed
+  id still links directly when a token *is* connected — the way through when
+  search is down — and shows as "Name not checked", since nothing looked it up.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is

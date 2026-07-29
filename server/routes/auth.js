@@ -241,6 +241,13 @@ router.get('/api/users', requirePermission('users.manage'), async (_req, res) =>
 router.get('/api/planning-center/people', requirePermission('users.manage'), async (req, res) => {
   const configured = pco.isConfigured();
   if (!configured) return res.json({ configured, people: [] });
+  if (!String(req.query.q ?? '').trim()) {
+    // The picker asks this as it mounts, to learn whether search exists at all.
+    // Pull the roster while the admin is still typing a display name, so the
+    // first search is a cache hit rather than a two-request wait.
+    pco.getPeopleRoster().catch(() => {});
+    return res.json({ configured, people: [] });
+  }
   try {
     res.json({ configured, people: await pco.searchPeople(req.query.q) });
   } catch {
