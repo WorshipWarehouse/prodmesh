@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, CircleUser, MonitorCog, RefreshCw, Trash2 } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { HelpTip } from '../components/HelpTip';
+import { PersonPicker } from '../components/PersonPicker';
 import { SelectField } from '../components/SelectField';
 import { ColorInput } from '../components/form/ColorInput';
 import { EditorSection } from '../components/form/EditorSection';
@@ -250,7 +251,7 @@ export function UserManagementPanel() {
           <input className="field" placeholder="Display name" value={user.displayName} onChange={(e) => setUser({ ...user, displayName: e.target.value })} />
           <input className="field" placeholder="Username" autoCapitalize="none" value={user.username} onChange={(e) => setUser({ ...user, username: e.target.value })} />
           <input className="field" placeholder="PIN" type="password" inputMode="numeric" value={user.pin} onChange={(e) => setUser({ ...user, pin: e.target.value })} />
-          <input className="field" placeholder="Planning Center person ID (optional)" value={user.planningCenterPersonId} onChange={(e) => setUser({ ...user, planningCenterPersonId: e.target.value })} />
+          <PersonPicker value={user.planningCenterPersonId} onChange={(personId) => setUser({ ...user, planningCenterPersonId: personId })} />
           <div className="users__checks">
             {directory.groups.map((group) => (
               <Checkbox key={group.id} label={group.name} checked={userGroups.includes(group.id)} onChange={() => setUserGroupsDraft(toggle(userGroups, group.id))} />

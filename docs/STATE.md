@@ -196,6 +196,17 @@ Notes:
   they expected. **Grace Community's own install now shows the prodmesh mark until
   they upload their logo** via Admin → General → Branding; the file is in git
   history (`git show 9fe09e1:src/assets/logo.png > chills-logo.png`).
+- **Planning Center person search** (2026-07-29): Admin → Users & access links a
+  new login to its Planning Center person by name instead of a hand-copied
+  nine-digit id (`PersonPicker`, `GET /api/planning-center/people`, gated on
+  `users.manage`). It searches **Services** people — the team that serves —
+  never the People product, which holds the whole congregation; results carry
+  id, name and photo only, never email or phone. Unlike plans, it **never
+  mocks**: with no token connected the control is the id field it replaced,
+  because a fabricated id gets written into a user record and would later wear
+  the identity of whoever really owns that number. A typed id still links
+  directly when a token *is* connected — the way through when search is down —
+  and shows as "Name not checked", since nothing looked it up.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is

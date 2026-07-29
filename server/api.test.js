@@ -84,6 +84,17 @@ test('user directory includes the avatar contract', async () => {
   assert.ok(directory.users.every((user) => Object.hasOwn(user, 'avatarUrl')));
 });
 
+test('person search says so when no Planning Center token is connected', async () => {
+  // Not an error: an install with no token still creates users, it just types
+  // the person ID by hand — so the UI has to be able to tell the difference.
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  const res = await fetch(base + '/api/planning-center/people?q=avery', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { configured: false, people: [] });
+});
+
 test('admins can rename, assign, and revoke a station', async () => {
   const managed = auth.registerStation({ name: 'Temporary Booth' });
   const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();

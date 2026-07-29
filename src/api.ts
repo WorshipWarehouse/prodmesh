@@ -244,6 +244,19 @@ export interface UserDirectory {
 
 export const getUserDirectory = () => getJson<UserDirectory>('/api/users');
 
+export interface PlanningCenterPerson {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
+/** Name search over Planning Center Services people. `configured: false` means
+ *  no token is connected, so the person ID has to be entered by hand. */
+export const searchPlanningCenterPeople = (query: string) =>
+  getJson<{ configured: boolean; people: PlanningCenterPerson[] }>(
+    `/api/planning-center/people?q=${encodeURIComponent(query)}`,
+  );
+
 export async function createUser(input: {
   username: string;
   displayName: string;

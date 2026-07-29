@@ -47,6 +47,12 @@ Planned use of Calendar (pending read-only API access):
 Expected ceiling is **two PCO products** (Services + Calendar), which is part of
 why Decision 1 holds.
 
+The user-import person search (2026-07-29) stays inside that ceiling on purpose.
+People would search better — it is the product built for it — but it holds the
+whole congregation, and the search only ever needs the team that serves, which
+Services already has. Adding People would mean the church's PAT could reach
+congregant addresses and households for a feature that never needs them.
+
 ## Consequences
 
 - New integrations follow the `auth → fetch → normalize → cache` module pattern

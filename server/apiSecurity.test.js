@@ -274,6 +274,23 @@ test('settings.manage cannot overwrite the admin PIN (it would mint a superuser)
   assert.equal(allowed.status, 200);
 });
 
+test('Planning Center person search is gated on users.manage', async () => {
+  // It exists to fill in a field on the create-user form, so it rides that
+  // form's permission and no wider — the names of everyone who serves are not
+  // something a booth operator needs to be able to enumerate.
+  const search = (token) => fetch(`${base}/api/planning-center/people?q=avery`, {
+    headers: token ? { Authorization: `Bearer ${token}`, 'X-Prodmesh-Station': station.token } : {},
+  });
+
+  assert.equal((await search(null)).status, 401);
+  assert.equal((await search(operatorToken)).status, 403);
+
+  const group = auth.createGroup({ name: 'People Importers', permissions: ['users.manage'] });
+  auth.createUser({ username: 'importer', displayName: 'Importer', pin: '8282', groupIds: [group.id] });
+  const token = (await (await post('/api/auth/login', { username: 'importer', pin: '8282' }, null, station.token)).json()).token;
+  assert.equal((await search(token)).status, 200);
+});
+
 test('users.manage cannot promote itself or grant permissions it lacks', async () => {
   const dir = auth.listDirectory();
   const adminGroup = dir.groups.find((x) => x.systemKey === 'admin');

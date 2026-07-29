@@ -25,10 +25,25 @@ export function isConfigured() {
 
 // ── tiny TTL cache ────────────────────────────────────────────────────────────
 const cache = new Map(); // key → { expires, value }
+const CACHE_MAX = 200;
+
+// Plan and person keys are bounded by the topology, but people-search keys are
+// whatever someone types, so the map needs a ceiling. Expired entries go first;
+// if that isn't enough, the oldest do (Map iterates in insertion order).
+function prune() {
+  const now = Date.now();
+  for (const [k, v] of cache) if (v.expires <= now) cache.delete(k);
+  for (const k of cache.keys()) {
+    if (cache.size < CACHE_MAX) break;
+    cache.delete(k);
+  }
+}
+
 async function cached(key, fn) {
   const hit = cache.get(key);
   if (hit && Date.now() < hit.expires) return hit.value;
   const value = await fn();
+  if (cache.size >= CACHE_MAX) prune();
   cache.set(key, { expires: Date.now() + CACHE_TTL_MS, value });
   return value;
 }
@@ -175,6 +190,55 @@ export function getPersonProfile(personId) {
       return null;
     }
   });
+}
+
+// ── People search (linking a prodmesh account to a PC profile) ────────────────
+//  Searches SERVICES people, not the People product. People holds the whole
+//  congregation — addresses, birthdays, households; Services holds the team
+//  that serves, which is the population that gets a prodmesh login. Staying in
+//  Services also keeps ADR 0001's two-product ceiling intact.
+//
+//  Returns id, name and photo. Nothing else: the caller is picking a person,
+//  not reading a contact card, so email and phone never cross the wire even
+//  though the PC record carries them.
+
+const PEOPLE_SEARCH_LIMIT = 8;
+const MIN_QUERY_LENGTH = 2;
+
+/**
+ * Never mocks — an unconfigured install returns nothing.
+ *
+ * The mock plans exist so the *display* is demoable; a fabricated person id is
+ * a different thing entirely. It gets written into a user record and stays
+ * there, so once a real token is connected that account would wear the photo
+ * and identity of whoever genuinely owns that number.
+ */
+export function searchPeople(query) {
+  const q = String(query ?? '').trim();
+  if (!isConfigured() || q.length < MIN_QUERY_LENGTH) return Promise.resolve([]);
+  return cached(`people:search:${q.toLowerCase()}`, async () => {
+    // ⓘ where[search_name_or_email] — confirm against live data. PC ignores
+    // where[] params it doesn't recognize rather than erroring, which would
+    // hand back the first page of everybody; matching locally as well makes
+    // that failure read as "no results" instead of a wrong list of names.
+    const body = await pcGet(
+      `/people?where[search_name_or_email]=${encodeURIComponent(q)}&per_page=${PEOPLE_SEARCH_LIMIT * 4}`,
+    );
+    return (body.data ?? [])
+      .map((d) => ({
+        id: d.id,
+        name: d.attributes?.full_name || d.attributes?.name || '',
+        avatarUrl: d.attributes?.photo_thumbnail_url ?? null,
+      }))
+      .filter((person) => person.name && matchesName(person.name, q))
+      .slice(0, PEOPLE_SEARCH_LIMIT);
+  });
+}
+
+/** Every word typed must appear: "meg h" finds Avery Stone, not every Avery. */
+function matchesName(name, query) {
+  const haystack = name.toLowerCase();
+  return query.toLowerCase().split(/\s+/).every((word) => haystack.includes(word));
 }
 
 /** A plan's service + rehearsal times, chronological. (Auditions/meetings out.) */
