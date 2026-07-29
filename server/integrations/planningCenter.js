@@ -25,12 +25,35 @@ export function isConfigured() {
 
 // ── tiny TTL cache ────────────────────────────────────────────────────────────
 const cache = new Map(); // key → { expires, value }
-async function cached(key, fn) {
+const CACHE_MAX = 200;
+
+// Plan and person keys are bounded by the topology, but people-search keys are
+// whatever someone types, so the map needs a ceiling. Expired entries go first;
+// if that isn't enough, the oldest do (Map iterates in insertion order).
+function prune() {
+  const now = Date.now();
+  for (const [k, v] of cache) if (v.expires <= now) cache.delete(k);
+  for (const k of cache.keys()) {
+    if (cache.size < CACHE_MAX) break;
+    cache.delete(k);
+  }
+}
+
+// Caches the PROMISE, not the resolved value, so callers that arrive while a
+// fetch is in flight join it instead of starting their own. The people picker
+// makes that concrete: it warms the roster as it mounts and then searches a
+// moment later, which was two full roster fetches. Failures are evicted — a
+// cached rejection would persist an outage for the whole TTL.
+function cached(key, fn) {
   const hit = cache.get(key);
   if (hit && Date.now() < hit.expires) return hit.value;
-  const value = await fn();
+  const value = fn();
+  if (cache.size >= CACHE_MAX) prune();
   cache.set(key, { expires: Date.now() + CACHE_TTL_MS, value });
-  return value;
+  return value.catch((err) => {
+    cache.delete(key);
+    throw err;
+  });
 }
 export function clearCache() {
   cache.clear();
@@ -175,6 +198,94 @@ export function getPersonProfile(personId) {
       return null;
     }
   });
+}
+
+// ── People search (linking a prodmesh account to a PC profile) ────────────────
+//  Searches SERVICES people, not the People product. People holds the whole
+//  congregation — addresses, birthdays, households; Services holds the team
+//  that serves, which is the population that gets a prodmesh login. Staying in
+//  Services also keeps ADR 0001's two-product ceiling intact.
+//
+//  Returns id, name and photo. Nothing else: the caller is picking a person,
+//  not reading a contact card, so email and phone never cross the wire even
+//  though the PC record carries them.
+
+const PEOPLE_SEARCH_LIMIT = 8;
+const MIN_QUERY_LENGTH = 2;
+const PEOPLE_PAGE_SIZE = 100; // PC's per-page maximum
+const PEOPLE_PAGE_CAP = 30; // 3000 people — a bound, not an expected limit
+
+const normalizePerson = (d) => ({
+  id: d.id,
+  name: d.attributes?.full_name || d.attributes?.name || '',
+  avatarUrl: d.attributes?.photo_thumbnail_url ?? null,
+  // Still findable, just flagged: someone who stopped serving can still need a
+  // login, and hiding them recreates "I can't find this person".
+  inactive: Boolean(d.attributes?.archived_at) || d.attributes?.status === 'inactive',
+});
+
+/**
+ * The whole Services roster, cached.
+ *
+ * Services /people IGNORES query filters — verified live 2026-07-29 against a
+ * 139-person roster: where[search_name_or_email], where[first_name], ?q= and
+ * ?search= all returned an identical total_count of 139. It answers a filtered
+ * request with an unfiltered page and no error, so asking it to search reads
+ * as "found some people, missing others" depending purely on who landed in the
+ * first page. Searching therefore means holding the list ourselves.
+ *
+ * Cheap: 139 people is two requests in about a second, then a cache hit for
+ * the next ten minutes. The page cap bounds a pathological roster rather than
+ * a realistic one.
+ */
+export function getPeopleRoster() {
+  return cached('people:roster', async () => {
+    const people = [];
+    let total = Infinity;
+    for (let page = 0; page < PEOPLE_PAGE_CAP && people.length < total; page++) {
+      const body = await pcGet(`/people?per_page=${PEOPLE_PAGE_SIZE}&offset=${people.length}`);
+      const rows = body.data ?? [];
+      if (!rows.length) break;
+      total = body.meta?.total_count ?? people.length + rows.length;
+      for (const row of rows) people.push(normalizePerson(row));
+    }
+    return people;
+  });
+}
+
+/**
+ * Never mocks — an unconfigured install returns nothing.
+ *
+ * The mock plans exist so the *display* is demoable; a fabricated person id is
+ * a different thing entirely. It gets written into a user record and stays
+ * there, so once a real token is connected that account would wear the photo
+ * and identity of whoever genuinely owns that number.
+ *
+ * No part of the query is ever sent to Planning Center — the matching happens
+ * here, over a list fetched with a fixed path.
+ */
+export async function searchPeople(query) {
+  const q = String(query ?? '').trim();
+  if (!isConfigured() || q.length < MIN_QUERY_LENGTH) return [];
+  const roster = await getPeopleRoster();
+  return roster
+    .filter((person) => person.name && matchesName(person.name, q))
+    .sort(byRelevance(q))
+    .slice(0, PEOPLE_SEARCH_LIMIT);
+}
+
+/** Every word typed must appear: "meg h" finds Avery Stone, not every Avery. */
+function matchesName(name, query) {
+  const haystack = name.toLowerCase();
+  return query.toLowerCase().split(/\s+/).every((word) => haystack.includes(word));
+}
+
+/** Currently serving first, then the people whose name actually starts with
+ *  what was typed — only eight rows show, so the order decides what's seen. */
+function byRelevance(query) {
+  const q = query.toLowerCase();
+  const score = (p) => (p.inactive ? 2 : 0) + (p.name.toLowerCase().startsWith(q) ? 0 : 1);
+  return (a, b) => score(a) - score(b) || a.name.localeCompare(b.name);
 }
 
 /** A plan's service + rehearsal times, chronological. (Auditions/meetings out.) */

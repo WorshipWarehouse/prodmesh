@@ -172,6 +172,134 @@
   font-size: 0.75rem;
 }
 
+/* ── Planning Center person picker (Users → Create user) ─────────────────── */
+.personpicker {
+  position: relative;
+}
+
+/* Same caption treatment as .lfield — the only labeled control in a form of
+   placeholder-only fields, because it's the only one that needs naming. */
+.personpicker__label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-faint);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.personpicker .field {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.personpicker__results {
+  position: absolute;
+  z-index: 30; /* over the permission checkboxes below it */
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 244px;
+  margin: 4px 0 0;
+  padding: 4px;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+.personpicker__option,
+.personpicker__picked {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.personpicker__option {
+  cursor: pointer;
+}
+
+/* Hover and the arrow keys drive the same state, so the two never disagree
+   about which row Enter would take. */
+.personpicker__option.is-active {
+  background: var(--bg-tile-hover);
+}
+
+.personpicker__picked {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  background: var(--bg-tile);
+}
+
+.personpicker__avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.personpicker__avatar img {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.personpicker__who {
+  min-width: 0;
+  flex: 1;
+  font-size: 0.8rem;
+}
+
+.personpicker__who strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.personpicker__who small {
+  display: block;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.personpicker__clear {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.personpicker__clear:hover {
+  color: var(--text);
+  background: var(--bg-tile-hover);
+}
+
+.personpicker__note {
+  padding: 8px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.personpicker__note--err {
+  color: var(--danger);
+}
+
 @media (max-width: 760px) {
   .users__grid { grid-template-columns: 1fr; }
   .users__row { grid-template-columns: 1fr; }

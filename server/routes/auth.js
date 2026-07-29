@@ -232,6 +232,31 @@ router.get('/api/users', requirePermission('users.manage'), async (_req, res) =>
   res.json(directory);
 });
 
+// Name → person id, so an admin never has to go dig a number out of Planning
+// Center. Same permission as creating the user it fills in, and no wider: the
+// names of everyone who serves are not something a booth operator needs.
+//
+// `configured: false` is a normal answer, not an error — an install with no
+// token still creates users, it just types the id by hand.
+router.get('/api/planning-center/people', requirePermission('users.manage'), async (req, res) => {
+  const configured = pco.isConfigured();
+  if (!configured) return res.json({ configured, people: [] });
+  if (!String(req.query.q ?? '').trim()) {
+    // The picker asks this as it mounts, to learn whether search exists at all.
+    // Pull the roster while the admin is still typing a display name, so the
+    // first search is a cache hit rather than a two-request wait.
+    pco.getPeopleRoster().catch(() => {});
+    return res.json({ configured, people: [] });
+  }
+  try {
+    res.json({ configured, people: await pco.searchPeople(req.query.q) });
+  } catch {
+    // Distinct from an empty result: "nobody by that name" and "Planning
+    // Center didn't answer" must not look the same to someone searching.
+    res.status(502).json({ error: 'planning_center_unavailable' });
+  }
+});
+
 router.post('/api/users', requirePermission('users.manage'), (req, res) => {
   try {
     const user = auth.createUser(req.body ?? {});
