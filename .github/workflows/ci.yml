@@ -1,9 +1,19 @@
 name: CI
 
+# Every branch, not just main. Work here lands by merging a verified feature
+# branch locally rather than through a pull request, so `pull_request` never
+# fires — which meant CI only ever tested code that had already shipped.
 on:
   push:
-    branches: [main]
+    branches: ['**']
+    tags: ['v*']
   pull_request:
+  workflow_dispatch:
+
+# A run for an outdated push is wasted minutes: keep only the newest per branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:

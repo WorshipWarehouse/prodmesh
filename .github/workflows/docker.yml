@@ -1,13 +1,21 @@
 name: Docker image
 
-# Every pull request builds the image and boots it, so a Dockerfile that no
-# longer works fails here rather than on a church's server. Only main and
-# version tags publish — and only after the smoke test passes.
+# Every push on every branch builds the image and boots it, so a Dockerfile
+# that no longer works fails here rather than on a church's server. Branches
+# build and test only; publishing is gated on main and version tags below.
+#
+# Not `pull_request`-only: work here lands by merging a verified feature branch
+# locally, so that event never fires and nothing would run until after a merge.
 on:
   push:
-    branches: [main]
+    branches: ['**']
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/prodmesh
@@ -82,10 +90,10 @@ jobs:
       # arm64 (Apple silicon, Raspberry Pi, ARM VPS) is emulated and slow, so
       # it only gets built for something that will actually be published.
       - uses: docker/setup-qemu-action@v3
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
 
       - uses: docker/login-action@v3
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -93,7 +101,7 @@ jobs:
 
       - uses: docker/metadata-action@v5
         id: meta
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         with:
           images: ${{ env.IMAGE }}
           tags: |
@@ -104,7 +112,7 @@ jobs:
 
       - name: Publish
         uses: docker/build-push-action@v6
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         with:
           context: .
           platforms: linux/amd64,linux/arm64
