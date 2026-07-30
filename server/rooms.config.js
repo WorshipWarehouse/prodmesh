@@ -70,20 +70,20 @@ const localTest = {
 export const rooms = {
   ...(process.env.PRODMESH_LOCAL_TEST === '1' ? localTest : {}),
 
-  // ── North rooms (pre-filled with the standard convention; flip mock when ──
+  // ── north rooms (pre-filled with the standard convention; flip mock when ──
   //    each room's Companion has the roomState variable + row-3 buttons set up) ─
   'north-main': {
     id: 'north-main',
-    name: 'North · Main Auditorium',
+    name: 'North Campus · Main Auditorium',
     site: 'north',
     mock: false, // LIVE — Companion runs on this same (Producer) Mac in production
-    companion: { host: '192.0.2.31', port: 8000 }, // Producer machine
+    companion: { host: '192.0.2.10', port: 8000 }, // Producer machine
     state: { variable: 'roomState' },
     planningCenter: {
       serviceTypes: [
         { id: '500001', name: 'Sunday' },
         { id: '500002', name: 'Second Service' },
-        { id: '500003', name: "Midweek" },
+        { id: '500003', name: 'Midweek' },
         { id: '500004', name: 'Evening' },
         // "Special Events" (265639) intentionally omitted: its plans aren't
         // reliably in this room. Add once Calendar can confirm room (see ADR 0001).
@@ -94,18 +94,18 @@ export const rooms = {
     // port per machine and can change it across restarts unless pinned in its
     // Network preferences. Observed 1025 on-site 2026-07-24; the DB value is
     // what actually runs, so fix it there (Admin → Campuses), not here.
-    proPresenter: { host: '192.0.2.74', port: 1025 },
+    proPresenter: { host: '192.0.2.15', port: 1025 },
     // Analysis source (SPL) — Smaart on the FOH Mac ("FOH-Soundgrid"), Smaart
     // v8 8.5.2.2, API v3 (the transport negotiates the path automatically;
     // verified live 2026-07-14). `source: 'rta'` points at a ProdMesh Remote
     // RTA instead. Optional (Smaart): password, device/channel, metric,
     // apiPath. Optional (RTA): metric (a metric id like 'leqS').
-    analysis: { source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95 },
+    analysis: { source: 'smaart', host: '192.0.2.40', port: 26000, target: 90, limit: 95 },
     // Auditorium-specific modes. Button locations [page, row, column].
     modes: [
       mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),
       mode('second', 'Second Service', '#ff9f0a', 'SECOND', [3, 0, 2]),
-      mode('womens', "Midweek", '#ff6fae', 'WOMENS', [3, 0, 3]),
+      mode('womens', 'Midweek', '#ff6fae', 'WOMENS', [3, 0, 3]),
       mode('ya', 'Evening', '#32ade6', 'YA', [3, 0, 4]),
       mode('event', 'Event', '#af7bf0', 'EVENT', [3, 0, 5]),
       mode('standby', 'Standby', '#8b97a8', 'STANDBY', [3, 3, 1], { isStandby: true }),
@@ -114,10 +114,10 @@ export const rooms = {
 
   'north-youth': {
     id: 'north-youth',
-    name: 'North · Youth',
+    name: 'North Campus · Youth Room',
     site: 'north',
     mock: true,
-    companion: { host: '192.0.2.150', port: 8000 }, // Lighting machine
+    companion: { host: '192.0.2.22', port: 8000 }, // Lighting machine
     state: { variable: 'roomState' },
     planningCenter: { serviceTypes: [{ id: '500005', name: 'Youth Service' }] },
     modes: standardModes(),
@@ -125,10 +125,10 @@ export const rooms = {
 
   'north-chapel': {
     id: 'north-chapel',
-    name: 'North · Chapel',
+    name: 'North Campus · Chapel',
     site: 'north',
     mock: true,
-    companion: { host: '192.0.2.101', port: 8000 }, // Chapel-Mac machine
+    companion: { host: '192.0.2.18', port: 8000 }, // Chapel-Mac machine
     state: { variable: 'roomState' },
     planningCenter: { serviceTypes: [{ id: '500006', name: 'Chapel Service' }] },
     modes: standardModes(),

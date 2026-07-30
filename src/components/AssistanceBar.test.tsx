@@ -36,7 +36,7 @@ describe('AssistanceBar', () => {
     api.getAssistance.mockResolvedValue({
       active: true,
       requestedAt: new Date('2026-07-26T17:42:00Z').getTime(),
-      userName: 'the maintainer',
+      userName: 'Sam',
     });
     api.dismissAssistance.mockImplementation(async () => {
       api.getAssistance.mockResolvedValue({ active: false });

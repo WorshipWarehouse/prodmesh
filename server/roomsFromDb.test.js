@@ -17,7 +17,7 @@ const group = auth.createGroup({ name: 'Mode Operators', permissions: ['rooms.mo
 auth.createUser({ username: 'operator', displayName: 'Operator', pin: '2468', groupIds: [group.id] });
 const station = auth.registerStation({ name: 'Rooms Test Station' });
 
-const CHAPEL = 'north-chapel';
+const CHAPEL = 'north-prayer';
 
 let base;
 let server;
@@ -78,7 +78,7 @@ test('the seeded topology produces the same server rooms as before', async () =>
 
 test('a room created in Admin → Campuses is a live server room', async () => {
   await editTopology((site) => {
-    site.auditoriums.push({ id: CHAPEL, name: 'North · Chapel', tiles: [] });
+    site.auditoriums.push({ id: CHAPEL, name: 'North Campus · Prayer Room', tiles: [] });
   });
 
   // Listed with the standard simulated mode set, no restart, no file edit.
@@ -116,10 +116,10 @@ test('a room created in Admin → Campuses is a live server room', async () => {
 
 test('renaming a room updates the live map in place', async () => {
   await editTopology((site) => {
-    site.auditoriums.find((a) => a.id === CHAPEL).name = 'North · Prayer Chapel';
+    site.auditoriums.find((a) => a.id === CHAPEL).name = 'North Campus · Prayer Room, renamed';
   });
   const listed = (await getRooms()).find((r) => r.id === CHAPEL);
-  assert.equal(listed.name, 'North · Prayer Chapel');
+  assert.equal(listed.name, 'North Campus · Prayer Room, renamed');
   // Stored connectivity survives a rename.
   assert.deepEqual((await getConn(CHAPEL)).companion.modes.map((m) => m.id), ['service', 'standby']);
 });
@@ -136,7 +136,7 @@ test('deleting a room removes it from the server; re-adding restores its config'
 
   // Connectivity rows are kept, so re-creating the same id brings it back.
   await editTopology((site) => {
-    site.auditoriums.push({ id: CHAPEL, name: 'North · Chapel', tiles: [] });
+    site.auditoriums.push({ id: CHAPEL, name: 'North Campus · Prayer Room', tiles: [] });
   });
   const back = (await getRooms()).find((r) => r.id === CHAPEL);
   assert.deepEqual(back.modes.map((m) => m.id), ['service', 'standby']);

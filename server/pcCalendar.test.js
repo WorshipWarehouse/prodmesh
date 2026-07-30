@@ -37,9 +37,9 @@ test('mock instances cover the weekly pattern and match seeded rooms', async () 
   assert.equal(new Date(sunday.startsAt).getDay(), 0);
   assert.ok(new Date(sunday.endsAt) > new Date(sunday.startsAt));
 
-  const hsm = events.filter((e) => e.location === 'Youth');
-  assert.equal(hsm.length, 2); // Youth Sunday + Youth Night
-  assert.ok(hsm.every((e) => e.roomIds.includes('north-youth')));
+  const youth = events.filter((e) => e.location === 'Youth Room');
+  assert.equal(youth.length, 2); // Youth Sunday + Youth Night
+  assert.ok(youth.every((e) => e.roomIds.includes('north-youth')));
 
   // The deliberately-unmapped location surfaces with no roomIds.
   const memorial = events.find((e) => e.name === 'Memorial Service');

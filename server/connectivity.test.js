@@ -31,7 +31,7 @@ test('setPlanningCenter validates, persists, and applies to the live rooms map',
 test('first boot seeds the analysis source from rooms.config.js', () => {
   const stored = conn.getAnalysis('north-main');
   assert.equal(stored.source, 'smaart');
-  assert.equal(stored.host, '192.0.2.7');
+  assert.equal(stored.host, '192.0.2.40');
   assert.equal(stored.target, 90);
   // The dev room's mock fixture seeds too (and rooms without one stay bare).
   assert.equal(conn.getAnalysis('local-test').mock, true);
@@ -40,9 +40,9 @@ test('first boot seeds the analysis source from rooms.config.js', () => {
 
 test('setAnalysis validates, persists, and applies to the live rooms map', () => {
   const clean = conn.setAnalysis('north-youth', {
-    source: 'rta', host: '192.0.2.99', port: '8517', target: '88', limit: '', metric: 'leqS',
+    source: 'rta', host: '192.0.2.17', port: '8517', target: '88', limit: '', metric: 'leqS',
   });
-  assert.deepEqual(clean, { source: 'rta', host: '192.0.2.99', port: 8517, target: 88, metric: 'leqS' });
+  assert.deepEqual(clean, { source: 'rta', host: '192.0.2.17', port: 8517, target: 88, metric: 'leqS' });
   assert.deepEqual(rooms['north-youth'].analysis, clean);
   // Clearing removes it from the database AND the live room object…
   conn.setAnalysis('north-youth', null);
@@ -57,7 +57,7 @@ test('a cleared analysis source stays cleared across applyConnectivity', () => {
   conn.applyConnectivity();
   assert.equal(rooms['north-main'].analysis, undefined);
   // Restore for any later tests.
-  conn.setAnalysis('north-main', { source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95 });
+  conn.setAnalysis('north-main', { source: 'smaart', host: '192.0.2.40', port: 26000, target: 90, limit: 95 });
 });
 
 test('setAnalysis rejects bad input without changing anything', () => {
@@ -88,14 +88,14 @@ test('logControl is Smaart-only and stored as a clean boolean', () => {
 });
 
 test('first boot seeds ProPresenter from rooms.config.js', () => {
-  assert.deepEqual(conn.getProPresenter('north-main'), { host: '192.0.2.74', port: 1025 });
+  assert.deepEqual(conn.getProPresenter('north-main'), { host: '192.0.2.15', port: 1025 });
   assert.deepEqual(conn.getProPresenter('local-test'), { host: '127.0.0.1', port: 62202 });
   assert.equal(conn.getProPresenter('north-youth'), null);
 });
 
 test('setProPresenter validates, persists, and applies to the live rooms map', () => {
-  const clean = conn.setProPresenter('north-youth', { host: '192.0.2.80', port: '62202', timer: ' Service Start ' });
-  assert.deepEqual(clean, { host: '192.0.2.80', port: 62202, timer: 'Service Start' });
+  const clean = conn.setProPresenter('north-youth', { host: '192.0.2.50', port: '62202', timer: ' Service Start ' });
+  assert.deepEqual(clean, { host: '192.0.2.50', port: 62202, timer: 'Service Start' });
   assert.deepEqual(rooms['north-youth'].proPresenter, clean);
   // Clearing removes it from the database AND the live room object.
   conn.setProPresenter('north-youth', null);
@@ -123,7 +123,7 @@ test('setProPresenter rejects bad input without changing anything', () => {
 test('first boot seeds Companion + modes from rooms.config.js', () => {
   const main = conn.getCompanion('north-main');
   assert.equal(main.mock, false);
-  assert.equal(main.host, '192.0.2.31');
+  assert.equal(main.host, '192.0.2.10');
   assert.equal(main.port, 8000);
   assert.equal(main.variable, 'roomState');
   assert.equal(main.modes.length, 6);
@@ -139,9 +139,9 @@ test('first boot seeds Companion + modes from rooms.config.js', () => {
 test('setCompanion persists and decomposes onto the four legacy room keys', () => {
   const clean = conn.setCompanion('north-youth', {
     mock: false,
-    host: '192.0.2.150',
+    host: '192.0.2.22',
     port: '8000',
-    variable: 'hsmState',
+    variable: 'youthState',
     modes: [
       { id: 'service', label: 'Service', color: '#34C759', match: 'SERVICE', press: { page: '2', row: '1', column: '0' } },
       { id: 'standby', label: 'Standby', color: '#8b97a8', match: 'STANDBY', isStandby: true },
@@ -153,8 +153,8 @@ test('setCompanion persists and decomposes onto the four legacy room keys', () =
   // Decomposed onto the live room object every consumer reads.
   const room = rooms['north-youth'];
   assert.equal(room.mock, false);
-  assert.deepEqual(room.companion, { host: '192.0.2.150', port: 8000 });
-  assert.equal(room.state.variable, 'hsmState');
+  assert.deepEqual(room.companion, { host: '192.0.2.22', port: 8000 });
+  assert.equal(room.state.variable, 'youthState');
   assert.equal(room.modes.length, 2);
   // Back to simulated: host becomes optional.
   conn.setCompanion('north-youth', { mock: true, modes: clean.modes });

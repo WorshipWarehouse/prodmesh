@@ -298,7 +298,7 @@ test('Companion connectivity: config.manage write, decomposes live, never clears
       companion: {
         mock: true,
         host: '10.0.0.20',
-        variable: 'hsmState',
+        variable: 'youthState',
         modes: [
           { id: 'service', label: 'Service', color: '#34c759', match: 'SERVICE', press: { page: 2, row: 0, column: 1 } },
           { id: 'standby', label: 'Standby', color: '#8b97a8', match: 'STANDBY', isStandby: true },

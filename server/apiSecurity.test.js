@@ -354,7 +354,7 @@ test('device hosts must be bare hostnames or IPs, not URLs', async () => {
     assert.throws(() => conn.validateAnalysis({ source: 'smaart', host }), /host|hostname/i, `analysis host ${JSON.stringify(host)}`);
   }
   // Real addresses still work, including hostnames and IPv6 literals.
-  for (const host of ['192.0.2.74', 'pcr-propresenter.local', 'FOH-Soundgrid', '[fe80::1]']) {
+  for (const host of ['192.0.2.15', 'pcr-propresenter.local', 'FOH-Soundgrid', '[fe80::1]']) {
     assert.equal(conn.validateProPresenter({ host }).host, host);
   }
 });
@@ -382,7 +382,7 @@ test('requests with a foreign Host header are refused (DNS rebinding)', async ()
 });
 
 // ── reports.view: operational context open, retrospective analysis gated ─────
-//  the maintainer's rule: leader names on the Run of Show are a MUST for volunteers —
+//  The maintainer's rule: leader names on the Run of Show are a MUST for volunteers —
 //  camera ops, switchers and FOH read them to know who is next, with nobody
 //  logged in. After-action reports are a different thing and are gated.
 

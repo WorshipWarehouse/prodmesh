@@ -1,5 +1,5 @@
 // The upgrade path: a box that was already running before the setup wizard
-// existed must never be dropped into it. Grace Community's own install has a PIN
+// existed must never be dropped into it. The original production install has a PIN
 // and campuses and updates itself via update.sh, so the very first restart
 // after this feature shipped would otherwise have opened first-run setup on a
 // production server.

@@ -177,7 +177,7 @@ describe('room console layout', () => {
         value={{
           name: 'Test Church',
           sites: [{
-            id: 'north', name: 'North', status: 'active',
+            id: 'north', name: 'North Campus', status: 'active',
             auditoriums: [{
               id: 'north-main', name: 'Main Auditorium',
               tiles: [

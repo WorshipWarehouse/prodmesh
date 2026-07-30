@@ -11,11 +11,11 @@ vi.mock('../api', async (importOriginal) => ({
   ...api,
 }));
 
-const MEGAN: PlanningCenterPerson = { id: '900001', name: 'Avery Stone', avatarUrl: 'https://pc.test/avery.jpg' };
-const ANDY: PlanningCenterPerson = { id: '900002', name: 'Riley Chen', avatarUrl: null };
+const AVERY: PlanningCenterPerson = { id: '900001', name: 'Avery Stone', avatarUrl: 'https://pc.test/avery.jpg' };
+const RILEY: PlanningCenterPerson = { id: '900102', name: 'Riley Chen', avatarUrl: null };
 
 /** Live search, unless a test says otherwise. */
-const connected = (people: PlanningCenterPerson[] = [MEGAN, ANDY]) =>
+const connected = (people: PlanningCenterPerson[] = [AVERY, RILEY]) =>
   api.searchPlanningCenterPeople.mockImplementation(async (q: string) =>
     ({ configured: true, people: q ? people : [] }));
 
@@ -49,7 +49,7 @@ describe('PersonPicker', () => {
 
     // The first row is active on arrival, so one ArrowDown lands on Riley.
     await user.keyboard('{ArrowDown}{Enter}');
-    expect(onChange).toHaveBeenCalledWith('900002');
+    expect(onChange).toHaveBeenCalledWith('900102');
   });
 
   it('unlinks a person', async () => {
@@ -91,7 +91,7 @@ describe('PersonPicker', () => {
   });
 
   it('flags someone who no longer serves', async () => {
-    connected([{ ...MEGAN, inactive: true }]);
+    connected([{ ...AVERY, inactive: true }]);
     const user = userEvent.setup();
     render(<PersonPicker value="" onChange={vi.fn()} />);
 

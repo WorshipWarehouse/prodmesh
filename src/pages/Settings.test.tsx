@@ -110,7 +110,7 @@ describe('Logs', () => {
       truncated: false,
       lines: [
         'Production dashboard server on http://localhost:8080',
-        '[smaart] 192.0.2.7: Smaart v8 8.5.2.2 via /api/v3/',
+        '[smaart] 192.0.2.40: Smaart v8 8.5.2.2 via /api/v3/',
         '[autostart] north-main: armed for 900102',
       ],
     });
@@ -118,7 +118,7 @@ describe('Logs', () => {
       entries: [{
         id: 1, ts: Date.now(), action: 'rooms.mode.change', result: 'allowed',
         resourceType: 'room-mode', resourceId: 'sunday', roomId: 'north-main', planId: null,
-        userName: 'the maintainer', username: 'justin', stationName: 'FOH – Producer', details: null,
+        userName: 'Sam', username: 'sam', stationName: 'FOH – Producer', details: null,
       }],
     });
   });
@@ -137,7 +137,7 @@ describe('Logs', () => {
 
     await user.click(screen.getByRole('button', { name: 'Audit trail' }));
     expect(await screen.findByText('rooms.mode.change')).toBeInTheDocument();
-    expect(screen.getByText('the maintainer')).toBeInTheDocument();
+    expect(screen.getByText('Sam')).toBeInTheDocument();
     expect(screen.getByText('allowed')).toBeInTheDocument();
   });
 });
@@ -196,12 +196,12 @@ describe('Campuses', () => {
   const church = {
     name: 'Test Church',
     sites: [{
-      id: 'north', name: 'North', status: 'active' as const,
+      id: 'north', name: 'North Campus', status: 'active' as const,
       auditoriums: [{
         id: 'north-main', name: 'Main Auditorium',
         tiles: [
-          { id: 'main-companion', type: 'companion' as const, label: 'Companion', host: '192.0.2.31' },
-          { id: 'main-cam', type: 'link' as const, label: 'Camera 9', url: 'http://192.0.2.129' },
+          { id: 'main-companion', type: 'companion' as const, label: 'Companion', host: '192.0.2.10' },
+          { id: 'main-cam', type: 'link' as const, label: 'Camera 9', url: 'http://192.0.2.20' },
         ],
       }],
     }],
@@ -216,10 +216,10 @@ describe('Campuses', () => {
     api.getRoomConnectivity.mockResolvedValue({
       hasServerRoom: true,
       planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] },
-      analysis: { source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95, hasPassword: false },
-      proPresenter: { host: '192.0.2.74', port: 62202 },
+      analysis: { source: 'smaart', host: '192.0.2.40', port: 26000, target: 90, limit: 95, hasPassword: false },
+      proPresenter: { host: '192.0.2.15', port: 62202 },
       companion: {
-        mock: false, host: '192.0.2.33', port: 8000, variable: 'roomState',
+        mock: false, host: '192.0.2.51', port: 8000, variable: 'roomState',
         modes: [
           { id: 'sunday', label: 'Sunday', color: '#34c759', match: 'SUNDAY', press: { page: 1, row: 3, column: 1 } },
           { id: 'standby', label: 'Standby', color: '#8b97a8', match: 'STANDBY', press: { page: 1, row: 3, column: 4 }, isStandby: true },
@@ -264,14 +264,14 @@ describe('Campuses', () => {
 
     expect(await screen.findByText('Quick Access tiles')).toBeInTheDocument();
     // Two Host fields exist (Companion tile + analysis source) — take the tile's.
-    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.31')!;
+    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.10')!;
     await user.clear(host);
-    await user.type(host, '192.0.2.99');
+    await user.type(host, '192.0.2.17');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
     const sent = api.saveConfig.mock.calls[0][0];
-    expect(sent.sites[0].auditoriums[0].tiles[0].host).toBe('192.0.2.99');
+    expect(sent.sites[0].auditoriums[0].tiles[0].host).toBe('192.0.2.17');
   });
 
   it('edits Planning Center service types independently of the topology save', async () => {
@@ -315,20 +315,20 @@ describe('Campuses', () => {
     );
 
     expect(await screen.findByText('Analysis source')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('192.0.2.7')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('192.0.2.40')).toBeInTheDocument();
     // Smaart shows the password field; RTA must not.
     expect(screen.getByLabelText('API password')).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText('Source'), 'rta');
     expect(screen.queryByLabelText('API password')).not.toBeInTheDocument();
     expect(screen.queryByText(/Start\/stop SPL logging/)).not.toBeInTheDocument();
-    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.7')!;
+    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.40')!;
     await user.clear(host);
-    await user.type(host, '192.0.2.50');
+    await user.type(host, '192.0.2.52');
     await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
 
     await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
-      source: 'rta', host: '192.0.2.50', port: 26000, target: 90, limit: 95, metric: undefined,
+      source: 'rta', host: '192.0.2.52', port: 26000, target: 90, limit: 95, metric: undefined,
     }));
     expect(api.saveConfig).not.toHaveBeenCalled();
   });
@@ -348,7 +348,7 @@ describe('Campuses', () => {
     await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
 
     await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
-      source: 'smaart', host: '192.0.2.7', port: 26000, target: 90, limit: 95,
+      source: 'smaart', host: '192.0.2.40', port: 26000, target: 90, limit: 95,
       metric: undefined, logControl: true,
     }));
   });
@@ -367,11 +367,11 @@ describe('Campuses', () => {
     await user.type(screen.getByLabelText('Countdown timer'), 'Service Start');
     await user.click(screen.getByRole('button', { name: 'Save ProPresenter' }));
     await waitFor(() => expect(api.saveProPresenter).toHaveBeenCalledWith('north-main', {
-      host: '192.0.2.74', port: 62202, timer: 'Service Start',
+      host: '192.0.2.15', port: 62202, timer: 'Service Start',
     }));
 
     // Blanking the host means "no ProPresenter in this room" — saves a clear.
-    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.74')!;
+    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.15')!;
     await user.clear(host);
     await user.click(screen.getByRole('button', { name: 'Save ProPresenter' }));
     await waitFor(() => expect(api.saveProPresenter).toHaveBeenLastCalledWith('north-main', null));
@@ -406,7 +406,7 @@ describe('Campuses', () => {
 
     await user.click(screen.getByRole('button', { name: 'Save Companion' }));
     await waitFor(() => expect(api.saveCompanion).toHaveBeenCalledWith('north-main', {
-      mock: false, host: '192.0.2.33', port: 8000, variable: 'roomState',
+      mock: false, host: '192.0.2.51', port: 8000, variable: 'roomState',
       modes: [
         { id: 'sunday', label: 'Sunday', color: '#34c759', match: 'SUNDAY', press: { page: 3, row: 0, column: 1 } },
         { id: 'standby', label: 'Standby', color: '#8b97a8', match: 'STANDBY', press: { page: 1, row: 3, column: 4 }, isStandby: true },

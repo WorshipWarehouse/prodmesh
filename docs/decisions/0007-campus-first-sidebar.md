@@ -6,7 +6,7 @@ Date: 2026-07-06 · Status: accepted
 
 The top-bar shell (ADR 0005) was room-centric: a room switcher in the chrome,
 and every page lived under `/room/:id`. That worked for one campus and a
-handful of rooms, but the vision is multi-site (South Campus opens Dec 2026),
+handful of rooms, but the vision is multi-site (a second campus is coming),
 and new top-level surfaces were arriving that aren't about a single room at
 all: the upcoming-events list, and analytics over the SQLite history.
 

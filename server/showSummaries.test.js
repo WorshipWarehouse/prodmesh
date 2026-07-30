@@ -93,7 +93,7 @@ test('GET /api/history serves the summary rows, newest first', async () => {
 
   const row = shows.find((s) => s.instanceId === INST);
   assert.equal(row.planTitle, 'Summary Test Service');
-  assert.equal(row.roomName, 'Youth'); // resolved from the live rooms map (DB topology)
+  assert.equal(row.roomName, 'Youth Room'); // resolved from the live rooms map (DB topology)
   assert.deepEqual(row.totals, { planned: 90, actual: 150, delta: 60 });
   assert.equal(row.spl.peak, 95);
   assert.ok('target' in row.spl && 'limit' in row.spl); // room targets applied at read

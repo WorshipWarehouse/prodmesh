@@ -22,7 +22,7 @@ vi.mock('../api', async (importOriginal) => ({
 // Both campuses have a "Main Auditorium" — labels must disambiguate.
 const rooms = [
   { id: 'north-main', name: 'Main Auditorium', site: 'north', hasCompanion: true, modes: [] },
-  { id: 'south-main', name: 'Main Auditorium', site: 'south-everett', hasCompanion: false, modes: [] },
+  { id: 'south-main', name: 'Main Auditorium', site: 'south', hasCompanion: false, modes: [] },
 ];
 
 // Events pinned to "today" so they land inside the initially-rendered week.
@@ -50,8 +50,8 @@ const events: CalendarEvent[] = [
 const church: Church = {
   name: 'Test Church',
   sites: [
-    { id: 'north', name: 'North', status: 'active', auditoriums: [] },
-    { id: 'south-everett', name: 'South Campus', status: 'active', auditoriums: [] },
+    { id: 'north', name: 'North Campus', status: 'active', auditoriums: [] },
+    { id: 'south', name: 'South Campus', status: 'active', auditoriums: [] },
   ],
 };
 
@@ -88,7 +88,7 @@ describe('Calendar', () => {
     expect(screen.getByText('· demo data')).toBeInTheDocument();
     // Same-named rooms across campuses get campus-qualified labels in the
     // All Campuses view — you can tell which "Main Auditorium" is which.
-    expect(screen.getByRole('link', { name: 'North · Main Auditorium' }))
+    expect(screen.getByRole('link', { name: 'North Campus · Main Auditorium' }))
       .toHaveAttribute('href', '/room/north-main');
     expect(screen.getByRole('link', { name: 'South Campus · Main Auditorium' }))
       .toHaveAttribute('href', '/room/south-main');

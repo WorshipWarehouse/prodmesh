@@ -121,6 +121,6 @@ Not a commitment — a default ordering to argue with.
 4. **Startup checklists** (room × event type, automated + manual items).
 5. **Multi-user auth & roles** (replaces the two-PIN model).
 6. **Per-role customizable dashboards** (drag/resize widget layouts).
-7. **Command center + South Campus** (site #2 opens Dec 2026; multi-site view).
+7. **Command center + South Campus** (site #2 when it opens; multi-site view).
 8. **The long tail** — NDI/RTMP widgets, trends dashboards, Resi/ProdCom/
    Shure integrations, Slack alerting.
