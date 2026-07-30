@@ -4,14 +4,13 @@ import express from 'express';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync } from 'node:fs';
 
 import { rooms } from '../roomsStore.js';
 import * as pco from '../integrations/planningCenter.js';
 import * as timeline from '../timeline.js';
 import * as summaries from '../showSummaries.js';
 import * as show from '../showManager.js';
-import * as settings from '../settings.js';
+import * as deployment from '../deployment.js';
 import * as auth from '../authStore.js';
 import * as splStore from '../splStore.js';
 import * as health from '../health.js';
@@ -23,8 +22,9 @@ const repoRoot = join(__dirname, '..', '..');
 
 const router = express.Router();
 
-const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
-router.get('/api/about', (_req, res) => res.json({ name: 'prodmesh', version: pkg.version }));
+// One source for the version, so /api/about and /api/system/version can't
+// disagree about what is running.
+router.get('/api/about', (_req, res) => res.json({ name: 'prodmesh', version: deployment.getVersion().version }));
 
 // Shows recorded before label-stamping existed (or while PC was unreachable)
 // have no planTitle. Resolve those plans directly by id — Planning Center
@@ -119,7 +119,11 @@ router.delete('/api/history/:instanceId', requirePermission('history.delete'), (
 // ── System (version + self-update) ─────────────────────────────────────────────
 
 router.get('/api/system/version', (_req, res) => {
-  res.json(settings.getVersion());
+  res.json({
+    ...deployment.getVersion(),
+    deployment: deployment.kind(),
+    update: deployment.updateCapability(),
+  });
 });
 
 // Per-integration transport health (recorded by the integration clients).
@@ -163,7 +167,16 @@ router.get('/api/system/health', (req, res) => {
 // Trigger a self-update (git pull + build + service restart). Runs detached so
 // it survives this process being restarted by the service manager; the client
 // polls /api/system/version to see the new commit land.
+//
+// Only a git checkout can do this. A container updates by being replaced, and
+// a packaged copy by being reinstalled — so those are refused here rather than
+// spawning a bash script that isn't there. 409, not 500: the request was
+// well-formed and authorized, this install just doesn't work that way.
 router.post('/api/system/update', requirePermission('system.update'), (_req, res) => {
+  const capability = deployment.updateCapability();
+  if (!capability.supported) {
+    return res.status(409).json({ error: 'update_not_supported', ...capability });
+  }
   const script = join(repoRoot, 'deploy', 'update.sh');
   try {
     const child = spawn('bash', [script], {
@@ -184,7 +197,7 @@ router.post('/api/system/update', requirePermission('system.update'), (_req, res
 // writes stdout/stderr to <repo>/logs/server.log; PRODMESH_LOG_FILE overrides
 // (tests, unusual deployments). Reads at most the last 512 KB.
 router.get('/api/system/logs', requirePermission('system.logs'), async (req, res) => {
-  const file = process.env.PRODMESH_LOG_FILE ?? join(repoRoot, 'logs', 'server.log');
+  const file = deployment.logFile();
   const lines = Math.max(50, Math.min(2000, Number(req.query.lines) || 500));
   try {
     const { stat, open } = await import('node:fs/promises');
@@ -214,7 +227,9 @@ router.get('/api/system/logs', requirePermission('system.logs'), async (req, res
     });
   } catch (err) {
     if (err.code === 'ENOENT') {
-      return res.json({ exists: false, file, lines: [] });
+      // The hint travels with the answer: "run install-service.sh" is wrong
+      // advice inside a container, where output goes to the runtime instead.
+      return res.json({ exists: false, file, hint: deployment.logHint(), lines: [] });
     }
     res.status(500).json({ error: String(err.message ?? err) });
   }

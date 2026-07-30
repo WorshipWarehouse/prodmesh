@@ -214,6 +214,23 @@ Notes:
   and would later wear the identity of whoever really owns that number. A typed
   id still links directly when a token *is* connected — the way through when
   search is down — and shows as "Name not checked", since nothing looked it up.
+- **Packaging** (2026-07-29): `server/deployment.js` answers how a copy was
+  installed — `git` (a checkout with the deploy scripts), `container`, or
+  `package` — and that decides three things that used to be assumed: the
+  version (build stamp first, git second, `package.json` last), whether
+  Admin → System offers an Update button at all, and what the Logs empty state
+  tells you to do. `POST /api/system/update` refuses with 409 where self-update
+  can't work, rather than spawning a bash script that isn't there. This also
+  removed the only two Windows-hostile lines in the server (`spawn('bash')` and
+  `execFileSync('git')`), which is what makes a desktop launcher possible later.
+- **Docker** (2026-07-29): `Dockerfile` (two-stage, so the toolchain
+  better-sqlite3 may need never ships), `docker-compose.yml` with everything
+  mutable in one named volume at `/data`, and `.github/workflows/docker.yml`
+  which builds on every PR, boots the container and checks what it says about
+  itself, then publishes multi-arch to GHCR from main and version tags. Serves
+  churches with a server or homelab. It does **not** serve the booth-Mac
+  church, which is what the planned tray launcher is for — Docker is not an
+  answer to "how do we install this" for a volunteer with one machine.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is

@@ -1,0 +1,32 @@
+# prodmesh, one command:  docker compose up -d
+#
+#   docker compose pull && docker compose up -d     — update to a new version
+#   docker compose logs -f                          — the server log
+#
+# The dashboard is then at http://<this-host-ip>:8080 from any machine on the
+# LAN. Room Macs and booth screens open that address.
+
+services:
+  prodmesh:
+    image: ghcr.io/jbeale/prodmesh:latest
+    # To build from a checkout instead of pulling, comment out `image` above
+    # and uncomment:
+    # build: .
+    container_name: prodmesh
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # PINs, credentials, the SQLite database, uploaded logo, show history.
+      # Back this up and you have backed up the install.
+      - prodmesh-data:/data
+    environment:
+      # A fresh container is a fresh install: it opens the setup wizard rather
+      # than seeding demo campuses. Set to `demo` to explore with sample data.
+      PRODMESH_SEED: empty
+      # TZ decides when a scheduled lock window starts — a Sunday 08:00 lock is
+      # 08:00 where the church is, not UTC.
+      TZ: America/Los_Angeles
+
+volumes:
+  prodmesh-data:

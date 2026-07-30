@@ -9,7 +9,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import crypto from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -213,23 +212,8 @@ export function checkSession(token) {
 
 export const destroySession = (token) => sessions.delete(token);
 
-// ── App version (current git commit) ──────────────────────────────────────────
-//  Cached for the life of the process. This ran TWO synchronous `git` forks per
-//  call, on an unauthenticated endpoint — measured ~29ms of fully blocked event
-//  loop each time, so a request flood froze every SSE stream and poller while
-//  the box forked git. The commit cannot change without a restart anyway:
-//  update.sh restarts the service, which is exactly when this is recomputed.
-let versionCache = null;
-
-export function getVersion() {
-  if (versionCache) return versionCache;
-  try {
-    const root = join(__dirname, '..');
-    const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root }).toString().trim();
-    const subject = execFileSync('git', ['log', '-1', '--format=%s'], { cwd: root }).toString().trim();
-    versionCache = { commit, subject };
-  } catch {
-    versionCache = { commit: 'unknown', subject: '' };
-  }
-  return versionCache;
-}
+// App version moved to server/deployment.js — it depends on how this copy was
+// installed, not on settings. It stays cached for the life of the process
+// there: resolving it used to fork git TWICE per call on an unauthenticated
+// endpoint (~29ms of blocked event loop each time), which froze every SSE
+// stream and poller under a request flood.

@@ -1,0 +1,127 @@
+name: Docker image
+
+# Every push on every branch builds the image and boots it, so a Dockerfile
+# that no longer works fails here rather than on a church's server. Branches
+# build and test only; publishing is gated on main and version tags below.
+#
+# Not `pull_request`-only: work here lands by merging a verified feature branch
+# locally, so that event never fires and nothing would run until after a merge.
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/prodmesh
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image has no .git to ask, so the version it will report is
+      # resolved here and baked in.
+      - name: Resolve build stamp
+        id: stamp
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          # Strip quotes and newlines — this becomes a build arg.
+          echo "subject=$(git log -1 --pretty=%s | tr -d '"\n' | cut -c1-120)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build the host architecture first and load it into the daemon, so the
+      # exact image that would be published is the one that gets tested.
+      - name: Build (amd64, loaded for testing)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: prodmesh:smoke
+          build-args: |
+            PRODMESH_VERSION=${{ steps.stamp.outputs.version }}
+            PRODMESH_COMMIT=${{ steps.stamp.outputs.commit }}
+            PRODMESH_COMMIT_SUBJECT=${{ steps.stamp.outputs.subject }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A build that succeeds and a container that serves are different claims.
+      - name: Boot it and check what it says about itself
+        run: |
+          docker run -d --name smoke -p 8080:8080 -e PRODMESH_SEED=empty prodmesh:smoke
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8080/api/system/health >/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "${ok:-}" ]; then echo "✗ container never became healthy"; docker logs smoke; exit 1; fi
+
+          # A fresh container is a fresh install — never demo-seeded campuses.
+          curl -sf http://127.0.0.1:8080/api/setup | grep -q '"needed":true' \
+            || { echo "✗ fresh container did not ask for setup"; docker logs smoke; exit 1; }
+
+          # And it must know that it cannot update itself.
+          version=$(curl -sf http://127.0.0.1:8080/api/system/version)
+          echo "$version"
+          echo "$version" | grep -q '"deployment":"container"' \
+            || { echo "✗ image does not identify as a container"; exit 1; }
+          echo "$version" | grep -q "\"commit\":\"${{ steps.stamp.outputs.commit }}\"" \
+            || { echo "✗ build stamp did not reach the running image"; exit 1; }
+
+          # The UI has to actually be in there — a server with no dist/ serves
+          # a working API and a blank page.
+          curl -sf http://127.0.0.1:8080/ | grep -qi '<div id="root"' \
+            || { echo "✗ built frontend missing from image"; exit 1; }
+
+          echo "✓ image boots, serves the UI, and reports itself correctly"
+          docker rm -f smoke
+
+      # arm64 (Apple silicon, Raspberry Pi, ARM VPS) is emulated and slow, so
+      # it only gets built for something that will actually be published.
+      - uses: docker/setup-qemu-action@v3
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+
+      - uses: docker/login-action@v3
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Publish
+        uses: docker/build-push-action@v6
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            PRODMESH_VERSION=${{ steps.stamp.outputs.version }}
+            PRODMESH_COMMIT=${{ steps.stamp.outputs.commit }}
+            PRODMESH_COMMIT_SUBJECT=${{ steps.stamp.outputs.subject }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
