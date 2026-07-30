@@ -83,7 +83,7 @@ function fakeSmaart({ requireAuth = true, logging = true, hasToggleCommand = tru
   };
 }
 
-// A fake Smaart v8 (as observed live on 8.5.2.2 at Grace Community FOH):
+// A fake Smaart v8 (as observed live on 8.5.2.2 at a church FOH):
 // /api/v4/ accepts the WebSocket but never answers RPCs; the real API is the
 // same dialect at /api/v3/.
 function fakeSmaartV8() {

@@ -20,7 +20,7 @@ const hasCampus = () => appConfig.getChurch().sites.length > 0;
 /**
  * Upgrades must never see a setup wizard.
  *
- * Grace Community's own box predates the stamp: it has a PIN and campuses, and
+ * The original production box predates the stamp: it has a PIN and campuses, and
  * update.sh would otherwise restart it into first-run setup. An install that
  * is ALREADY configured when the process starts is by definition not a fresh
  * one, so it is stamped complete here, once, at boot.

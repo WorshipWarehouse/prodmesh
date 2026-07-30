@@ -274,7 +274,7 @@ export async function searchPeople(query) {
     .slice(0, PEOPLE_SEARCH_LIMIT);
 }
 
-/** Every word typed must appear: "meg h" finds Avery Stone, not every Avery. */
+/** Every word typed must appear: "ave h" finds Avery Hunt, not every Avery. */
 function matchesName(name, query) {
   const haystack = name.toLowerCase();
   return query.toLowerCase().split(/\s+/).every((word) => haystack.includes(word));
@@ -387,7 +387,7 @@ function mockItems() {
     { title: 'Praise', type: 'song', length: 300, key: 'G', leader: 'Avery' },
     { title: 'Great Are You Lord', type: 'song', length: 330, key: 'A', leader: 'Riley' },
     { title: 'Message', type: 'header' },
-    { title: 'Sermon', type: 'item', length: 1800, leader: 'Koby' },
+    { title: 'Sermon', type: 'item', length: 1800, leader: 'Pastor Dave' },
     { title: 'Response Song', type: 'song', length: 300, key: 'D', leader: 'Avery' },
     { title: 'Dismissal', type: 'header' },
   ];

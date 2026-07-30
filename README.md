@@ -13,8 +13,9 @@ A modular, web-based launcher + dashboard for church production. Screens so far:
   (read live from a Companion variable) and one-tap buttons to switch between
   **Sunday / Mid-Week / Special Event**, plus **Standby** when the room is active.
 
-Sites: **North** (active) and **South Campus** (opens December 2026), each
-with Main / Youth / Chapel / Elementary Chapel auditoriums.
+The demo topology ships two campuses — **North Campus** (active) and **South
+Campus** (not yet open) — each with Main Auditorium / Youth Room / Chapel /
+Kids Room. A real install starts empty and builds its own in the setup wizard.
 
 ## Architecture
 
@@ -53,10 +54,10 @@ Open `src/config/dashboard.config.ts` and add a tile to the right auditorium:
 
 ```ts
 { id: 'north-main-graphics', type: 'screenshare',
-  label: 'Graphics Mac', note: 'Screen Sharing', host: '192.0.2.40' },
+  label: 'Graphics Mac', note: 'Screen Sharing', host: '192.0.2.30' },
 
 { id: 'north-main-companion', type: 'companion',
-  label: 'Companion', host: '192.0.2.10' },   // → http://192.0.2.10:8000
+  label: 'Companion', host: '192.0.2.31' },   // → http://192.0.2.31:8000
 ```
 
 > Replace every `PLACEHOLDER-*` host with a real IP or `.local` hostname.

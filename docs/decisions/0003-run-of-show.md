@@ -21,7 +21,7 @@ bolting all of this onto the Room Status page and bloating it.
    (YouTube Live viewers, SMAART loudness, on-air) are additions, not rewrites.
 
 3. **ProPresenter is a per-room streaming integration** (Phase 2). Each room has
-   its own ProPresenter (Main `192.0.2.74`, Chapel `192.0.2.101`, Youth TBD). The
+   its own ProPresenter (Main `192.0.2.15`, Chapel `192.0.2.18`, Youth Room TBD). The
    backend connects server-side (LAN API, no CORS) and — since ProPresenter
    streams slide changes — relays updates to the browser via **SSE** (the first
    real use of push in this app). Target the **official API (7.9+)**. Mock-first.

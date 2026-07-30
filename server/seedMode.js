@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  SEED MODE  —  "is this a real install, or a dev/test box?"
 //
-//  Several stores ship first-run defaults that are really Grace Community's own
+//  Several stores ship first-run defaults that are really demo-fixture
 //  data (the topology seed's campuses and device IPs; the example Sunday lock
 //  on room "north-main"). Tests and dev are built on that fixture, so it
 //  cannot simply be deleted — but a church installing prodmesh must never see

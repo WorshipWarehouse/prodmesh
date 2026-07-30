@@ -131,7 +131,7 @@ router.get('/api/system/version', (_req, res) => {
 // Deliberately still readable without a login — it is the first diagnostic
 // when a room misbehaves, and a booth screen or a phone on the LAN should be
 // able to answer "is Planning Center up?" without anyone signing in. But the
-// keys are `proPresenter@192.0.2.74:1025`, i.e. a free inventory of the
+// keys are `proPresenter@192.0.2.15:1025`, i.e. a free inventory of the
 // production VLAN, and lastError can carry a prefix of a device's response
 // body. So anonymous callers get status without addresses; system.logs gets
 // the detail (`?detail=1` to be explicit about wanting it).

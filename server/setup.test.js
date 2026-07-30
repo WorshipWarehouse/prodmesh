@@ -24,7 +24,7 @@ test('a fresh install wants the wizard', () => {
 
 test('a real install seeds no schedule for someone else\'s room', () => {
   // The example Sunday lock is keyed to "north-main". A church that has
-  // never heard of North must not open Settings to a protection window on it.
+  // never heard of north must not open Settings to a protection window on it.
   assert.deepEqual(settings.getPublicSettings().schedules, {});
 });
 

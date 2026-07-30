@@ -7,27 +7,27 @@ Last updated: 2026-07-06.
 
 ## Sites & rooms
 
-**North** (active). **South Campus** — status `coming-soon`, shown as DISABLED,
-opens Dec 2026, no rooms wired yet.
+**North Campus** (active). **South Campus** — status `coming-soon`, shown as DISABLED,
+not yet open, no rooms wired yet.
 
 | Room | Companion | Modes | Planning Center |
 |---|---|---|---|
-| Auditorium (`north-main`) | **live** — 192.0.2.31, var `roomState`, buttons pg3 | Sunday/Second Service/Midweek/Evening/Event/Standby (real) | **live** — Sunday, Second Service, Midweek, Evening |
-| Youth (`north-youth`) | mock — 192.0.2.150 (config ready) | standard set (Sunday/Mid-Week/Event/Standby) — **real modes unknown** | **live** — Youth Service |
-| Chapel (`north-chapel`) | mock — 192.0.2.101 (config ready) | standard set — **real modes unknown** | **live** — Chapel Service |
+| Auditorium (`north-main`) | **live** — 192.0.2.10, var `roomState`, buttons pg3 | Sunday/Second Service/Midweek/Evening/Event/Standby (real) | **live** — Sunday, Second Service, Midweek, Evening |
+| Youth Room (`north-youth`) | mock — 192.0.2.22 (config ready) | standard set (Sunday/Mid-Week/Event/Standby) — **real modes unknown** | **live** — Youth Service |
+| Chapel (`north-chapel`) | mock — 192.0.2.18 (config ready) | standard set — **real modes unknown** | **live** — Chapel Service |
 | Local Test (`local-test`) | live — 127.0.0.1 (dev fixture; **opt-in via `PRODMESH_LOCAL_TEST=1`**, set by the npm dev scripts — hidden in production) | standard set | live — Sunday (demo) |
 
 Notes:
 - Companion "live" means `mock: false`; it only actually reaches Companion when the
   server runs on/with network access to that host.
-- Youth/Chapel use placeholder button locations (pg1/row3/1-4) and the standard mode set
+- Youth Room/Chapel use placeholder button locations (pg1/row3/1-4) and the standard mode set
   until their real modes + button locations are provided (Auditorium's are real).
 
 ## Integrations
 
 | Integration | Status |
 |---|---|
-| Bitfocus Companion (per room) | Live for Auditorium; Youth/Chapel mock pending real setup |
+| Bitfocus Companion (per room) | Live for Auditorium; Youth Room/Chapel mock pending real setup |
 | Planning Center **Services** | **Live** — plan display + order of service, PAT in `server/data/secrets.json` |
 | Planning Center **Calendar** | **Not started** — awaiting read-only access. High value (see below) |
 | **Smaart SPL** | **Transport implemented; v8 compat added 2026-07-14** — full pipeline (capture → SQLite → live meter + report) + real WebSocket transport (auth → `activeCalibratedInputs` → SPL metric stream). FOH Mac probe (2026-07-14) found **Smaart v8 (8.5.2.2)**: its `/api/v4/` socket accepts connections but never answers RPCs; the same dialect lives at `/api/v3/`. Transport now negotiates v4 → v3 and caches the answering path (`smaart.apiPath` pins it). Since 2026-07-18 Smaart is one of two interchangeable **analysis sources** (see `integrations/analysis.js`); ProdMesh Remote RTA is the free alternative. **Live at FOH 2026-07-21**: starting SPL logging in Smaart lit the dashboard meter — metering alone isn't enough, inputs must be calibrated + logging; shows can now drive logging on/off via `analysis.logControl`. Remaining: enumerate `get commands` on the FOH v8 to confirm it exposes "Toggle SPL Logging" (verified on v9) |
@@ -187,13 +187,13 @@ Notes:
   church is still on step two. `GET /api/setup` is public (both facts already
   are); `POST /api/setup/complete` needs `*`.
 - **Bundled logo** (2026-07-27): the default mark is `src/assets/prodmesh-logo.svg`
-  (the prodmesh icon). It used to be `logo.png` — Grace Community's mountain, present
+  (the prodmesh icon). It used to be `logo.png` — the maintainer's church mark, present
   since the initial commit — so every church installing prodmesh saw another
   church's logo until they uploaded their own. The sidebar's
   `filter: brightness(0) invert(1)` went with it: it suited that one
   dark-on-transparent mark but flattened every uploaded colour logo into a white
   silhouette, while the Branding preview (no filter) showed the admin the logo
-  they expected. **Grace Community's own install now shows the prodmesh mark until
+  they expected. **The original production install now shows the prodmesh mark until
   they upload their logo** via Admin → General → Branding; the file is in git
   history (`git show 9fe09e1:src/assets/logo.png > chills-logo.png`).
 - **Planning Center person search** (2026-07-29): Admin → Users & access links a
@@ -250,7 +250,7 @@ Notes:
      `pollRunState` still auto-detects and falls back to polling for builds that
      don't, so no version regresses — see ARCHITECTURE.md.
    - Remaining: set each room's real PP API port on-site (PP picks an ephemeral
-     port per machine); wire Youth (PP host TBD).
+     port per machine); wire the Youth Room (PP host TBD).
 2. ~~Connectivity migration into the room page~~ **Complete 2026-07-21** (page
    built 2026-07-15; PC service types 2026-07-15, analysis source 2026-07-18,
    ProPresenter + Companion 2026-07-21). Pattern in `server/connectivity.js`:
@@ -276,7 +276,7 @@ Notes:
 3. **PC Calendar integration** — authoritative event→room→time. Unlocks:
    auto-populating lockout windows from real bookings (retire manual schedules),
    and confidently mapping "Special Events" to the right room.
-4. **Youth/Chapel go live** — get their real modes + Companion button locations,
+4. **Youth Room/Chapel go live** — get their real modes + Companion button locations,
    enter them on the room page and untick Simulated. All in the browser now.
    (Auditorium is the template.)
 5. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
@@ -299,4 +299,4 @@ Notes:
 ## Decisions on hold pending info
 
 - **Auditorium "Special Events"** mapping omitted until Calendar can confirm room.
-- **South Campus** rooms/config — after the Dec 2026 opening.
+- **South Campus** rooms/config — once that campus opens.

@@ -80,7 +80,7 @@ export function replaceChurch(input) {
   return getChurch();
 }
 
-// Whether first boot installs the demo topology (Grace Community's real campuses,
+// Whether first boot installs the demo topology (the demo church's campuses,
 // rooms and device IPs — the fixture every server test is built on) is the
 // same question several stores ask, so it lives in seedMode.js. A church
 // installing prodmesh must never inherit someone else's campuses, and the

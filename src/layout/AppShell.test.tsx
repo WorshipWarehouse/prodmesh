@@ -28,10 +28,10 @@ const authenticated: AuthStatus = {
   setupNeeded: false,
   user: {
     id: 'user-1',
-    username: 'jbeale',
-    displayName: 'the maintainer Beale',
+    username: 'srivera',
+    displayName: 'Sam Rivera',
     planningCenterPersonId: 'P900001',
-    avatarUrl: 'https://example.test/justin.jpg',
+    avatarUrl: 'https://example.test/srivera.jpg',
   },
   permissions: ['*'],
   station: {
@@ -63,7 +63,7 @@ describe('AppShell identity and Admin navigation', () => {
     api.getAbout.mockResolvedValue({ version: '1.0.0' });
     api.getConfig.mockResolvedValue({
       name: 'Test Church',
-      sites: [{ id: 'north', name: 'North', status: 'active', auditoriums: [] }],
+      sites: [{ id: 'north', name: 'North Campus', status: 'active', auditoriums: [] }],
     });
     api.getAuthStatus.mockResolvedValue(authenticated);
     api.logoutAdmin.mockResolvedValue(undefined);
@@ -76,7 +76,7 @@ describe('AppShell identity and Admin navigation', () => {
     expect(screen.getByRole('link', { name: 'General' })).toHaveAttribute('href', '/admin/general');
     expect(screen.getByRole('link', { name: 'Stations' })).toHaveAttribute('href', '/admin/stations');
     expect(screen.getByRole('link', { name: 'Checklists' })).toHaveAttribute('href', '/admin/checklists');
-    expect(screen.getByRole('button', { name: /the maintainer Beale/ }).querySelector('img')).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /Sam Rivera/ }).querySelector('img')).toHaveAttribute(
       'src',
       authenticated.user?.avatarUrl,
     );
@@ -85,7 +85,7 @@ describe('AppShell identity and Admin navigation', () => {
   it('dismisses the account menu by toggle, click-away, and Escape', async () => {
     const user = userEvent.setup();
     renderShell();
-    const account = await screen.findByRole('button', { name: /the maintainer Beale/ });
+    const account = await screen.findByRole('button', { name: /Sam Rivera/ });
 
     await user.click(account);
     expect(screen.getByRole('button', { name: 'Lock station' })).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe('AppShell identity and Admin navigation', () => {
   it('requires confirmation before locking the station', async () => {
     const user = userEvent.setup();
     renderShell();
-    const account = await screen.findByRole('button', { name: /the maintainer Beale/ });
+    const account = await screen.findByRole('button', { name: /Sam Rivera/ });
 
     await user.click(account);
     await user.click(screen.getByRole('button', { name: 'Lock station' }));
@@ -135,7 +135,7 @@ describe('room-only station', () => {
     api.getConfig.mockResolvedValue({
       name: 'Test Church',
       sites: [{
-        id: 'north', name: 'North', status: 'active',
+        id: 'north', name: 'North Campus', status: 'active',
         auditoriums: [{ id: 'north-main', name: 'Main Auditorium', tiles: [] }],
       }],
     });

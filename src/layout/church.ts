@@ -14,7 +14,7 @@ export const useChurch = () => useContext(ChurchContext);
 
 /**
  * Room display name for cross-campus views. Campuses reuse room names
- * ("Main Auditorium" exists at North AND South Campus), so any list that
+ * ("Main Auditorium" exists at North Campus AND South Campus), so any list that
  * can span campuses prefixes the campus name — but only when it has to:
  * viewing a single campus, or a name that already carries it, stays short.
  */

@@ -71,18 +71,18 @@ afterEach(() => {
 });
 
 test('finds someone past the first page of the roster', async () => {
-  // The reported bug: Grace Community has 139 people in Services and their tech
+  // The reported bug: a church with 139 people in Services had its tech
   // director sat at #113, so a search that read one page found "some people"
   // and silently missed the rest.
   const roster = [
     ...Array.from({ length: 112 }, (_, i) => person(`${1000 + i}`, `Volunteer ${i} Person`)),
-    person('142095475', 'Arturo Ortega'),
+    person('900101', 'Jordan Reyes'),
     ...Array.from({ length: 26 }, (_, i) => person(`${2000 + i}`, `Later ${i} Person`)),
   ];
   stubPlanningCenter(roster);
 
-  const results = await pco.searchPeople('arturo');
-  assert.deepEqual(results.map((p) => p.id), ['142095475']);
+  const results = await pco.searchPeople('jordan');
+  assert.deepEqual(results.map((p) => p.id), ['900101']);
   assert.equal(calls.length, 2, 'paged through the whole roster');
 });
 
@@ -110,8 +110,8 @@ test('nothing the admin types is ever sent to Planning Center', async () => {
 });
 
 test('every word typed has to appear', async () => {
-  stubPlanningCenter([person('1', 'Avery Stone'), person('2', 'Avery Torres')]);
-  assert.deepEqual((await pco.searchPeople('avery h')).map((p) => p.name), ['Avery Stone']);
+  stubPlanningCenter([person('1', 'Avery Hunt'), person('2', 'Avery Torres')]);
+  assert.deepEqual((await pco.searchPeople('avery h')).map((p) => p.name), ['Avery Hunt']);
 });
 
 test('people who still serve come first, and inactive ones say so', async () => {
@@ -119,25 +119,25 @@ test('people who still serve come first, and inactive ones say so', async () => 
   // inactive volunteer can still need a login, so they stay findable.
   stubPlanningCenter([
     person('1', 'Avery Zither', { status: 'inactive', archived_at: '2025-01-01T00:00:00Z' }),
-    person('2', 'Avery Stone'),
+    person('2', 'Avery Hunt'),
   ]);
   const results = await pco.searchPeople('avery');
-  assert.deepEqual(results.map((p) => p.name), ['Avery Stone', 'Avery Zither']);
+  assert.deepEqual(results.map((p) => p.name), ['Avery Hunt', 'Avery Zither']);
   assert.deepEqual(results.map((p) => p.inactive), [false, true]);
 });
 
 test('a one-letter query never reaches Planning Center', async () => {
   stubPlanningCenter([person('1', 'Avery Stone')]);
-  assert.deepEqual(await pco.searchPeople('m'), []);
+  assert.deepEqual(await pco.searchPeople('a'), []);
   assert.deepEqual(await pco.searchPeople(''), []);
   assert.equal(calls.length, 0);
 });
 
 test('the roster is fetched once, not per search', async () => {
-  stubPlanningCenter([person('1', 'Avery Stone'), person('2', 'Arturo Ortega')]);
+  stubPlanningCenter([person('1', 'Avery Stone'), person('2', 'Jordan Reyes')]);
   await pco.searchPeople('avery');
   await pco.searchPeople('Avery'); // same search, different shift key
-  await pco.searchPeople('arturo'); // different search, same roster
+  await pco.searchPeople('jordan'); // different search, same roster
   assert.equal(calls.length, 1);
 });
 

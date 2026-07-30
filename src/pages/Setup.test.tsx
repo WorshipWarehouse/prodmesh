@@ -161,9 +161,9 @@ describe('buildChurch', () => {
   it('keeps existing ids so a resumed wizard orphans nothing', () => {
     // Stations, schedules and booth bookmarks point at room ids. Renaming a
     // room in the wizard must not silently mint a new one.
-    const renamed = buildChurch(CONFIGURED, 'Grace Community', 'North', ['Main Auditorium']);
+    const renamed = buildChurch(CONFIGURED, 'Grace Community', 'north', ['Main Auditorium']);
     expect(renamed.sites[0].id).toBe('main');
-    expect(renamed.sites[0].name).toBe('North');
+    expect(renamed.sites[0].name).toBe('north');
     expect(renamed.sites[0].auditoriums[0].id).toBe('aud');
     expect(renamed.sites[0].auditoriums[0].name).toBe('Main Auditorium');
   });

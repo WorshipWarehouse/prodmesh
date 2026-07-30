@@ -15,8 +15,8 @@ vi.mock('../api', () => api);
 const testChurch = {
   name: 'Test Church',
   sites: [
-    { id: 'north', name: 'North', status: 'active' as const, auditoriums: [] },
-    { id: 'south-everett', name: 'South Campus', status: 'disabled' as const, auditoriums: [] },
+    { id: 'north', name: 'North Campus', status: 'active' as const, auditoriums: [] },
+    { id: 'south', name: 'South Campus', status: 'disabled' as const, auditoriums: [] },
   ],
 };
 

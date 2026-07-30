@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  BRANDING  —  the institution's logo.
 //
-//  A church installing prodmesh should see their own mark, not Grace Community's.
+//  A church installing prodmesh should see their own mark, not another church's.
 //  The bundled ProdMesh logo stays the default; this stores an override.
 //
 //  Threat notes (this is the app's only file-upload path, so they are all

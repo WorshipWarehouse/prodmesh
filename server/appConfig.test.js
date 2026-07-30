@@ -17,7 +17,7 @@ test('first boot seeds the topology from topologySeed.js', () => {
   assert.equal(storedTiles.length, seedTiles.length);
   // Round-trip fidelity: per-type leaf fields survive the JSON column.
   const companion = storedTiles.find((t) => t.id === 'north-main-companion');
-  assert.equal(companion.host, '192.0.2.31');
+  assert.equal(companion.host, '192.0.2.10');
   const share = storedTiles.find((t) => t.type === 'screenshare' && t.username);
   assert.ok(share.host);
 });
@@ -25,15 +25,15 @@ test('first boot seeds the topology from topologySeed.js', () => {
 test('replaceChurch validates, normalizes, and persists atomically', () => {
   const church = cfg.getChurch();
   const next = structuredClone(church);
-  next.name = '  Grace Community Production  ';
+  next.name = '  Grace Community Church  ';
   next.sites[0].auditoriums[0].tiles.push({
-    id: 'new-tile', type: 'link', label: ' Stream Deck ', url: 'http://192.0.2.200', junk: 'dropped',
+    id: 'new-tile', type: 'link', label: ' Stream Deck ', url: 'http://192.0.2.23', junk: 'dropped',
   });
   const stored = cfg.replaceChurch(next);
-  assert.equal(stored.name, 'Grace Community Production');
+  assert.equal(stored.name, 'Grace Community Church');
   const added = stored.sites[0].auditoriums[0].tiles.find((t) => t.id === 'new-tile');
   assert.equal(added.label, 'Stream Deck');
-  assert.equal(added.url, 'http://192.0.2.200');
+  assert.equal(added.url, 'http://192.0.2.23');
   assert.equal('junk' in added, false);
   // And it round-trips through a fresh read.
   assert.deepEqual(cfg.getChurch(), stored);

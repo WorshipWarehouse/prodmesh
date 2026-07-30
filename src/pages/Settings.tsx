@@ -1928,7 +1928,7 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
         {draft.source !== 'none' && (
           <>
             <Field label="Host" width="grow">
-              <input className="field" placeholder="e.g. 192.0.2.7" value={draft.host}
+              <input className="field" placeholder="e.g. 192.168.1.120" value={draft.host}
                 onChange={(e) => f.patch({ host: e.target.value })} />
             </Field>
             <Field label="Port" width="sm">
@@ -2071,7 +2071,7 @@ function CompanionEditor({ roomId, initial, status }: { roomId: string; initial:
           onChange={(e) => f.patch({ mock: e.target.checked })}
         />
         <Field label="Host" width="grow">
-          <input className="field" placeholder="e.g. 192.0.2.31" value={draft.host}
+          <input className="field" placeholder="e.g. 192.168.1.100" value={draft.host}
             onChange={(e) => f.patch({ host: e.target.value })} />
         </Field>
         <Field label="Port" width="sm">
@@ -2179,7 +2179,7 @@ function ProPresenterEditor({ roomId, initial, status }: { roomId: string; initi
     >
       <FormRow>
         <Field label="Host" width="grow">
-          <input className="field" placeholder="e.g. 192.0.2.74" value={draft.host}
+          <input className="field" placeholder="e.g. 192.168.1.110" value={draft.host}
             onChange={(e) => f.patch({ host: e.target.value })} />
         </Field>
         <Field label="Port" width="sm">

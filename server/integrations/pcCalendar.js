@@ -109,11 +109,11 @@ export function normalizeInstance(data, eventsById = new Map()) {
 // one deliberately-unmatched location (the "Special Events" mapping problem).
 const WEEKLY = [
   { dow: 0, name: 'Sunday Services', location: 'Main Auditorium', start: [7, 30], end: [13, 0], approval: 'A' },
-  { dow: 0, name: 'Youth Sunday', location: 'Youth', start: [8, 30], end: [12, 30], approval: 'A' },
+  { dow: 0, name: 'Youth Sunday', location: 'Youth Room', start: [8, 30], end: [12, 30], approval: 'A' },
   { dow: 2, name: 'Chapel Night', location: 'Chapel', start: [17, 30], end: [21, 0], approval: 'A' },
-  { dow: 3, name: 'Youth Night', location: 'Youth', start: [17, 30], end: [21, 30], approval: 'A' },
+  { dow: 3, name: 'Youth Night', location: 'Youth Room', start: [17, 30], end: [21, 30], approval: 'A' },
   { dow: 4, name: 'Worship Rehearsal', location: 'Main Auditorium', start: [18, 0], end: [21, 30], approval: 'A' },
-  { dow: 6, name: 'Memorial Service', location: 'Chapel', start: [10, 0], end: [12, 0], approval: 'P' },
+  { dow: 6, name: 'Memorial Service', location: 'Fellowship Hall', start: [10, 0], end: [12, 0], approval: 'P' },
 ];
 
 function mockInstances(startMs, endMs) {
