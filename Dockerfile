@@ -28,6 +28,23 @@ RUN npm run build
 # Drop dev dependencies (vite, vitest, typescript) from what gets copied on.
 RUN npm prune --omit=dev
 
+# The frontend libraries are `dependencies` because Vite needs them to build —
+# but the build already happened, and what came out is dist/ (under 1 MB). The
+# server imports none of them, so they are 53 MB of dead weight in an image a
+# church has to pull. lucide-react alone is 40 MB of individual icon modules.
+#
+# Removing them here rather than moving them to devDependencies keeps this a
+# packaging concern: `npm ci --omit=dev && npm run build` anywhere else would
+# break if the build's own inputs were classified as optional.
+RUN rm -rf node_modules/lucide-react \
+           node_modules/react \
+           node_modules/react-dom \
+           node_modules/react-router \
+           node_modules/react-router-dom \
+           node_modules/scheduler \
+           node_modules/@fontsource \
+           node_modules/@fontsource-variable
+
 # ── Runtime ───────────────────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runtime
 
@@ -47,15 +64,20 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-# Only what the server actually serves: the built UI, the server, and prod deps.
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/server ./server
-COPY --from=build /app/package.json ./package.json
+# Only what the server actually serves: the built UI, the server, and the
+# runtime dependencies.
+#
+# --chown on each COPY, never a `chown -R` afterwards: recursive chown rewrites
+# every file's metadata, and because that lands in its own layer it duplicated
+# all of node_modules. One convenience line was 99 MB of the image.
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/server ./server
+COPY --from=build --chown=node:node /app/package.json ./package.json
 
 # Everything mutable lives in the volume: SQLite, secrets.json, uploaded logo,
 # show timelines. The image itself stays read-only in practice.
-RUN mkdir -p /data && chown -R node:node /data /app
+RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME ["/data"]
 
