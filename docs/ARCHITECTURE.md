@@ -117,7 +117,7 @@ Express server (server/)
   *item note* in the "Leader" category (fetch items with `include=item_notes`).
 - **ProPresenter API is on its own port**, and it is **per-machine and
   ephemeral** — ProPresenter picks one and it can change across restarts unless
-  pinned in its Network preferences (church Booth-Mac has answered on
+  pinned in its Network preferences (one production Mac has answered on
   1025, a dev laptop on 62201; 62202 is only this module's fallback default).
   49310 is the legacy WS and won't speak HTTP. The active item's fields nest under `playlist_item.id`. And
   `?chunked=true` support is **version-dependent**: on 21.4 both

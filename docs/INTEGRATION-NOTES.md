@@ -1,0 +1,149 @@
+# Integration notes
+
+Device and API behaviour that cost real on-site time to discover. None of it is
+in any vendor's documentation, and most of it contradicts the obvious reading.
+Read the relevant section before changing an integration.
+
+Everything here was verified against real gear on the dates given. Where a fact
+is version-specific, the version is stated — assume nothing carries forward.
+
+---
+
+## ProPresenter
+
+**The API port is per-machine and ephemeral.** ProPresenter picks one and can
+change it across restarts unless pinned in Network preferences. Observed values
+include 1025 and 62201 on different machines; `62202` is only this module's
+fallback default. `49310` is the legacy WebSocket and will not speak HTTP.
+Never hard-code a port — it is per-room configuration.
+
+**Every minor version behaves differently.** After any ProPresenter upgrade,
+re-run the probe battery: `active`, `focused`, playlists, uuid-vs-path
+addressing, `slide_index`.
+
+### Version differences (verified live)
+
+| Behaviour | 21.1 | 21.4 |
+|---|---|---|
+| `/v1/playlist/active` | answers all-null even mid-show | works |
+| `/v1/playlist/{uuid}` | 404s — address by index path (`/v1/playlist/1/0`) | uuid addressing works |
+| `active`'s `playlist_item` | carries `presentation_info` | lost `presentation_info` (arrangement) |
+| `slide_index` payload | no `total_cues` | gained `total_cues` / `remaining_cues` |
+
+21.1's breakage of `active` and uuid addressing appears to have been a bug —
+21.4 restored both. `/v1/playlist/focused` returns a full `playlist_item`
+(including `is_pco`) on both. Playlist items carry
+`presentation_info.presentation_uuid`; `proPresenter.js` resolves the live item
+by presentation uuid rather than index, because index addressing is exactly what
+broke on 21.1.
+
+### Chunked streaming
+
+`?chunked=true` on `/v1/presentation/slide_index` **pushes** — every slide
+advance arrives sub-second, carrying `presentation_id.uuid/name` and (on 21.4)
+`total_cues` / `remaining_cues`. Verified live on **both 21.1 and 21.4**.
+`/v1/playlist/active?chunked=true` also pushes item changes on 21.4.
+
+`pollRunState` auto-detects streaming, relaxes to a 5s watchdog while it trusts
+the stream, and reverts to full-rate polling on disconnect, three failed
+reconnects, or a watchdog-observed slide the stream never pushed. Only a
+*subsequent* push counts as detection — every build sends an opening snapshot.
+
+This is deliberately **not** a user setting. An operator cannot know whether
+their build pushes, and a wrong choice loses tracking silently mid-service.
+
+### Quirks that have bitten us live
+
+- **Re-triggering an item** makes `slide_index` briefly report the item's
+  *stored* slide position — where it was left last time — before the slide
+  actually triggered. Any logic reading slide position at item-trigger time must
+  debounce or edge-trigger.
+- `playlist_item` reads **null right after an item trigger** until the next
+  slide action. Keep the last mapped item as a baseline.
+- **Zero-slide "shell" presentations** (a placeholder like "Message") cannot be
+  activated at all.
+
+Trigger endpoints: `GET /v1/playlist/focused/{index}/trigger`,
+`GET /v1/trigger/next`, `GET /v1/presentation/active/{i}/trigger`.
+
+---
+
+## Planning Center
+
+**Services v2 `/people` silently ignores every query filter.** Verified live
+against a 139-person roster: `where[search_name_or_email]`, `where[search_name]`,
+`where[full_name]`, `where[first_name]`, `where[last_name]`, `?q=` and `?search=`
+each returned the full unfiltered `total_count` — HTTP 200, no error, no
+warning.
+
+This is worse than an outright failure. Code that asks Services to search people
+*appears* to work, because the first page is full of real names, while silently
+missing everyone past it. The fix is to hold the roster locally and match
+against it. There is no correct filter parameter to find.
+
+Roster shape (same verification): 110 active / 29 archived of 139; every person
+had `photo_thumbnail_url`; attributes include `status` and `archived_at`. Two
+pages at `per_page=100` took about 1.1s.
+
+**Calendar is different** — its `where[…]` comparison params and pagination
+links were verified live and do work. Do not generalize from one Planning
+Center product to another.
+
+Other Services facts:
+- Service times are **per-plan**, not via `include` (the included array is
+  ambiguous across plans).
+- Song key is `item.key_name`.
+- Item "Leader" is not a field — it is an *item note* in the "Leader" category.
+  Fetch items with `include=item_notes`.
+- A room can host multiple service types; map rooms to an array and merge.
+
+---
+
+## Smaart
+
+API v4 is a WebSocket at `ws://host:26000/api/v4/`. Smaart v8 (8.5.2.2) accepts
+connections on `/api/v4/` but never answers RPCs; the same dialect lives at
+`/api/v3/`. The transport negotiates v4 → v3 and caches whichever answers
+(`smaart.apiPath` pins it).
+
+**Reachable is not the same as reporting.** A health check can show Smaart
+connected and still yield "no matching calibrated input" — inputs must be
+calibrated *and* SPL logging must be running. Metering alone produces nothing.
+Shows can drive logging on and off via `analysis.logControl`.
+
+---
+
+## ProPresenter Network Link ("ProLink") — evaluated and rejected
+
+Fully reverse-engineered against 21.4; a custom client reached
+green/Connected and received live operations. Recording it here so nobody spends
+that week again.
+
+It is plain JSON over HTTP on the normal API port, plus protobuf multicast for
+presence. Four pieces are required, each failing differently if missing:
+
+1. `GET /group/status` → `{"group_definition": <group|null>, "member_name": str}`.
+   `null` means unaffiliated — empty-string fields are not recognised.
+2. **Announce on multicast always**, ~1/s to `224.0.0.90:18514`, even before
+   joining. ProPresenter will not dial a device it has never heard announce; a
+   silent peer produces a ~15s "Unable to connect" with zero HTTP requests made.
+3. `POST /group/add_member` — the body wraps the group in **PascalCase**
+   `GroupDefinition`, while the GET returns snake_case `group_definition`. The
+   reply is a Rust enum: the bare JSON string `"Accept"`, or
+   `{"Decline":"AlreadyInGroup"}`. Returning `{}` reads as a failed request.
+4. `GET /heartbeat?port=N` (not `/group/heartbeat`), ~2/s. Omit it and you stay
+   "Not Connected".
+
+`224.0.0.90` is link-local (TTL 1), so presence requires the same L2 VLAN even
+though HTTP itself routes across subnets.
+
+**Do not use this for prodmesh.** Two disqualifying reasons:
+
+- Members sit inside a **synchronous commit** — ProPresenter blocks on each
+  member's `PrerollComplete` before firing. A slow or wedged member delays the
+  operator's actual slide change. Nothing prodmesh does is worth that risk.
+- Everything is addressed by **index path**, the exact fragility that broke
+  tracking on 21.1.
+
+The shipped answer is `slide_index?chunked=true` streaming: documented,
+read-only, gives presentation UUID and cue counts, and cannot affect output.

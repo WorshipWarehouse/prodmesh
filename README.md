@@ -1,152 +1,110 @@
-# Production Dashboard
+# prodmesh
 
-A modular, web-based launcher + dashboard for church production. Screens so far:
+A production dashboard for churches, running on your own LAN. One screen the
+whole team opens: room status and mode control, the service order live from
+Planning Center, startup checklists, run of show that follows ProPresenter, and
+SPL history after the fact.
 
-- **Quick Access** (`/`) — a launcher that opens on each production Mac and jumps
-  the team into the right tools per site & auditorium:
-  - **Room Status** tiles → open that room's Status page (mode control)
-  - **Companion** tiles → open the Bitfocus Companion web UI (`http://host:8000`)
-  - **Screen Share** tiles → open macOS Screen Sharing.app to a Mac (`vnc://host`)
-  - **Link** tiles → device web UIs (Hyperdeck, GrandMA3, cameras…) / any web tool
-- **Room Status** (`/room/<id>`) — a simple, pastor-facing screen meant to be the
-  **browser homepage** on each room's main Mac. Shows the room's current mode
-  (read live from a Companion variable) and one-tap buttons to switch between
-  **Sunday / Mid-Week / Special Event**, plus **Standby** when the room is active.
+It is a **local server**, not a cloud service. Booth screens, room Macs and
+phones all open `http://<host-ip>:8080`. Nothing leaves the building except the
+calls you configure to Planning Center.
 
-The demo topology ships two campuses — **North Campus** (active) and **South
-Campus** (not yet open) — each with Main Auditorium / Youth Room / Chapel /
-Kids Room. A real install starts empty and builds its own in the setup wizard.
+## Install
 
-## Architecture
-
-> **Returning to this project?** Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-> (mental model, patterns, invariants, gotchas) and [`docs/STATE.md`](docs/STATE.md)
-> (what's live vs mock + roadmap) first. Decisions are in [`docs/decisions/`](docs/decisions/).
-
-```
-Browser (Quick Access + Room Status)
-        │  /api/*
-        ▼
-Express proxy  (server/)  ──HTTP──▶  Bitfocus Companion  (per room, :8000)
-        │
-        └─ also serves the built frontend (dist/) in production
+```bash
+curl -O https://raw.githubusercontent.com/jbeale/prodmesh/main/docker-compose.yml
+docker compose up -d
 ```
 
-The proxy exists because Companion's HTTP API sends no CORS headers, so the
-browser can't read room state from it directly. The server reads/writes Companion
-server-side and exposes a clean `/api`.
+Open `http://<this-host-ip>:8080` and a setup wizard takes it from there — it
+asks who you are, creates the first admin, and starts with an empty building for
+you to describe. Images are published for amd64 and arm64.
 
-## How it's organized
+Prefer a git checkout with auto-start via launchd or systemd? See
+[`deploy/README.md`](deploy/README.md), which covers both paths, updates and
+backups.
 
-The whole UI is **config-driven**. You almost never edit components — you edit
-one data file:
+## What it does
+
+- **Home** — every room in the campus as a live status card: current mode,
+  whether it is on air, what is on next. Plus a launcher for the tools that live
+  on each machine (Companion, screen sharing, device web UIs).
+- **Room Status** (`/room/<id>`) — the pastor-facing screen, meant to be the
+  browser homepage on a room's main Mac. Current mode read live from a Companion
+  variable, and one-tap buttons to change it. Schedule-based lockouts stop a
+  mode change during a service unless someone enters the override PIN.
+- **Services** — upcoming events from Planning Center, each opening to service
+  and rehearsal times, plan notes, series artwork, and a **startup checklist**
+  whose items can press real Companion buttons.
+- **Run of show** — a server-coordinated show session per room. It follows
+  ProPresenter live, tracks slide progress, can start and complete itself from
+  the items you nominate, and produces a planned-versus-actual timing report for
+  the debrief.
+- **Analytics** — show history and SPL measurement from Smaart or the free
+  ProdMesh Remote RTA, kept in SQLite so it outlives Planning Center's
+  "upcoming" window.
+- **Admin** — campuses and rooms, connectivity, users and permissions, stations,
+  checklists, branding, logs and the audit trail.
+
+Every integration is optional and mock-first: rooms work in memory before any
+hardware is wired, so you can set the whole thing up on a laptop and connect
+real gear later.
+
+## Requirements
+
+A machine that stays on and reachable from the production network — a NAS, a
+homelab box, a spare Mac mini. Docker, or Node 22+ for a checkout. Planning
+Center, Companion, ProPresenter and Smaart are each optional.
+
+## How it's put together
 
 ```
-src/config/dashboard.config.ts   ← THE dashboard: sites, auditoriums, tiles
-src/types.ts                     ← data model + how to add a new tile type
-src/tiles/registry.tsx           ← how each tile type behaves (icon, link, color)
-src/components/                  ← generic renderers (Site, Auditorium, Tile)
+Browser  ──/api/*──▶  Express (server/)  ──HTTP──▶  Bitfocus Companion (per room)
+                            │                       ProPresenter, Smaart
+                            ├── SQLite (better-sqlite3) — the source of truth
+                            └── serves the built frontend (dist/) in production
 ```
 
-### Add a machine or tool
+The proxy exists because Companion's HTTP API sends no CORS headers, so a
+browser cannot read room state directly. The server talks to devices and exposes
+a clean `/api`.
 
-Open `src/config/dashboard.config.ts` and add a tile to the right auditorium:
+**Configuration lives in the database, not in files.** `server/rooms.config.js`
+and `server/topologySeed.js` are fresh-install *seeds* only — once the server has
+booted, SQLite owns campuses, rooms, connectivity and modes, and everything is
+edited in Admin. Adding a room in the UI produces a real server room with
+simulated modes, ready to point at a Companion.
 
-```ts
-{ id: 'north-main-graphics', type: 'screenshare',
-  label: 'Graphics Mac', note: 'Screen Sharing', host: '192.0.2.30' },
+Secrets (Planning Center tokens and the like) live in a git-ignored
+`server/data/secrets.json` beside the database, or come from `PRODMESH_SECRET_*`
+environment variables. They are write-only in the UI and never read back out.
 
-{ id: 'north-main-companion', type: 'companion',
-  label: 'Companion', host: '192.0.2.31' },   // → http://192.0.2.31:8000
-```
-
-> Replace every `PLACEHOLDER-*` host with a real IP or `.local` hostname.
-
-### Add a whole new module later (metrics, service order, media status…)
-
-1. Add a variant to the `Tile` union in `src/types.ts`.
-2. Add one entry to `tileRegistry` in `src/tiles/registry.tsx`.
-
-That's it — the rest of the app renders it automatically. This is what keeps the
-project from sprawling as it grows.
-
-## Room Status screens (mode control)
-
-Room control lives in **`server/rooms.config.js`** — the source of truth for the
-Status pages. Each room maps to a Companion install, a state variable, and a set
-of modes (each mode presses a Companion button).
-
-Set each room Mac's **browser homepage** to its Status page, e.g.
-`http://<lan-box>:8080/room/north-main`.
-
-### Going live for a room
-
-Rooms ship with `mock: true`, so the screens work in-memory before any Companion
-wiring exists (great for demos). To make a room control real Companion:
-
-1. In Companion, create a **custom variable** (default name `room_mode`) and have
-   each mode's automation set it to that mode's `match` value
-   (`sunday` / `midweek` / `special` / `standby`).
-2. Note the **page/row/column** of each mode's button and fill in `press`.
-3. Set **`mock: false`** for that room.
-
-The Status page shows **● Companion live** when it's reading real state, or
-**○ Demo mode** when it's falling back to in-memory state.
-
-## Run it
+## Development
 
 ```bash
 npm install
-npm run dev      # web (http://localhost:5173) + API proxy (http://localhost:3001)
-npm run build    # production build → dist/
-npm start        # serve built app + API on one port (default 8080)
-npm test         # backend test suite (node --test)
+npm run dev      # Vite (5173) + API (3001), with /api proxied
+npm test         # 247 server tests (node --test) + 100 UI tests (vitest)
+npm run build    # → dist/
+npm start        # built app + API on one port (default 8080)
 ```
 
-In dev, Vite proxies `/api` to the Express server automatically.
+Server tests run against mock-mode rooms, so no hardware is needed. CI runs
+build, both test layers and lint on every branch.
 
-## Testing & CI
+## Documentation
 
-Backend logic is covered by `node --test` (zero deps) under `server/*.test.js`:
-settings/PIN/lock engine, config validation, room mapping, and full API
-auth + lockout flows (against mock-mode rooms, so no Companion needed). Run
-`npm test`. GitHub Actions (`.github/workflows/ci.yml`) runs build + tests on
-every push and PR.
+| | |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Conventions, constraints and workflow — start here if you are contributing |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Mental model, patterns, invariants, gotchas |
+| [`docs/STATE.md`](docs/STATE.md) | What is live vs mock, and the roadmap |
+| [`docs/INTEGRATION-NOTES.md`](docs/INTEGRATION-NOTES.md) | Hard-won device and API behaviour |
+| [`docs/decisions/`](docs/decisions/) | Architecture decision records |
+| [`docs/VISION.md`](docs/VISION.md) | Where this is going |
 
-## Integration secrets
+## A note on scope
 
-Tokens for external services (Planning Center, etc.) go in a git-ignored
-`server/data/secrets.json` — copy `server/secrets.example.json` and fill it in,
-or set `PRODMESH_SECRET_*` env vars. Read them via `getSecret('planningCenter.appId')`.
-
-## Deploy on the always-on LAN box
-
-```bash
-npm run build
-npm start        # → every PC opens http://<lan-box-ip>:8080
-# (PORT=9000 npm start to change the port)
-```
-
-### Auto-start on boot / login
-
-Use the cross-platform installer instead of running `npm start` by hand — it sets
-up a **launchd** service on macOS or a **systemd** service on Linux, so the
-dashboard starts automatically and restarts if it crashes:
-
-```bash
-./deploy/install-service.sh
-```
-
-See [`deploy/README.md`](deploy/README.md) for managing, updating, and removing
-the service. Give the box a stable IP or `.local` hostname so the URL never
-changes.
-
-### Notes for the all-Mac setup
-
-- **`vnc://` screen sharing** opens Screen Sharing.app natively on macOS. Enable
-  **System Settings → General → Sharing → Screen Sharing** on each target Mac.
-  The first launch may ask the browser for permission to open the app.
-- **Companion** must be reachable on the LAN; its web UI defaults to port 8000.
-  Set a tile's `view` to `'tablet'` or `'emulator'` to deep-link those pages.
-- Kiosk tip: open the URL in Safari and **View → Enter Full Screen**, or add it
-  to the Dock / login items on each booth Mac.
+prodmesh is designed as a **LAN appliance**, in the same spirit as Bitfocus
+Companion. It has no TLS and binds all interfaces on purpose. Do not port-forward
+it. If you need it from outside the building, put it behind a VPN.

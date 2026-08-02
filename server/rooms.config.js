@@ -77,7 +77,7 @@ export const rooms = {
     name: 'North Campus · Main Auditorium',
     site: 'north',
     mock: false, // LIVE — Companion runs on this same (Producer) Mac in production
-    companion: { host: '192.0.2.10', port: 8000 }, // Producer machine
+    companion: { host: '192.0.2.10', port: 8000 }, // the producer machine
     state: { variable: 'roomState' },
     planningCenter: {
       serviceTypes: [
@@ -90,7 +90,7 @@ export const rooms = {
       ],
     },
     // Fresh-install seed only — after first boot the database owns this.
-    // ProPresenter. Port is a guess by nature: PP picks an ephemeral API
+    // The room's ProPresenter Mac. Port is a guess by nature: PP picks an ephemeral API
     // port per machine and can change it across restarts unless pinned in its
     // Network preferences. Observed 1025 on-site 2026-07-24; the DB value is
     // what actually runs, so fix it there (Admin → Campuses), not here.
@@ -105,8 +105,8 @@ export const rooms = {
     modes: [
       mode('sunday', 'Sunday', '#34c759', 'SUNDAY', [3, 0, 1]),
       mode('second', 'Second Service', '#ff9f0a', 'SECOND', [3, 0, 2]),
-      mode('womens', 'Midweek', '#ff6fae', 'WOMENS', [3, 0, 3]),
-      mode('ya', 'Evening', '#32ade6', 'YA', [3, 0, 4]),
+      mode('midweek', 'Midweek', '#ff6fae', 'MIDWEEK', [3, 0, 3]),
+      mode('evening', 'Evening', '#32ade6', 'EVENING', [3, 0, 4]),
       mode('event', 'Event', '#af7bf0', 'EVENT', [3, 0, 5]),
       mode('standby', 'Standby', '#8b97a8', 'STANDBY', [3, 3, 1], { isStandby: true }),
     ],
@@ -128,7 +128,7 @@ export const rooms = {
     name: 'North Campus · Chapel',
     site: 'north',
     mock: true,
-    companion: { host: '192.0.2.18', port: 8000 }, // Chapel-Mac machine
+    companion: { host: '192.0.2.18', port: 8000 }, // the chapel's ProPresenter machine
     state: { variable: 'roomState' },
     planningCenter: { serviceTypes: [{ id: '500006', name: 'Chapel Service' }] },
     modes: standardModes(),
