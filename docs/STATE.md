@@ -286,6 +286,25 @@ Notes:
    Producer bridges the production LAN and the audio network, so it reaches
    Smaart directly.
 7. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
+8. **Safe change — preview / diff / rollback for room programming.** (Idea, not
+   yet designed.) A control surface gets programmed once and then frozen: a
+   volunteer who is unsure what a mode edit will actually *do* will simply not
+   touch it, because Sunday is coming and a wrong guess is visible to the whole
+   room. So configuration rots in place and the one person who understands it
+   becomes a dependency. This is the general failure mode of every custom
+   control system — large venues hit the same wall and cope by only reprogramming
+   during a shutdown, which is a luxury a church that meets weekly does not have.
+   The fix is not faster editing; it is making a change **reversible** so trying
+   one stops being a gamble:
+   - show what a mode would do before pressing it (which Companion buttons, on
+     which page/row/column, against which state variable)
+   - diff a pending room config against what is live
+   - one-tap revert to the previous known-good config
+   Open questions before this is a design: what is the unit of change (a mode? a
+   room? the whole topology?), and what "preview" can honestly mean given
+   Companion presses are fire-and-forget with no dry-run. `room_connectivity`
+   already being SQLite-owned and rebuilt in place (item 2) is the natural place
+   to hang config history.
 
 ## Deferred tech debt (known, low-risk)
 
