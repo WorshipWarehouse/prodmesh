@@ -12,7 +12,7 @@ not yet open, no rooms wired yet.
 
 | Room | Companion | Modes | Planning Center |
 |---|---|---|---|
-| Auditorium (`north-main`) | **live** — 192.0.2.10, var `roomState`, buttons pg3 | Sunday/Second Service/Midweek/Evening/Event/Standby (real) | **live** — Sunday, Second Service, Midweek, Evening |
+| Auditorium (`north-main`) | **live** — 192.0.2.10, var `roomState`, buttons pg3 | Sunday/Second/Midweek/Evening/Event/Standby (real) | **live** — Sunday, Second Service, Midweek, Evening |
 | Youth Room (`north-youth`) | mock — 192.0.2.22 (config ready) | standard set (Sunday/Mid-Week/Event/Standby) — **real modes unknown** | **live** — Youth Service |
 | Chapel (`north-chapel`) | mock — 192.0.2.18 (config ready) | standard set — **real modes unknown** | **live** — Chapel Service |
 | Local Test (`local-test`) | live — 127.0.0.1 (dev fixture; **opt-in via `PRODMESH_LOCAL_TEST=1`**, set by the npm dev scripts — hidden in production) | standard set | live — Sunday (demo) |
@@ -281,7 +281,7 @@ Notes:
    (Auditorium is the template.)
 5. **Room-Mac browser homepages** — set each room Mac to `http://<box>:8080/room/<id>`.
 6. ~~Confirm production deployment on the Producer Mac~~ **Done 2026-07-14**:
-   `install-service.sh` run on Booth-Producer (launchd label `com.prodmesh.dashboard`,
+   `install-service.sh` run on the producer Mac (launchd label `com.prodmesh.dashboard`,
    port 8080, logs in `~/prodmesh/logs/server.log`, RunAtLoad + KeepAlive). The
    Producer bridges the production LAN and the audio network, so it reaches
    Smaart directly.

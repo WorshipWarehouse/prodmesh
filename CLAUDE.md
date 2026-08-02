@@ -1,0 +1,118 @@
+# Working on prodmesh
+
+A LAN-hosted production dashboard for churches: room mode control, run of show,
+service data from Planning Center, and SPL analysis. React 19 + TypeScript +
+Vite on the front, Express + SQLite (`better-sqlite3`) on the back, served as
+one origin in production.
+
+Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the mental model and
+[`docs/STATE.md`](docs/STATE.md) for what is live vs mock. Decisions are ADRs in
+[`docs/decisions/`](docs/decisions/). Device and API behaviour that cost real
+on-site time to learn is in
+[`docs/INTEGRATION-NOTES.md`](docs/INTEGRATION-NOTES.md) — read it before
+touching any integration.
+
+```bash
+npm run dev     # Vite (5173) + API (3001)
+npm test        # server (node --test) + UI (vitest)
+npm run build   # → dist/
+npm start       # built app + API on one port (8080)
+npm run lint
+```
+
+A dev server with the extra local-test room:
+`PRODMESH_LOCAL_TEST=1 PORT=8080 NODE_ENV=production node server/index.js`
+
+## Rules
+
+These are not style preferences. Each one exists because breaking it caused a
+real problem.
+
+**Never commit `server/data/`.** It holds the live Planning Center token, PINs,
+shows, timelines and the SQLite database. It is git-ignored; keep it that way.
+Before every commit:
+
+```bash
+git diff --cached --name-only | grep -E "data/secrets|data/settings|data/shows|data/timelines|data/checklists|prodmesh.db"
+```
+
+Expect no hits.
+
+**Everything under `server/` is published.** The Dockerfile's runtime stage does
+`COPY --from=build /app/server ./server` wholesale, so seed fixtures *and* every
+`*.test.js` ship inside the image — `docker run … cat server/topologySeed.js`
+prints them. Never put a real device IP, OS username or hostname, Planning
+Center id (service type or person), or a real person's name in `server/`. Demo
+and test data uses TEST-NET-1 (`192.0.2.x`), role-shaped usernames, and
+fictional ids. UI *placeholders* in `src/` deliberately stay `192.168.1.x` —
+they are illustrative and match what an admin expects to type.
+
+**No runtime CDN or internet dependencies.** A booth machine may have no route
+to the internet. Fonts are bundled via `@fontsource`. Vendor any new asset
+rather than hotlinking it.
+
+**Branch, then merge locally.** `feat/<name>` (or `fix/`, `chore/`, `docs/`) →
+tests green → live-verify against a running server → **the maintainer tests it**
+→ merge `--no-ff` to main → push → delete the branch both sides. No pull
+requests are ever opened, so CI must trigger on `push: branches: ['**']` with
+publishing steps gated on
+`github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')`.
+Branches with nothing user-visible (server refactors, test additions) may merge
+once tests are green and a live boot is verified. Anything a user can see or
+click waits for the maintainer.
+
+**main is the deployment channel.** The production box runs
+`deploy/update.sh` — `git pull --ff-only`, `npm ci` when package files changed,
+build, service restart. Anything merged to main can land on a live system.
+Avoid gratuitous server restarts; SSE clients disconnect.
+
+## Threat model
+
+prodmesh is a **LAN appliance**, like Bitfocus Companion. The bar is *"this got
+bridged onto guest wifi and a teenager is throwing requests at it"*, not
+internet exposure. That is why there is no TLS and why it binds all interfaces:
+deliberate, not an oversight.
+
+Triage findings against that bar. Unauthenticated resource exhaustion and
+privilege escalation matter. Passive wire sniffing does not. If you are ever
+tempted to port-forward any of this, don't.
+
+## What automated tests can and cannot certify
+
+The suite (`npm test`) covers the settings/PIN/lock engine, config validation,
+room mapping, permissions and ACLs, full API auth + lockout flows, and UI
+interaction in jsdom. It runs against **mock-mode rooms**, so it needs no
+hardware. Green means the logic holds.
+
+Green does **not** mean the feature works. Anything touching ProPresenter,
+Companion, Smaart or Planning Center is only truly verified on-site, against
+that building's gear, usually on a Sunday. A ProPresenter minor version can
+change API behaviour underneath passing tests. Do not report a hardware-facing
+change as verified because CI is green — say which half was checked.
+
+## Environment variables
+
+| Variable | Effect |
+|---|---|
+| `PRODMESH_DATA_DIR` | Relocate the data dir. Tests use temp dirs. |
+| `PRODMESH_LOCAL_TEST=1` | Adds the local-test dev room. Hidden in production. |
+| `PRODMESH_AUTOSTART_TEST=1` | Show autostart ignores the arm window. **Dev only.** |
+| `PRODMESH_LOG_FILE` | Override the log path Admin → Logs tails. |
+| `PRODMESH_SECRET_*` | Supply secrets by env instead of `server/data/secrets.json`. |
+| `PORT` | Serve port (default 8080). |
+
+## Conventions
+
+- Backend is plain JS (ESM), frontend is TypeScript. Server tests are
+  `node --test`, one process per file — a file's module-level code is how boot
+  order gets arranged, so keep tests that need different boot state in
+  different files.
+- Comments explain *why*, especially where code looks strange because a device
+  or API is strange. Preserve that reasoning when you edit; it is the most
+  expensive content in the repo.
+- UI copy follows [`docs/UI_TEXT.md`](docs/UI_TEXT.md): terse labels, HelpTip
+  for supplementary detail, no intro paragraphs.
+- Test practice as configuration moves into Admin is in
+  [`docs/TESTING.md`](docs/TESTING.md).
+- Keep `docs/STATE.md` current. It is how a cold context — human or agent —
+  finds out where the project actually stands.
