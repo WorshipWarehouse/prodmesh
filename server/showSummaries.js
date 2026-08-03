@@ -16,16 +16,17 @@
 import { getDb } from './db.js';
 import * as timeline from './timeline.js';
 import * as splStore from './splStore.js';
+import * as streamStore from './streamStore.js';
 
 const UPSERT = `
   INSERT INTO show_summaries (
     instance_id, room_id, plan_id, time_id, plan_title, service_type_name,
     dates, time_name, time_starts_at, started_at, completed_at,
-    item_count, planned_seconds, actual_seconds, spl, updated_at
+    item_count, planned_seconds, actual_seconds, spl, stream, updated_at
   ) VALUES (
     @instanceId, @roomId, @planId, @timeId, @planTitle, @serviceTypeName,
     @dates, @timeName, @timeStartsAt, @startedAt, @completedAt,
-    @itemCount, @plannedSeconds, @actualSeconds, @spl, @updatedAt
+    @itemCount, @plannedSeconds, @actualSeconds, @spl, @stream, @updatedAt
   )
   ON CONFLICT (instance_id) DO UPDATE SET
     room_id = excluded.room_id, plan_id = excluded.plan_id,
@@ -35,6 +36,7 @@ const UPSERT = `
     started_at = excluded.started_at, completed_at = excluded.completed_at,
     item_count = excluded.item_count, planned_seconds = excluded.planned_seconds,
     actual_seconds = excluded.actual_seconds, spl = excluded.spl,
+    stream = excluded.stream,
     updated_at = excluded.updated_at
 `;
 
@@ -46,6 +48,9 @@ export function refresh(instanceId) {
   const actual = tl.items.reduce((s, i) => s + (i.actualSeconds || 0), 0);
   // Keep an already-captured SPL block if the raw samples have been pruned.
   const agg = splStore.aggregate(instanceId) ?? get(instanceId)?.spl ?? null;
+  // Same for viewership — and it matters more here, because YouTube cannot
+  // re-supply a curve that has been pruned. This row is the last copy.
+  const stream = streamStore.aggregate(instanceId) ?? get(instanceId)?.stream ?? null;
   getDb().prepare(UPSERT).run({
     instanceId,
     roomId: tl.roomId ?? null,
@@ -62,6 +67,7 @@ export function refresh(instanceId) {
     plannedSeconds: planned,
     actualSeconds: actual,
     spl: agg ? JSON.stringify(agg) : null,
+    stream: stream ? JSON.stringify(stream) : null,
     updatedAt: Date.now(),
   });
   return get(instanceId);
@@ -83,6 +89,7 @@ const rowToSummary = (r) => ({
   plannedSeconds: r.planned_seconds,
   actualSeconds: r.actual_seconds,
   spl: r.spl ? JSON.parse(r.spl) : null,
+  stream: r.stream ? JSON.parse(r.stream) : null,
 });
 
 export function get(instanceId) {

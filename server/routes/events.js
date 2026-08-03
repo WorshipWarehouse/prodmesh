@@ -7,6 +7,7 @@ import * as pco from '../integrations/planningCenter.js';
 import * as timeline from '../timeline.js';
 import * as show from '../showManager.js';
 import * as splStore from '../splStore.js';
+import * as streamStore from '../streamStore.js';
 import * as summaries from '../showSummaries.js';
 import * as checklist from '../checklistStore.js';
 import * as chkTemplates from '../checklistTemplates.js';
@@ -236,6 +237,7 @@ router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
       startedAt: report.startedAt ?? null,
       completedAt: report.completedAt ?? null,
       spl: null,
+      stream: null,
       restricted: true, // the UI says "sign in to see how it ran"
     });
   }
@@ -247,6 +249,14 @@ router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   report.spl = agg
     ? { ...agg, target: analysisCfg?.target ?? null, limit: analysisCfg?.limit ?? null }
     : null;
+
+  // Viewership, same fallback: aggregate from raw samples while they exist,
+  // otherwise the block copied into the summary row. The curve comes only from
+  // raw samples — once those are pruned the KPIs survive and the sparkline
+  // doesn't, which is the right way round.
+  const stream = streamStore.aggregate(instance) ?? summaries.get(instance)?.stream ?? null;
+  report.stream = stream ? { ...stream, series: streamStore.series(instance) } : null;
+
   res.json(report);
 });
 

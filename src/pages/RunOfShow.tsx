@@ -32,7 +32,7 @@ import type { WidgetType } from '../widgets/types';
 // Run of Show's widget row, in order. A hard-coded layout for now — 1.5 reads
 // the equivalent list out of a stored dashboard instead, which is the only
 // part that changes.
-const ROS_WIDGETS: WidgetType[] = ['countdown', 'loudness'];
+const ROS_WIDGETS: WidgetType[] = ['countdown', 'loudness', 'viewers'];
 
 export function RunOfShow() {
   const { roomId = '', planId = '' } = useParams();

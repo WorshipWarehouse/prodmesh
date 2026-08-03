@@ -39,10 +39,12 @@ import {
   getRoomConnectivityStatus,
   savePcServiceTypes,
   saveAnalysis,
+  saveYouTube,
   saveProPresenter,
   saveCompanion,
   type PcServiceType,
   type AnalysisConfig,
+  type YouTubeConfig,
   type ProPresenterConfig,
   type CompanionConfig,
   type ModeConfig,
@@ -1770,6 +1772,7 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
           <CompanionEditor roomId={roomId} initial={conn.companion} status={chip(status?.companion)} />
           <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} status={chip(status?.planningCenter)} />
           <AnalysisEditor roomId={roomId} initial={conn.analysis} status={chip(status?.analysis)} />
+          <YouTubeEditor roomId={roomId} initial={conn.youtube} />
           <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} status={chip(status?.proPresenter)} />
         </>
       )}
@@ -1842,6 +1845,63 @@ function PcServiceTypesEditor({ roomId, initial, status }: { roomId: string; ini
       <button className="btn" onClick={() => f.setDraft((all) => [...all, { id: '', name: '' }])}>
         + Add service type
       </button>
+    </EditorSection>
+  );
+}
+
+// Where the room's service is streamed. A channel id is the normal case: the
+// video id changes every week, and the server finds whatever is live on the
+// channel. A fixed video id is the escape hatch for a one-off broadcast.
+interface YouTubeDraft {
+  channelId: string;
+  videoId: string;
+}
+
+const toYtDraft = (cfg: YouTubeConfig | null): YouTubeDraft => ({
+  channelId: cfg?.channelId ?? '',
+  videoId: cfg?.videoId ?? '',
+});
+
+function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeConfig | null }) {
+  const f = useDraft(toYtDraft(initial), async (d) => {
+    const stored = await saveYouTube(
+      roomId,
+      d.channelId.trim() || d.videoId.trim()
+        ? { channelId: d.channelId.trim() || null, videoId: d.videoId.trim() || null }
+        : null,
+    );
+    return toYtDraft(stored);
+  });
+  const { draft } = f;
+
+  return (
+    <EditorSection
+      title="YouTube Live"
+      help="Records how many people watched the stream, for the show report. Needs a YouTube API key under Admin → General → Integrations. Viewer counts are only available while a broadcast is live — YouTube does not report them afterwards, so nothing is recorded for services that ran before this was set up."
+      saveLabel="Save YouTube"
+      form={f}
+    >
+      <FormRow>
+        <Field label="Channel ID" width="grow">
+          <input
+            className="field"
+            placeholder="e.g. UCxxxxxxxxxxxxxxxxxxxxxx"
+            value={draft.channelId}
+            onChange={(e) => f.patch({ channelId: e.target.value })}
+          />
+        </Field>
+        <Field label="Video ID" width="grow">
+          <input
+            className="field"
+            placeholder="optional — pins one broadcast"
+            value={draft.videoId}
+            onChange={(e) => f.patch({ videoId: e.target.value })}
+          />
+        </Field>
+      </FormRow>
+      <p className="settings__muted">
+        Leave both blank if this room isn’t streamed.
+      </p>
     </EditorSection>
   );
 }

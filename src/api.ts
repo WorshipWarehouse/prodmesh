@@ -553,12 +553,20 @@ export interface CompanionConfig {
   modes: ModeConfig[];
 }
 
+/** Where a room's livestream lives. A channel id is the normal case — the
+ *  video id changes every week and nobody wants to re-enter it. */
+export interface YouTubeConfig {
+  channelId: string | null;
+  videoId: string | null;
+}
+
 export interface RoomConnectivity {
   hasServerRoom: boolean;
   planningCenter: { serviceTypes: PcServiceType[] } | null;
   analysis: AnalysisConfig | null;
   proPresenter: ProPresenterConfig | null;
   companion: CompanionConfig | null;
+  youtube: YouTubeConfig | null;
 }
 
 export const getRoomConnectivity = (roomId: string) =>
@@ -608,6 +616,19 @@ export async function saveAnalysis(
   });
   await requireOk(res);
   return (await res.json()).analysis;
+}
+
+export async function saveYouTube(
+  roomId: string,
+  youtube: YouTubeConfig | null,
+): Promise<YouTubeConfig | null> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/youtube`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ youtube }),
+  });
+  await requireOk(res);
+  return (await res.json()).youtube;
 }
 
 export async function saveProPresenter(
@@ -825,9 +846,21 @@ export interface TimingReport {
   startedAt?: number | null;
   completedAt?: number | null;
   spl?: SplReport | null;
+  stream?: StreamReport | null;
   /** Server withheld the analysis: reports.view required. Timestamps still
    *  come through so Run of Show can show a finished service. */
   restricted?: boolean;
+}
+
+/** YouTube Live viewership for one service. `series` is the thinned curve —
+ *  present only while the raw samples survive retention; the KPIs outlive it. */
+export interface StreamReport {
+  count: number;
+  peak: number;
+  avg: number;
+  from: number;
+  to: number;
+  series?: { ts: number; viewers: number }[];
 }
 
 export const getReport = (id: string, planId: string, timeId?: string | null) =>
@@ -875,6 +908,16 @@ export interface SplState {
   ca?: CaState | null;
 }
 
+/** Live YouTube viewers. `current` is null when nothing is broadcasting or the
+ *  broadcaster hid the counter — never 0, which would be a number people read. */
+export interface StreamState {
+  current: number | null;
+  peak: number | null; // show peak — only while a show is live
+  avg: number | null;  // show average — only while a show is live
+  live: boolean;
+  title?: string | null;
+}
+
 export interface ShowState {
   active: boolean;
   roomId?: string;
@@ -886,6 +929,7 @@ export interface ShowState {
   current?: ShowCurrent;
   timer?: PpTimer | null;
   spl?: SplState | null;
+  stream?: StreamState | null;
 }
 
 export const getShow = (roomId: string) =>

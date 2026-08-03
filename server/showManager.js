@@ -22,8 +22,10 @@ import { onConnectivityChange } from './connectivity.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as pco from './integrations/planningCenter.js';
 import * as analysis from './integrations/analysis.js';
+import * as youtube from './integrations/youtube.js';
 import * as timeline from './timeline.js';
 import * as splStore from './splStore.js';
+import * as streamStore from './streamStore.js';
 import * as summaries from './showSummaries.js';
 import * as showConfig from './showConfig.js';
 import { armWindow, pickAutostartTime, shouldAutostart, shouldAutoComplete, armsAutoComplete } from './autoShow.js';
@@ -36,14 +38,17 @@ const timers = new Map(); // roomId -> published PP timer state (or null)
 const timerWatchers = new Map(); // roomId -> AbortController (runs while subscribed)
 const spls = new Map(); // roomId -> published SPL state (or null)
 const splWatchers = new Map(); // roomId -> AbortController (runs while subscribed)
+const streams = new Map(); // roomId -> published YouTube viewer state (or null)
+const streamWatchers = new Map(); // roomId -> AbortController
 
-// Topic names this module publishes. The room's live state is three
+// Topic names this module publishes. The room's live state is several
 // independent facets, not one envelope: a slide change should not re-send the
 // SPL meter, and a widget that only wants loudness should not make the server
 // poll ProPresenter's timers.
 export const showTopic = (roomId) => `room:${roomId}:show`;
 export const timerTopic = (roomId) => `room:${roomId}:timer`;
 export const splTopic = (roomId) => `room:${roomId}:spl`;
+export const streamTopic = (roomId) => `room:${roomId}:youtube`;
 
 const instanceId = (show) => `${show.planId}__${show.timeId}`;
 const showFile = (roomId) => join(SHOWS_DIR, `${roomId.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`);
@@ -82,6 +87,7 @@ export function getState(roomId) {
 const publishShow = (roomId) => hub.publish(showTopic(roomId), showState(roomId));
 const publishTimer = (roomId) => hub.publish(timerTopic(roomId), timers.get(roomId) ?? null);
 const publishSpl = (roomId) => hub.publish(splTopic(roomId), spls.get(roomId) ?? null);
+const publishStream = (roomId) => hub.publish(streamTopic(roomId), streams.get(roomId) ?? null);
 
 // The show topic's producer is the show itself, which runs whether or not a
 // browser is attached — so it has no start/stop, only a snapshot. The timer
@@ -104,6 +110,12 @@ hub.registerTopic('room:*:spl', {
   start: startSplWatcher,
   stop: stopSplWatcher,
   snapshot: (roomId) => spls.get(roomId) ?? null,
+});
+hub.registerTopic('room:*:youtube', {
+  valid: (roomId) => Boolean(rooms[roomId]),
+  start: startStreamWatcher,
+  stop: stopStreamWatcher,
+  snapshot: (roomId) => streams.get(roomId) ?? null,
 });
 
 /** Topics the legacy combined `state` event is assembled from. */
@@ -173,6 +185,90 @@ function stopSplWatcher(roomId) {
   spls.delete(roomId);
 }
 
+// ── YouTube Live watcher ─────────────────────────────────────────────────────
+//  Same lifecycle rule as SPL: it runs while the room has viewers OR an active
+//  show, and samples persist to SQLite only while a show is live. The live
+//  count is broadcast either way, so a widget can show "watching now" outside
+//  a service without polluting any report.
+//
+//  Unlike SPL there is no local device here — every poll is a metered request
+//  to Google (see integrations/youtube.js on quota), which is exactly why the
+//  refcounting matters: nobody should burn quota for a room nobody is looking
+//  at, and the poll is 30s rather than 1s.
+
+function streamNeeded(roomId) {
+  return hub.subscriberCount(streamTopic(roomId)) > 0 || shows.has(roomId);
+}
+
+function startStreamWatcher(roomId) {
+  if (streamWatchers.has(roomId)) return;
+  const cfg = rooms[roomId]?.youtube;
+  if (!youtube.isConfigured(cfg)) return;
+  // A key-less install would otherwise poll forever getting the same error.
+  if (!cfg.mock && !youtube.hasCredentials()) return;
+  const ctl = new AbortController();
+  streamWatchers.set(roomId, ctl);
+  youtube.watchViewers(cfg, (s) => onStreamSample(roomId, s), ctl.signal).catch(() => {
+    if (!ctl.signal.aborted) {
+      streams.set(roomId, null);
+      publishStream(roomId);
+    }
+  });
+}
+
+function stopStreamWatcher(roomId) {
+  if (streamNeeded(roomId)) return; // still wanted by a show or a viewer
+  streamWatchers.get(roomId)?.abort();
+  streamWatchers.delete(roomId);
+  streams.delete(roomId);
+}
+
+function restartStreamWatcher(roomId) {
+  streamWatchers.get(roomId)?.abort();
+  streamWatchers.delete(roomId);
+  streams.delete(roomId);
+  const show = shows.get(roomId);
+  if (show && !show.streamStats && youtube.isConfigured(rooms[roomId]?.youtube)) {
+    show.streamStats = streamStore.runningStats(instanceId(show)); // record mid-show
+  }
+  if (streamNeeded(roomId)) startStreamWatcher(roomId);
+  publishStream(roomId);
+}
+
+// `null` means "nothing is live right now" — an ordinary state most of the
+// week, not a failure. It clears the meter without disturbing recorded stats.
+function onStreamSample(roomId, sample) {
+  if (!sample || sample.viewers == null) {
+    // Keep the running peak/avg visible if a show is recording: a momentary
+    // gap in YouTube's answer shouldn't blank the numbers mid-service.
+    const show = shows.get(roomId);
+    const stats = show?.streamStats;
+    streams.set(
+      roomId,
+      stats?.n
+        ? { current: null, peak: stats.peak, avg: Math.round(stats.sum / stats.n), live: false }
+        : null,
+    );
+    publishStream(roomId);
+    return;
+  }
+
+  const show = shows.get(roomId);
+  let peak = null;
+  let avg = null;
+  if (show && show.streamStats) {
+    streamStore.record(roomId, instanceId(show), sample.ts, sample.viewers);
+    const st = show.streamStats;
+    st.n += 1;
+    st.sum += sample.viewers;
+    st.peak = st.peak == null ? sample.viewers : Math.max(st.peak, sample.viewers);
+    peak = st.peak;
+    avg = Math.round(st.sum / st.n);
+  }
+  streams.set(roomId, { current: sample.viewers, peak, avg, live: true, title: sample.title ?? null });
+  publishStream(roomId);
+}
+
 // ── Live config edits ────────────────────────────────────────────────────────
 //  Watchers capture the room's config object when they start, so a
 //  connectivity save must restart any that are running — including starting
@@ -207,6 +303,7 @@ function restartPoller(show) {
 
 onConnectivityChange((roomId, integration) => {
   if (integration === 'analysis') restartSplWatcher(roomId);
+  if (integration === 'youtube') restartStreamWatcher(roomId);
   if (integration === 'proPresenter') {
     restartTimerWatcher(roomId);
     const show = shows.get(roomId);
@@ -409,10 +506,12 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
   summaries.refresh(instanceId(show)); // history reflects the (re)start immediately
   // Seed running SPL stats from any samples already recorded (reopened show).
   if (analysis.isConfigured(room.analysis)) show.splStats = splStore.runningStats(instanceId(show));
+  if (youtube.isConfigured(room.youtube)) show.streamStats = streamStore.runningStats(instanceId(show));
   persistShow(show);
   publishShow(roomId);
   startPoller(show);
   startSplWatcher(roomId); // capture runs with the show, not the browsers
+  startStreamWatcher(roomId);
   startShowLogging(show);
   return show;
 }
@@ -446,6 +545,7 @@ export function endShow(roomId) {
   shows.delete(roomId);
   removeShowFile(roomId);
   stopSplWatcher(roomId); // no-op if viewers still want the live meter
+  stopStreamWatcher(roomId);
   stopShowLogging(show);
   publishShow(roomId);
   return getState(roomId);

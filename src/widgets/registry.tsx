@@ -10,6 +10,7 @@
 
 import { CountdownWidget } from './CountdownWidget';
 import { LoudnessWidget } from './LoudnessWidget';
+import { ViewersWidget } from './ViewersWidget';
 import type { WidgetDef, WidgetType } from './types';
 
 export const widgetRegistry: Record<WidgetType, WidgetDef> = {
@@ -24,6 +25,13 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     title: 'Loudness',
     description: 'Live SPL against the room’s target and limit, with C-A when available.',
     component: LoudnessWidget,
+    defaultSpan: 'third',
+  },
+
+  viewers: {
+    title: 'Live viewers',
+    description: 'Concurrent YouTube viewers while the room is streaming.',
+    component: ViewersWidget,
     defaultSpan: 'third',
   },
 };

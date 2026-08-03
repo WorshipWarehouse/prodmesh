@@ -238,7 +238,8 @@ function redactAnalysis(cfg) {
 router.get('/api/config/rooms/:roomId/connectivity', requirePermission('config.manage'), (req, res) => {
   if (!rooms[req.params.roomId]) {
     return res.json({
-      hasServerRoom: false, planningCenter: null, analysis: null, proPresenter: null, companion: null,
+      hasServerRoom: false, planningCenter: null, analysis: null, proPresenter: null,
+      companion: null, youtube: null,
     });
   }
   res.json({
@@ -246,6 +247,7 @@ router.get('/api/config/rooms/:roomId/connectivity', requirePermission('config.m
     planningCenter: connectivity.getPlanningCenter(req.params.roomId) ?? { serviceTypes: [] },
     analysis: redactAnalysis(connectivity.getAnalysis(req.params.roomId)),
     proPresenter: connectivity.getProPresenter(req.params.roomId),
+    youtube: connectivity.getYouTube(req.params.roomId),
     // A room with no stored row yet (created in Admin → Campuses) shows its
     // live defaults so the editor opens pre-filled rather than unsavable.
     companion:
@@ -273,6 +275,21 @@ router.put('/api/config/rooms/:roomId/connectivity/planning-center', requirePerm
       details: { integration: 'planningCenter', serviceTypes: stored.serviceTypes.length },
     });
     res.json({ planningCenter: stored });
+  } catch (err) {
+    res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
+  }
+});
+
+router.put('/api/config/rooms/:roomId/connectivity/youtube', requirePermission('config.manage'), (req, res) => {
+  try {
+    const clean = connectivity.setYouTube(req.params.roomId, req.body?.youtube ?? null);
+    auditSuccess(req, 'config.manage', {
+      resourceType: 'room-connectivity',
+      resourceId: req.params.roomId,
+      roomId: req.params.roomId,
+      details: { integration: 'youtube', configured: Boolean(clean) },
+    });
+    res.json({ youtube: clean });
   } catch (err) {
     res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
   }

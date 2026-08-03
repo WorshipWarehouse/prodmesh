@@ -91,6 +91,54 @@ Trigger endpoints: `GET /v1/playlist/focused/{index}/trigger`,
 
 ---
 
+## YouTube Live
+
+### The constraint everything else follows from
+
+`concurrentViewers` exists **only while a broadcast is live**. It is gone the
+moment the stream ends, and YouTube will not serve it retroactively without
+OAuth-gated Analytics. So a Show Report's viewer curve can only ever be *our
+own recording* — `stream_samples` is the primary record, not a cache of
+something recoverable. A service that ran before this was configured has no
+curve and never will.
+
+It is also **absent while live** if the broadcaster hid the counter. That is a
+real configuration, not an error: it reads as `null`, never `0`. A zero would
+be a fabricated attendance figure in a report someone may show their elders.
+
+### Quota
+
+Default 10,000 units/day, and the two calls differ by 100x:
+
+| Call | Cost | Use |
+|---|---|---|
+| `videos.list?part=liveStreamingDetails` | **1** | the viewer count |
+| `search.list?eventType=live` | **100** | finding today's video id |
+
+So the live video is resolved rarely (15-min TTL, re-resolved sooner when
+nothing is live) and viewers are polled every 30s. A 90-minute service is
+~180 units plus a handful of searches.
+
+Quota exhaustion returns **403 with `reason: quotaExceeded`** — worth naming
+explicitly, because a bare 403 sends someone hunting for a permissions problem
+that isn't there. The watcher backs off 30 minutes on it; retrying cannot help
+until the daily UTC reset.
+
+### Gotchas
+
+- `concurrentViewers` is a **string** in the JSON, not a number.
+- `actualEndTime` present = the broadcast is over, whatever else the payload
+  says. Don't infer "live" from `actualStartTime` alone.
+- An API key reads public data only. Unlisted/private broadcasts and historic
+  analytics need OAuth plus a Google verification review for the
+  `youtube.readonly` scope — deliberately not done.
+- **No automatic mock.** Every other integration falls back to sample data
+  without credentials; this one does not, because these numbers are persisted
+  and shown as attendance. `youtube: { mock: true }` is a dev fixture only
+  `rooms.config.js` declares, exactly like `analysis.mock`.
+
+---
+
 ## Planning Center
 
 **Services v2 `/people` silently ignores every query filter.** Verified live
