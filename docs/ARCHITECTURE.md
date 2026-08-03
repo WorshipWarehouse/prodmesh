@@ -45,6 +45,8 @@ Express server (server/)
 |---|---|
 | Topology (sites, rooms, tiles) | SQLite, served by `GET /api/config`; seeded by `server/topologySeed.js` |
 | Tile types & rendering | `src/types.ts`, `src/tiles/registry.tsx`, `src/components/Tile.tsx` |
+| Widget types & contract | `src/widgets/registry.tsx`, `src/widgets/types.ts` |
+| Shared query cache keys | `src/lib/keys.ts` |
 | Pages | `src/pages/` |
 | API client (request/response) | `src/api.ts` + `src/lib/useQuery.ts` |
 | Live values (push) | `src/lib/stream.ts` (`useTopic`) |
@@ -66,23 +68,31 @@ Express server (server/)
    everything else renders it automatically. New machine/tool = a data edit made
    in Admin → Campuses, no rebuild.
 
-2. **The database owns configuration.** Rooms, Companion hosts, button
+2. **Widgets are addressed by string, and take only `{roomId, config}`.**
+   A new widget = a type in `src/widgets/types.ts` + one entry in
+   `src/widgets/registry.tsx`. The narrow props contract is what makes a
+   stored dashboard layout possible at all: a layout is data, so a widget must
+   need nothing but data. Widgets therefore fetch their own state — free,
+   provided they use the shared cache keys in `src/lib/keys.ts`. Not every
+   panel is a widget; a page's own control surface stays a page component.
+
+3. **The database owns configuration.** Rooms, Companion hosts, button
    locations and PC service-type ids all live in SQLite and are edited in
    Admin (ADR 0009). `rooms.config.js` is now only a fresh-install seed. Getting
    this config wrong fires the wrong AV action, so the *editing* is permission-
    gated and validated — the old answer, keeping it in code, made every church
    depend on whoever could edit and redeploy.
 
-3. **Integration pattern:** each external service is a self-contained module doing
+4. **Integration pattern:** each external service is a self-contained module doing
    **auth → fetch → normalize → cache**, with a **mock-first** fallback. See
    `integrations/planningCenter.js` as the reference. The next integration
    (Calendar, ProPresenter) drops in the same way.
 
-4. **Mock-first everywhere.** Companion rooms have `mock: true`; integrations fall
+5. **Mock-first everywhere.** Companion rooms have `mock: true`; integrations fall
    back to realistic sample data with no credentials. The whole app is demoable
    with zero external wiring, and degrades gracefully when a service is down.
 
-5. **Server-side enforcement.** Anything that must not be bypassable (admin auth,
+6. **Server-side enforcement.** Anything that must not be bypassable (admin auth,
    mode lockouts) is checked on the server. The browser is never trusted.
 
 ## Key flows
@@ -112,7 +122,10 @@ Express server (server/)
 
 - Never trust the client for auth/lockout; enforce on the server.
 - Never commit `server/data/` (PINs, secrets, per-box settings). It is git-ignored.
-- Keep structural config (button locations!) in code and validated at startup.
+- Structural config (button locations!) lives in SQLite and is validated —
+  at startup by `validate.js` and on every save by `connectivity.js`. It used
+  to live in code; what must not change is that it is *validated*, since a
+  wrong button location fires the wrong AV action in front of a room.
 - Integrations stay mock-first and cached; never let a slow/broken external API
   block or blank the dashboards.
 - One server owns production; room Macs are browsers. Update = update that box.

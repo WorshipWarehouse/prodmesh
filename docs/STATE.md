@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **258 server tests** with **106 frontend interaction/configuration tests**
+  combines **263 server tests** with **114 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -328,12 +328,17 @@ Notes:
    Smaart directly.
 7. **1.1 — in progress.** Three features, sequenced scaffolding → YouTube →
    launcher:
-   - ~~Streaming/widget scaffolding for custom Dashboard views~~ transport
-     **done 2026-08-03** (ADR 0010, above). Remaining: the widget registry
-     (mirroring `src/tiles/registry.tsx`) and arbitrary 1–12 column spans on
-     `WidgetGrid` — `.widgets` is already a 12-col grid, only the span
-     vocabulary (`half`/`third`/`two-thirds`) is narrow. The Dashboard *feature*
-     — stored, editable layouts — is 1.5; 1.1 only lays the track.
+   - ~~Streaming/widget scaffolding for custom Dashboard views~~ **done**
+     (ADR 0010): transport 2026-08-03, widget registry 2026-08-04. Widgets take
+     `{roomId, config}` and **nothing else** — a stored layout is data, so a
+     widget can only be placed from data if it needs nothing but data. They
+     therefore fetch their own state, which costs nothing extra because pages
+     and widgets share cache keys (`src/lib/keys.ts`). `countdown` and
+     `loudness` are registered; Run of Show renders through the registry so the
+     contract is exercised by a real page. Its Start/End/Prev/Next stays a page
+     component — no dashboard would place it. Spans are now arbitrary 1–12
+     columns, with `half`/`third`/`two-thirds` as aliases. The Dashboard
+     *feature* — stored, editable layouts — is 1.5; 1.1 laid the track.
    - **YouTube Live viewership** in Show Reports as a mini-graph KPI. Shaped by
      one constraint: `concurrentViewers` **vanishes when the stream ends** and
      is absent if the broadcaster hides the counter, so the graph can only be

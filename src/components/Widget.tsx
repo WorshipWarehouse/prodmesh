@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { spanColumns, type WidgetSpan } from '../widgets/types';
 
 // Dashboard building blocks: pages compose Widgets into a WidgetGrid.
 // A new feature is a new Widget dropped into the grid — not a page rewrite.
@@ -16,11 +17,13 @@ export function Widget({
 }: {
   title?: string;
   meta?: ReactNode; // badges / actions in the header's right corner
-  span?: 'half' | 'third' | 'two-thirds'; // grid width ≥880px; full width below
+  /** Columns on the 12-col grid at ≥880px; always full width below. */
+  span?: WidgetSpan;
   className?: string;
   children: ReactNode;
 }) {
-  const cls = ['widget', span && `widget--${span}`, className].filter(Boolean).join(' ');
+  const cols = spanColumns(span);
+  const cls = ['widget', cols && `widget--span-${cols}`, className].filter(Boolean).join(' ');
   return (
     <section className={cls}>
       {(title || meta) && (
