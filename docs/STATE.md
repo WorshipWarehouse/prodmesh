@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **293 server tests** with **123 frontend interaction/configuration tests**
+  combines **294 server tests** with **123 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -368,12 +368,33 @@ Notes:
      mock (`youtube: { mock: true }` is a dev fixture, like `analysis.mock`).
      **Not verified against a real broadcast** — mock mode and unit tests
      certify storage, aggregation and rendering only.
-   - **Desktop launcher** (Electron, matching Companion) for the booth-Mac
-     church that can't run Docker. `server/deployment.js` gains a `desktop`
-     kind; `PRODMESH_DATA_DIR` → `app.getPath('userData')`. The work is
-     `better-sqlite3` needing an Electron-ABI rebuild per platform, plus macOS
-     signing/notarization — unsigned means a volunteer meets Gatekeeper, which
-     substantially defeats the feature.
+   - **Desktop launcher** (Electron, matching Companion) — **built
+     2026-08-04, unsigned so far.** Menu-bar app for the booth-Mac church that
+     can't run Docker: tray icon, status window showing the LAN addresses other
+     screens should point at, and the Express server running **in Electron's
+     main process** (imported, not forked — one copy of the code, no orphaned
+     server on a force-quit). `deployment.kind()` gains `desktop`, which makes
+     Admin → System refuse the Update button and point at the tray instead.
+     Data lives in `app.getPath('userData')/data`, outside the bundle, so an
+     update replaces the program and never a church's database.
+     - **Its own package**, not a workspace: `deploy/update.sh` runs `npm ci`
+       at the root on the production box, and a root Electron devDependency
+       would push ~200MB onto every git-install church for something they will
+       never run. `desktop/build.mjs` stages a tree that mirrors the repo, so
+       `../server/index.js` resolves the same in dev and packaged.
+     - **better-sqlite3 must be built for Electron's ABI, not Node's.** The
+       staged install uses `--ignore-scripts` deliberately: the default fetches
+       a Node-ABI binary this tree never uses, and when no prebuild matches it
+       compiles with node-gyp, which needs Python's `distutils` — removed in
+       3.12, so it fails building something we'd discard. `electron-rebuild`
+       does the real one.
+     - CI (`desktop.yml`) builds macOS + Windows on every branch, publishes
+       installers only from a `v*` tag, and smoke-tests the packaged app
+       **under Electron** (`PRODMESH_SMOKE=1`) — plain `node` cannot load the
+       tree at all, and an ABI mismatch is the likeliest way this ships broken.
+     - **Remaining: macOS signing.** The five `APPLE_*` secrets in
+       `desktop/README.md` are not set yet, so builds are unsigned and a
+       volunteer would meet Gatekeeper. Needed before `v1.1.0`.
 8. **Later widgets on Run of Show:** SMAART loudness, on-air.
 9. **Safe change — preview / diff / rollback for room programming.** (Idea, not
    yet designed.) A control surface gets programmed once and then frozen: a

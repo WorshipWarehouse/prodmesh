@@ -38,6 +38,17 @@ test('a packaged copy names reinstalling as the path forward', () => {
   assert.ok(capability.reason, 'never refuses without saying what to do instead');
 });
 
+test('a desktop install points at the tray, not the Update button', () => {
+  // The endpoint would be pulling a git checkout a packaged app does not have,
+  // so it must refuse — and say where the update actually lives.
+  process.env.PRODMESH_DEPLOYMENT = 'desktop';
+  assert.equal(deployment.kind(), 'desktop');
+  const capability = deployment.updateCapability();
+  assert.equal(capability.supported, false);
+  assert.equal(capability.strategy, 'desktop');
+  assert.match(capability.reason, /menu bar/i);
+});
+
 test('the build stamp wins over git', () => {
   // What a packaged copy has: by the time it runs there is no repository to
   // ask, so the build tells it what it is.

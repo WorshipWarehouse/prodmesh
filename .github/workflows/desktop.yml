@@ -1,0 +1,117 @@
+name: Desktop launcher
+
+# Builds the tray app for macOS and Windows.
+#
+# Runs on every branch so a broken build surfaces here rather than on release
+# day — but only a `v*` tag publishes installers, matching the rule that tags,
+# not main, are the deployment channel.
+#
+# Not `pull_request`-only: work lands by merging a verified branch locally, so
+# that event never fires.
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false # a Windows failure should not hide a working mac build
+      matrix:
+        include:
+          - os: macos-14
+            platform: mac
+          - os: windows-2022
+            platform: win
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # build.mjs stamps the commit
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # The frontend must exist before staging: build.mjs refuses without it,
+      # because an app packaged around an empty dist/ serves a blank page and
+      # looks like a server fault.
+      - name: Build the frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install launcher toolchain
+        run: npm ci --prefix desktop
+
+      # Signing only when the secrets are present, so forks and branch builds
+      # still produce something testable instead of failing.
+      - name: Check signing availability
+        id: signing
+        shell: bash
+        run: |
+          if [ "${{ matrix.platform }}" = "mac" ] && [ -n "${{ secrets.APPLE_CERTIFICATE }}" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build (signed + notarized)
+        if: steps.signing.outputs.sign == 'true'
+        working-directory: desktop
+        env:
+          # electron-builder reads these directly; it imports the certificate
+          # into a temporary keychain and notarizes via notarytool.
+          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist -- --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+
+      - name: Build (unsigned)
+        if: steps.signing.outputs.sign != 'true'
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without a certificate, asking electron-builder to sign fails the
+          # run; an unsigned artefact is still worth having for testing.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist -- --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+
+      # The launcher's whole promise is "double-click and a dashboard appears",
+      # so a build producing an app that cannot start is worse than no build.
+      #
+      # It runs under ELECTRON, not node: better-sqlite3 in this tree is built
+      # against Electron's ABI and plain node cannot load it at all. That is
+      # precisely what makes this check worth having — an ABI mismatch is the
+      # single most likely way this app ships broken, and it is invisible until
+      # something opens the database.
+      - name: Smoke-test the packaged app
+        working-directory: desktop
+        shell: bash
+        env:
+          PRODMESH_SMOKE: '1'
+          PORT: '8123'
+        run: node_modules/.bin/electron .build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prodmesh-${{ matrix.platform }}
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.exe
+            desktop/release/*.blockmap
+            desktop/release/latest*.yml
+          if-no-files-found: error
+          retention-days: 14

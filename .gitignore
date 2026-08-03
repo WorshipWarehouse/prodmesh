@@ -25,3 +25,8 @@ dist-ssr
 
 # Per-box runtime settings (PINs, schedules)
 server/data/
+
+# Desktop launcher build output
+desktop/.build/
+desktop/release/
+desktop/node_modules/
