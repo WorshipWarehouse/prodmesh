@@ -21,7 +21,7 @@
 //      database.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { app, BrowserWindow, Menu, Tray, dialog, shell, nativeImage, clipboard } from 'electron';
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, shell, nativeImage, clipboard } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdirSync, readFileSync, writeSync } from 'node:fs';
@@ -116,6 +116,15 @@ async function startServer() {
   pushState();
   updateTray();
 }
+
+// Opening the dashboard is the one action the window offers, and it happens
+// HERE rather than in the preload: preloads are sandboxed, so `shell` is
+// undefined there and the call fails silently. The renderer sends no URL —
+// the main process opens what it is actually serving, so the window has no
+// say in the destination.
+ipcMain.on('prodmesh:open', () => {
+  if (state.status === 'running') shell.openExternal(dashboardUrl());
+});
 
 // ── Status window ────────────────────────────────────────────────────────────
 

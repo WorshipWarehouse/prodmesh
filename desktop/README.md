@@ -9,6 +9,7 @@ is, and a button to open it.
 npm ci --prefix desktop     # once
 npm run build               # the frontend, at the repo ROOT — required
 npm start   --prefix desktop   # fast iteration (see the caveat below)
+npm test    --prefix desktop   # status-window wiring (needs a window server)
 npm run app  --prefix desktop  # package + launch the REAL app (macOS)
 npm run pack --prefix desktop  # unpacked app in desktop/release
 npm run dist --prefix desktop  # installers (.dmg / .exe)
@@ -71,6 +72,13 @@ under plain `node`. It cannot work; use `npm start --prefix desktop`.
 
 **Editing `desktop/main.js` does nothing until you re-stage.** `npm start`
 stages first; running `electron .build` by hand does not.
+
+**Preloads are sandboxed.** Only `ipcRenderer` and `contextBridge` are
+available in `preload.cjs` — `shell`, `dialog` and the rest of the electron
+module are `undefined` there. Calling one fails as an uncaught error in the
+renderer console, which nobody is watching, so the UI just quietly does
+nothing. Anything that acts on the machine belongs in `main.js` over IPC.
+`npm test --prefix desktop` guards exactly this.
 
 **One instance at a time.** `requestSingleInstanceLock()` means a second launch
 surfaces the running app and exits 0. A stray instance from an earlier run will

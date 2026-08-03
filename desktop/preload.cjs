@@ -4,23 +4,19 @@
 // window opts in with sandbox:false + type:module, and there is nothing here
 // worth that complication.
 //
-// Deliberately one-way and read-only. The window shows what the server is
-// doing; every ACTION (open, quit, reveal folders) lives in the tray menu,
-// where it is one code path rather than two. So this exposes no way to make
-// anything happen.
-const { contextBridge, ipcRenderer, shell } = require('electron');
+// ONLY ipcRenderer AND contextBridge ARE AVAILABLE HERE. Preloads are
+// sandboxed by default since Electron 20, so most of the electron module —
+// `shell` very much included — is undefined. Calling it fails silently and the
+// UI simply does nothing, which is exactly the bug this file used to have.
+// Anything that acts on the machine belongs in main.js, reached over IPC.
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('prodmesh', {
   onState: (fn) => {
     ipcRenderer.on('prodmesh:state', (_e, state) => fn(state));
   },
-  // The one exception: opening the dashboard. It is the primary thing a first
-  // run needs to do, and burying it in the menu bar on a machine nobody has
-  // set up yet would be a poor first five minutes. openExternal only ever
-  // reaches the local dashboard URL the main process reported.
-  open: (url) => {
-    if (/^http:\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+):\d+\/?$/.test(url)) {
-      shell.openExternal(url);
-    }
-  },
+  // Note there is no URL parameter. The main process already knows what it is
+  // serving, so the window cannot influence what gets opened — which is a
+  // stronger guarantee than validating a URL the renderer supplied.
+  open: () => ipcRenderer.send('prodmesh:open'),
 });

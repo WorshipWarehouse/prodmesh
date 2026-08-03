@@ -152,9 +152,7 @@
         $('open').disabled = !running;
       });
 
-      $('open').addEventListener('click', () => {
-        if (current?.url) window.prodmesh.open(current.url);
-      });
+      $('open').addEventListener('click', () => window.prodmesh.open());
     </script>
   </body>
 </html>

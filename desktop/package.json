@@ -8,6 +8,7 @@
     "stage": "node build.mjs",
     "pack": "node build.mjs && electron-builder --config electron-builder.yml --dir",
     "dist": "node build.mjs && electron-builder --config electron-builder.yml",
+    "test": "electron test/ui-test.cjs",
     "start": "node build.mjs && electron .build",
     "app": "node build.mjs && electron-builder --config electron-builder.yml --dir && open -n release/mac-arm64/ProdMesh.app"
   },

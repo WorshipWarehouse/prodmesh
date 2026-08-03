@@ -120,6 +120,13 @@ jobs:
       # precisely what makes this check worth having — an ABI mismatch is the
       # single most likely way this app ships broken, and it is invisible until
       # something opens the database.
+      # The status window is the only interactive surface in the launcher, and
+      # its one button silently did nothing once — a sandboxed preload has no
+      # `shell`, so the call failed in the renderer console where nobody looks.
+      - name: Test the status window
+        working-directory: desktop
+        run: npm test
+
       - name: Smoke-test the packaged app
         working-directory: desktop
         shell: bash
