@@ -165,6 +165,7 @@ export function EventDetail() {
         </Widget>
 
         <ShowConfigWidget
+          times={plan.times}
           roomId={roomId}
           planId={planId}
           items={plan.items}

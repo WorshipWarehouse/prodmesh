@@ -7,11 +7,13 @@ import * as pco from '../integrations/planningCenter.js';
 import * as timeline from '../timeline.js';
 import * as show from '../showManager.js';
 import * as splStore from '../splStore.js';
+import * as streamStore from '../streamStore.js';
 import * as summaries from '../showSummaries.js';
 import * as checklist from '../checklistStore.js';
 import * as chkTemplates from '../checklistTemplates.js';
 import * as showCfg from '../showConfig.js';
 import * as ppro from '../integrations/proPresenter.js';
+import * as youtube from '../integrations/youtube.js';
 import * as auth from '../authStore.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 import { applyMode, modeLockError } from '../roomModes.js';
@@ -111,6 +113,27 @@ router.get('/api/rooms/:id/event/:planId', async (req, res) => {
 });
 
 // ── Show automation config (Event Detail → Show Config widget) ───────────────
+
+// The channel's live + scheduled broadcasts, for the Event Detail picker.
+//
+// Gated with the config it feeds, and for a second reason: each call costs
+// ~201 YouTube quota units (two searches at 100, one batched details read at
+// 1). That is nothing for an operator opening a picker a few times a week and
+// a lot for an open endpoint anyone can hammer.
+router.get('/api/rooms/:id/youtube/broadcasts', requirePermission('shows.configure'), async (req, res) => {
+  const cfg = rooms[req.params.id]?.youtube;
+  if (!cfg?.channelId) return res.json({ configured: false, broadcasts: [] });
+  if (!youtube.hasCredentials()) {
+    return res.json({ configured: true, broadcasts: [], error: 'No YouTube API key configured' });
+  }
+  try {
+    res.json({ configured: true, broadcasts: await youtube.listBroadcasts(cfg.channelId) });
+  } catch (err) {
+    // A failed listing must not block configuring the event — the id can still
+    // be pinned by hand, and the auto path needs no pin at all.
+    res.json({ configured: true, broadcasts: [], error: String(err.message ?? err) });
+  }
+});
 
 router.put('/api/rooms/:id/event/:planId/show-config', requirePermission('shows.configure'), (req, res) => {
   if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });
@@ -236,6 +259,7 @@ router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
       startedAt: report.startedAt ?? null,
       completedAt: report.completedAt ?? null,
       spl: null,
+      stream: null,
       restricted: true, // the UI says "sign in to see how it ran"
     });
   }
@@ -247,6 +271,14 @@ router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   report.spl = agg
     ? { ...agg, target: analysisCfg?.target ?? null, limit: analysisCfg?.limit ?? null }
     : null;
+
+  // Viewership, same fallback: aggregate from raw samples while they exist,
+  // otherwise the block copied into the summary row. The curve comes only from
+  // raw samples — once those are pruned the KPIs survive and the sparkline
+  // doesn't, which is the right way round.
+  const stream = streamStore.aggregate(instance) ?? summaries.get(instance)?.stream ?? null;
+  report.stream = stream ? { ...stream, series: streamStore.series(instance) } : null;
+
   res.json(report);
 });
 

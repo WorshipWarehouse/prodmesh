@@ -120,6 +120,7 @@ export const roomTopic = {
   timer: (roomId: string) => `room:${roomId}:timer`,
   spl: (roomId: string) => `room:${roomId}:spl`,
   mode: (roomId: string) => `room:${roomId}:mode`,
+  youtube: (roomId: string) => `room:${roomId}:youtube`,
 };
 
 /** Test hook: drop the connection and every cached value. */

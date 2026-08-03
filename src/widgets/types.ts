@@ -64,4 +64,4 @@ export interface WidgetDef {
   defaultSpan: WidgetSpan;
 }
 
-export type WidgetType = 'countdown' | 'loudness';
+export type WidgetType = 'countdown' | 'loudness' | 'viewers';

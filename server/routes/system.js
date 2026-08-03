@@ -13,6 +13,7 @@ import * as show from '../showManager.js';
 import * as deployment from '../deployment.js';
 import * as auth from '../authStore.js';
 import * as splStore from '../splStore.js';
+import * as streamStore from '../streamStore.js';
 import * as health from '../health.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 
@@ -93,14 +94,20 @@ router.get('/api/history', requirePermission('reports.view'), async (_req, res) 
       spl: row.spl
         ? { ...row.spl, target: room?.analysis?.target ?? null, limit: room?.analysis?.limit ?? null }
         : null,
+      // Peak/average viewers per service, so history can be read as a trend
+      // rather than one report at a time. No curve here — that is the detail
+      // view's job and would bloat a list of every show ever recorded.
+      stream: row.stream ?? null,
     };
   });
   res.json({ shows });
 });
 
 // Erase a recorded run (accidental start, invalid rehearsal). Removes the
-// timeline JSON, the SPL samples, and the summary row — irreversible, so it's
-// permission-gated, audited, and refused while that instance is live.
+// timeline JSON, the SPL samples, the viewer samples, and the summary row —
+// irreversible, so it's permission-gated, audited, and refused while that
+// instance is live. Note the viewer curve genuinely cannot be recovered
+// afterwards: YouTube does not serve historic concurrent viewers.
 router.delete('/api/history/:instanceId', requirePermission('history.delete'), (req, res) => {
   const { instanceId } = req.params;
   if (show.activeInstanceIds().includes(instanceId)) {
@@ -111,6 +118,7 @@ router.delete('/api/history/:instanceId', requirePermission('history.delete'), (
   }
   timeline.remove(instanceId);
   splStore.removeInstance(instanceId);
+  streamStore.removeInstance(instanceId); // deleting a show deletes all of it
   summaries.remove(instanceId);
   auditSuccess(req, 'history.delete', { resourceType: 'show-instance', resourceId: instanceId });
   res.json({ ok: true });

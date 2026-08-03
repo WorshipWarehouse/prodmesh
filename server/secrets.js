@@ -95,6 +95,14 @@ export const SECRET_GROUPS = [
       },
     ],
   },
+  {
+    id: 'youtube',
+    label: 'YouTube',
+    hint:
+      'API key from a Google Cloud project with the YouTube Data API v3 enabled. '
+      + 'Reads public viewer counts only — restrict the key to that API.',
+    fields: [{ path: 'youtube.apiKey', label: 'API key' }],
+  },
 ];
 
 export const SECRET_KEYS = SECRET_GROUPS.flatMap((g) => g.fields.map((f) => ({ ...f, group: g.id })));

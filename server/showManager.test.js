@@ -151,3 +151,35 @@ test('a connectivity save restarts the SPL watcher with the new config', async (
     await srvB.close();
   }
 });
+
+// ── YouTube per-service resolution ───────────────────────────────────────────
+// The room owns the channel; a service time owns the video. Exercised through
+// the real show lifecycle rather than the resolver directly, because the bug
+// worth catching is a watcher left running on the config it captured.
+
+test('a service marked "not streamed" records nothing and starts no watcher', async () => {
+  const ROOM2 = 'north-chapel'; // no analysis/PP — nothing else to start
+  conn.setYouTube(ROOM2, { channelId: 'UCtestchannel' });
+  try {
+    // Auto: the room's channel config reaches the watcher.
+    showCfg.setConfig(ROOM2, 'plan-x', { videos: {} });
+    assert.equal(sm.youtubeConfigForTest(ROOM2, 'plan-x', 't-8am')?.channelId, 'UCtestchannel');
+
+    // Pinned: the channel is kept, the video is overridden.
+    showCfg.setConfig(ROOM2, 'plan-x', { videos: { 't-8am': 'vidAAAAAAAA' } });
+    const pinned = sm.youtubeConfigForTest(ROOM2, 'plan-x', 't-8am');
+    assert.equal(pinned.videoId, 'vidAAAAAAAA');
+    assert.equal(pinned.channelId, 'UCtestchannel');
+
+    // Not streamed: NULL, so isConfigured() is false and no watcher starts —
+    // no quota spent, and no chance of recording a leftover broadcast.
+    showCfg.setConfig(ROOM2, 'plan-x', { videos: { 't-8am': null } });
+    assert.equal(sm.youtubeConfigForTest(ROOM2, 'plan-x', 't-8am'), null);
+
+    // A DIFFERENT service time on the same plan is unaffected.
+    assert.equal(sm.youtubeConfigForTest(ROOM2, 'plan-x', 't-930')?.channelId, 'UCtestchannel');
+  } finally {
+    showCfg.clearConfig(ROOM2, 'plan-x');
+    conn.setYouTube(ROOM2, null);
+  }
+});

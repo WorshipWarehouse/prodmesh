@@ -5,10 +5,30 @@
 //    startItemId: '<pc item id>' | null,  // PP lands on this item → show starts
 //    endItemId:   '<pc item id>' | null,  // last slide of this item → show ends
 //    map: { '<pc item id>': { ppIndex, ppName } }  // manual PC→PP overrides
+//    videos: { '<time id>': '<video id>' | null }   // per service, tri-state
 //  }
 //
 //  Keyed per (roomId, planId) — per EVENT, not per service time: the 9:00 and
 //  11:00 share one config, autostart picks the right time by the clock.
+//
+//  `videos` is the exception, and deliberately so: a channel pre-creates one
+//  broadcast per service, so 8:00 and 9:30 are DIFFERENT videos on the same
+//  plan. It lives here rather than on the room for exactly that reason — a
+//  room-level pin would attribute both services to one broadcast and report
+//  the same numbers twice.
+//
+//  Three states per service time, and the distinction between the first two
+//  is load-bearing:
+//    key ABSENT  → auto: record whatever is live on the channel
+//    value null  → NOT STREAMED: record nothing, and don't even look
+//    value '<id>' → pinned to that broadcast
+//
+//  "Not streamed" is not the same as "nothing pinned". A plan often has five
+//  service times of which two are broadcast; on auto, the other three would
+//  happily record a stream that was left running from an earlier service and
+//  attribute those viewers to a service nobody watched online. Explicit null
+//  also means the watcher never starts, so no YouTube quota is spent looking
+//  for a broadcast that was never going to exist.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getDb } from './db.js';
@@ -59,9 +79,30 @@ function validate(config) {
       map[pcId] = { ppIndex: pp.ppIndex, ppName: typeof pp.ppName === 'string' ? pp.ppName : null };
     }
   }
+  // Per-service broadcast. null is MEANINGFUL (not streamed) and is kept;
+  // '' and undefined mean "auto" and are dropped, so only non-default states
+  // are stored. Ids are charset-checked because the value is interpolated into
+  // a YouTube request URL — same reasoning as validateHost.
+  const videos = {};
+  if (config.videos != null) {
+    if (typeof config.videos !== 'object') throw new Error('videos must be an object');
+    for (const [timeId, videoId] of Object.entries(config.videos)) {
+      if (videoId === null) {
+        videos[timeId] = null; // explicitly not streamed
+        continue;
+      }
+      if (videoId === undefined || videoId === '') continue; // "Auto" — find what's live
+      if (typeof videoId !== 'string' || videoId.length > 32 || !/^[A-Za-z0-9_-]+$/.test(videoId)) {
+        throw new Error(`"${timeId}" needs a YouTube video id (letters, digits, - and _ only)`);
+      }
+      videos[timeId] = videoId;
+    }
+  }
+
   return {
     startItemId: id(config.startItemId, 'startItemId'),
     endItemId: id(config.endItemId, 'endItemId'),
     map,
+    videos,
   };
 }

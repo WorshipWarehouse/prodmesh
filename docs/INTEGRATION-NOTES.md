@@ -91,6 +91,88 @@ Trigger endpoints: `GET /v1/playlist/focused/{index}/trigger`,
 
 ---
 
+## YouTube Live
+
+### The constraint everything else follows from
+
+`concurrentViewers` exists **only while a broadcast is live**. It is gone the
+moment the stream ends, and YouTube will not serve it retroactively without
+OAuth-gated Analytics. So a Show Report's viewer curve can only ever be *our
+own recording* — `stream_samples` is the primary record, not a cache of
+something recoverable. A service that ran before this was configured has no
+curve and never will.
+
+It is also **absent while live** if the broadcaster hid the counter. That is a
+real configuration, not an error: it reads as `null`, never `0`. A zero would
+be a fabricated attendance figure in a report someone may show their elders.
+
+### Quota
+
+Default 10,000 units/day, and the two calls differ by 100x:
+
+| Call | Cost | Use |
+|---|---|---|
+| `videos.list?part=liveStreamingDetails` | **1** | the viewer count |
+| `search.list?eventType=live` | **100** | finding today's video id |
+
+So the live video is resolved rarely (15-min TTL, re-resolved sooner when
+nothing is live) and viewers are polled every 30s. A 90-minute service is
+~180 units plus a handful of searches.
+
+Quota exhaustion returns **403 with `reason: quotaExceeded`** — worth naming
+explicitly, because a bare 403 sends someone hunting for a permissions problem
+that isn't there. The watcher backs off 30 minutes on it; retrying cannot help
+until the daily UTC reset.
+
+### Which broadcast belongs to which service
+
+The room owns the **channel**; a **service time** owns the video. A church's
+channel pre-creates one broadcast per service, so an 8:00 and a 9:30 on the
+same Sunday plan are *different videos in the same room* — a room-level video
+pin would attribute both to one broadcast and report identical numbers twice.
+(That was the first shape of this and it was wrong; caught in field feedback
+before it shipped.)
+
+Normally **nothing needs pinning**. The watcher searches the channel for
+whatever is live, and since the 8:00 broadcast is what's live at 8:00, each
+service already records the right one.
+
+`show_config.videos` is therefore **tri-state per service time**, and the first
+two are not the same thing:
+
+| Stored | Meaning |
+|---|---|
+| key absent | auto — record whatever is live |
+| `null` | **not streamed** — record nothing, don't even look |
+| `'<videoId>'` | pinned to that broadcast |
+
+"Not streamed" matters because a plan often has five service times of which two
+are broadcast. On auto, the other three would happily record a stream left
+running from an earlier service and attribute those viewers to a service nobody
+watched online. It also means the watcher never starts for that service, so no
+quota is spent looking for a broadcast that was never going to exist.
+
+The picker there lists live + scheduled broadcasts, and **shows the scheduled
+time, not just the title**: pre-created broadcasts are all called "Sunday
+Service" and the clock is the only thing that tells them apart. It costs
+100 + 100 (two `search.list`) + **1** (`videos.list` batches up to 50 ids), so
+it is loaded only when that section is expanded, never on page view.
+
+### Gotchas
+
+- `concurrentViewers` is a **string** in the JSON, not a number.
+- `actualEndTime` present = the broadcast is over, whatever else the payload
+  says. Don't infer "live" from `actualStartTime` alone.
+- An API key reads public data only. Unlisted/private broadcasts and historic
+  analytics need OAuth plus a Google verification review for the
+  `youtube.readonly` scope — deliberately not done.
+- **No automatic mock.** Every other integration falls back to sample data
+  without credentials; this one does not, because these numbers are persisted
+  and shown as attendance. `youtube: { mock: true }` is a dev fixture only
+  `rooms.config.js` declares, exactly like `analysis.mock`.
+
+---
+
 ## Planning Center
 
 **Services v2 `/people` silently ignores every query filter.** Verified live

@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-03.
+Last updated: 2026-08-04.
 
 ## Sites & rooms
 
@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **263 server tests** with **114 frontend interaction/configuration tests**
+  combines **293 server tests** with **123 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -339,15 +339,35 @@ Notes:
      component — no dashboard would place it. Spans are now arbitrary 1–12
      columns, with `half`/`third`/`two-thirds` as aliases. The Dashboard
      *feature* — stored, editable layouts — is 1.5; 1.1 laid the track.
-   - **YouTube Live viewership** in Show Reports as a mini-graph KPI. Shaped by
-     one constraint: `concurrentViewers` **vanishes when the stream ends** and
-     is absent if the broadcaster hides the counter, so the graph can only be
-     our own recording — a sampling integration structurally identical to SPL
-     (`stream_samples` mirroring `spl_samples`, keyed by the same instanceId,
-     aggregated into `show_summaries`). API key only, no OAuth: `videos.list`
-     costs 1 quota unit against 10k/day, `search.list` (finding the live video)
-     costs 100 — so search once at show start, then poll `videos.list`. A fifth
-     `room_connectivity` integration, edited on the room page.
+   - ~~**YouTube Live viewership**~~ **built 2026-08-04, awaiting a real
+     channel.** `concurrentViewers` vanishes when a stream ends and is absent
+     if the broadcaster hides the counter, so the curve can only be our own
+     recording: `stream_samples` mirrors `spl_samples` (same instanceId key),
+     aggregated into `show_summaries` so the KPIs outlive sample pruning —
+     which matters here because YouTube cannot re-supply them. Retention is a
+     year, not 90 days, for the same reason. API key only (`youtube.apiKey`
+     secret); `videos.list` costs 1 quota unit against 10k/day and
+     `search.list` costs 100, so the video id is resolved on a 15-min TTL and
+     viewers polled every 30s. Fifth `room_connectivity` integration, edited
+     on the room page. New `room:<id>:youtube` topic + `viewers` widget; Show
+     Report gains peak/avg/duration and an inline-SVG sparkline (no chart
+     library — the no-CDN rule makes every dependency a bundle decision).
+     **The room owns the CHANNEL; a service time owns the video** — a channel
+     pre-creates one broadcast per service, so 8:00 and 9:30 on one plan are
+     different videos and a room-level pin would double-report one of them.
+     Pins live in `show_config.videos` keyed by timeId, picked on Event Detail
+     from the channel's live + scheduled broadcasts (labelled with the
+     scheduled time, since they all share a title). Tri-state: absent = auto,
+     `null` = **not streamed**, id = pinned. "Not streamed" is not the same as
+     "nothing pinned" — a plan with five service times may broadcast two, and
+     on auto the rest would record a stream left running from an earlier
+     service. Usually nothing needs setting: the watcher finds whatever is
+     live, which is already right per service.
+     **A hidden counter reads as `null`, never `0`** — a fabricated attendance
+     figure is worse than a blank one, which is also why there is no automatic
+     mock (`youtube: { mock: true }` is a dev fixture, like `analysis.mock`).
+     **Not verified against a real broadcast** — mock mode and unit tests
+     certify storage, aggregation and rendering only.
    - **Desktop launcher** (Electron, matching Companion) for the booth-Mac
      church that can't run Docker. `server/deployment.js` gains a `desktop`
      kind; `PRODMESH_DATA_DIR` → `app.getPath('userData')`. The work is

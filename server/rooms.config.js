@@ -63,6 +63,11 @@ const localTest = {
     // Analysis source (SPL) — mock meter for dev (no analyzer on this machine).
     // target/limit in dB: our Sundays target 90, not to exceed 95.
     analysis: { mock: true, target: 90, limit: 95 },
+    // YouTube Live viewers — mock for dev, for the same reason as the meter
+    // above: no broadcast on this machine. Deliberately the ONLY way to get
+    // simulated viewer numbers, since they are persisted into show reports
+    // and a fabricated attendance figure is worse than a blank one.
+    youtube: { mock: true },
     modes: standardModes(),
   },
 };

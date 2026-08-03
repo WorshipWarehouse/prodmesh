@@ -301,3 +301,39 @@ span.ros-track__status {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+
+/* Live YouTube viewers — same shape as the loudness meter beside it. */
+.ros-viewers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.ros-viewers__count {
+  font-size: 1.9rem;
+  font-weight: 650;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ros-viewers__dot {
+  display: inline-flex;
+  margin-left: 6px;
+  color: var(--danger, #ff4d4f);
+}
+
+.ros-viewers--live .ros-viewers__dot { animation: ros-viewers-pulse 2s ease-in-out infinite; }
+
+@keyframes ros-viewers-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ros-viewers--live .ros-viewers__dot { animation: none; }
+}

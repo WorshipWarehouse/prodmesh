@@ -553,12 +553,20 @@ export interface CompanionConfig {
   modes: ModeConfig[];
 }
 
+/** Where a room's livestream lives. The room owns the CHANNEL; which video a
+ *  given service used is pinned per service time in the show config, because a
+ *  channel pre-creates one broadcast per service. */
+export interface YouTubeConfig {
+  channelId: string | null;
+}
+
 export interface RoomConnectivity {
   hasServerRoom: boolean;
   planningCenter: { serviceTypes: PcServiceType[] } | null;
   analysis: AnalysisConfig | null;
   proPresenter: ProPresenterConfig | null;
   companion: CompanionConfig | null;
+  youtube: YouTubeConfig | null;
 }
 
 export const getRoomConnectivity = (roomId: string) =>
@@ -608,6 +616,19 @@ export async function saveAnalysis(
   });
   await requireOk(res);
   return (await res.json()).analysis;
+}
+
+export async function saveYouTube(
+  roomId: string,
+  youtube: YouTubeConfig | null,
+): Promise<YouTubeConfig | null> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/youtube`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ youtube }),
+  });
+  await requireOk(res);
+  return (await res.json()).youtube;
 }
 
 export async function saveProPresenter(
@@ -747,7 +768,26 @@ export interface ShowConfig {
   startItemId: string | null; // PP lands on this PC item → show autostarts
   endItemId: string | null; // last slide of this PC item → show auto-completes
   map: Record<string, { ppIndex: number; ppName: string | null } | null>;
+  /** YouTube broadcast per SERVICE TIME, tri-state. Key ABSENT = auto (record
+   *  whatever is live); `null` = not streamed (record nothing, don't look);
+   *  a string = pinned to that broadcast. A channel pre-creates one broadcast
+   *  per service, so 8:00 and 9:30 are different videos on one plan. */
+  videos: Record<string, string | null>;
 }
+
+/** A live or scheduled broadcast on the room's channel, for the pin picker. */
+export interface YouTubeBroadcast {
+  videoId: string;
+  title: string;
+  scheduledStart: string | null;
+  actualStart: string | null;
+  live: boolean;
+}
+
+export const getYouTubeBroadcasts = (roomId: string) =>
+  getJson<{ configured: boolean; broadcasts: YouTubeBroadcast[]; error?: string }>(
+    `/api/rooms/${encodeURIComponent(roomId)}/youtube/broadcasts`,
+  );
 
 export interface PpPlaylist {
   playlistName: string | null;
@@ -825,9 +865,21 @@ export interface TimingReport {
   startedAt?: number | null;
   completedAt?: number | null;
   spl?: SplReport | null;
+  stream?: StreamReport | null;
   /** Server withheld the analysis: reports.view required. Timestamps still
    *  come through so Run of Show can show a finished service. */
   restricted?: boolean;
+}
+
+/** YouTube Live viewership for one service. `series` is the thinned curve —
+ *  present only while the raw samples survive retention; the KPIs outlive it. */
+export interface StreamReport {
+  count: number;
+  peak: number;
+  avg: number;
+  from: number;
+  to: number;
+  series?: { ts: number; viewers: number }[];
 }
 
 export const getReport = (id: string, planId: string, timeId?: string | null) =>
@@ -875,6 +927,16 @@ export interface SplState {
   ca?: CaState | null;
 }
 
+/** Live YouTube viewers. `current` is null when nothing is broadcasting or the
+ *  broadcaster hid the counter — never 0, which would be a number people read. */
+export interface StreamState {
+  current: number | null;
+  peak: number | null; // show peak — only while a show is live
+  avg: number | null;  // show average — only while a show is live
+  live: boolean;
+  title?: string | null;
+}
+
 export interface ShowState {
   active: boolean;
   roomId?: string;
@@ -886,6 +948,7 @@ export interface ShowState {
   current?: ShowCurrent;
   timer?: PpTimer | null;
   spl?: SplState | null;
+  stream?: StreamState | null;
 }
 
 export const getShow = (roomId: string) =>

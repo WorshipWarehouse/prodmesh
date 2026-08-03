@@ -254,6 +254,36 @@ const MIGRATIONS = [
       addColumn(d, 'stations', 'room_only', 'INTEGER NOT NULL DEFAULT 0');
     },
   },
+
+  {
+    // YouTube Live concurrent viewers, sampled while a show is live.
+    //
+    // Its own table rather than a column on spl_samples: the two have
+    // different sources, different cadences (~1/s vs ~1/30s) and either can be
+    // configured without the other, so sharing rows would mean mostly-null
+    // columns on both sides. Keyed by the same instance_id as timelines and
+    // spl_samples so the report joins all three for free.
+    //
+    // This table is the ONLY record of the curve — YouTube drops
+    // concurrentViewers the moment a broadcast ends.
+    name: 'stream-samples',
+    up(d) {
+      d.exec(`
+        CREATE TABLE IF NOT EXISTS stream_samples (
+          room_id     TEXT    NOT NULL,
+          instance_id TEXT    NOT NULL, -- planId__timeId (same key as timelines)
+          ts          INTEGER NOT NULL, -- ms since epoch
+          viewers     INTEGER NOT NULL  -- concurrent viewers reported by YouTube
+        );
+        CREATE INDEX IF NOT EXISTS idx_stream_samples_instance
+          ON stream_samples (instance_id, ts);
+      `);
+      // The aggregate lives on the summary row too, so a report still shows
+      // peak/average viewers after the raw samples age out — and because
+      // YouTube cannot re-supply them, this ends up being the last copy.
+      addColumn(d, 'show_summaries', 'stream', 'TEXT');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

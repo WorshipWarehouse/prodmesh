@@ -32,7 +32,8 @@ const PC = 'planningCenter';
 const ANALYSIS = 'analysis';
 const PP = 'proPresenter';
 const COMPANION = 'companion';
-const INTEGRATIONS = [PC, ANALYSIS, PP, COMPANION];
+const YOUTUBE = 'youtube';
+const INTEGRATIONS = [PC, ANALYSIS, PP, COMPANION, YOUTUBE];
 
 // Long-lived per-room work (the show manager's watchers) registers here to be
 // restarted when a room's config changes — applyConnectivity() alone can't
@@ -302,6 +303,55 @@ export function setProPresenter(roomId, config) {
 }
 
 /**
+ * Normalize + validate a YouTube Live config; null clears it (the room isn't
+ * streamed). A CHANNEL only — the room owns the channel, a service time owns
+ * the video.
+ *
+ * There is deliberately no room-level video id. A church's channel pre-creates
+ * one broadcast per service, so an 8:00 and a 9:30 on the same Sunday are
+ * different videos in the same room; pinning at the room would attribute both
+ * to one broadcast and report identical numbers twice. Per-service pins live
+ * in show_config (`videos`), edited on Event Detail. Normally nothing needs
+ * pinning: the watcher finds whatever is live on the channel.
+ *
+ * The id is charset-checked, not merely length-checked, because it is
+ * interpolated into a request URL — same reasoning as validateHost().
+ */
+export function validateYouTube(input) {
+  if (input === null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('youtube must be an object');
+
+  const id = (v, what, max) => {
+    const s = String(v ?? '').trim();
+    if (!s) return null;
+    if (s.length > max || !/^[A-Za-z0-9_-]+$/.test(s)) {
+      throw new Error(`${what} must be a YouTube id (letters, digits, - and _ only)`);
+    }
+    return s;
+  };
+
+  const channelId = id(input.channelId, 'Channel ID', 64);
+  if (!channelId) return null; // no channel = the room isn't streamed
+  return { channelId };
+}
+
+/** The stored YouTube config for a room (null if it isn't streamed). */
+export function getYouTube(roomId) {
+  return readRow(roomId, YOUTUBE);
+}
+
+/** Validate + store a room's YouTube Live source (null clears it), apply live. */
+export function setYouTube(roomId, config) {
+  if (!rooms[roomId]) throw new Error(`Unknown room "${roomId}"`);
+  const clean = validateYouTube(config);
+  if (clean === null) deleteRow(roomId, YOUTUBE);
+  else writeRow(roomId, YOUTUBE, clean);
+  applyConnectivity();
+  notifyChange(roomId, YOUTUBE);
+  return clean;
+}
+
+/**
  * Assign stored connectivity onto the live rooms map (boot + after saves).
  * Once an integration has been seeded the database is authoritative: a room
  * with no row has that integration cleared, even if rooms.config.js still
@@ -343,6 +393,11 @@ function seedIfEmpty() {
     [ANALYSIS]: (room) => room.analysis ?? null,
     [PP]: (room) => room.proPresenter ?? null,
     [COMPANION]: companionFromRoom,
+    // youtube has no rooms.config.js predecessor to adopt — it arrived after
+    // the file stopped being anything but a fresh-install seed. Seeding still
+    // runs so the marker is set and the database is authoritative from boot
+    // one, rather than the integration looking "never seeded" forever.
+    [YOUTUBE]: (room) => room.youtube ?? null,
   };
   for (const integration of INTEGRATIONS) {
     const key = `connectivity_seeded:${integration}`;
