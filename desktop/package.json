@@ -8,7 +8,8 @@
     "stage": "node build.mjs",
     "pack": "node build.mjs && electron-builder --config electron-builder.yml --dir",
     "dist": "node build.mjs && electron-builder --config electron-builder.yml",
-    "start": "node build.mjs && electron .build"
+    "start": "node build.mjs && electron .build",
+    "app": "node build.mjs && electron-builder --config electron-builder.yml --dir && open -n release/mac-arm64/ProdMesh.app"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",

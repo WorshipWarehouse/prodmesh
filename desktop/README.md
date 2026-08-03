@@ -8,10 +8,20 @@ is, and a button to open it.
 ```bash
 npm ci --prefix desktop     # once
 npm run build               # the frontend, at the repo ROOT — required
-npm start   --prefix desktop   # run it
+npm start   --prefix desktop   # fast iteration (see the caveat below)
+npm run app  --prefix desktop  # package + launch the REAL app (macOS)
 npm run pack --prefix desktop  # unpacked app in desktop/release
 npm run dist --prefix desktop  # installers (.dmg / .exe)
 ```
+
+**`npm start` will say "Electron" in the dock and menu bar.** Not a bug and not
+fixable from our code: an unpacked run *is* `Electron.app`, and macOS reads the
+name from the running bundle's `Info.plist`, which belongs to Electron.
+`app.setName()` governs `app.getName()` and the userData path — not the dock.
+
+The packaged app has its own `Info.plist` and reads **ProdMesh** everywhere.
+Use `npm run app` when you want to see what a church sees; `npm start` is for
+iterating, where a wrong dock label costs nothing.
 
 ## Why this is its own package
 
