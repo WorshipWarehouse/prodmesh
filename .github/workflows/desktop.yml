@@ -59,25 +59,48 @@ jobs:
         id: signing
         shell: bash
         run: |
-          if [ "${{ matrix.platform }}" = "mac" ] && [ -n "${{ secrets.APPLE_CERTIFICATE }}" ]; then
+          if [ "${{ matrix.platform }}" = "mac" ] && [ -n "${{ secrets.MACOS_CERT_P12 }}" ]; then
             echo "sign=true" >> "$GITHUB_OUTPUT"
           else
             echo "sign=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # notarytool authenticates with an App Store Connect API key rather than
+      # an Apple ID + app-specific password. It has to exist as a FILE on disk,
+      # so the base64 secret is decoded into the runner's temp dir — never the
+      # workspace, which gets archived as build artefacts.
+      - name: Stage the notarization key
+        if: steps.signing.outputs.sign == 'true'
+        id: apikey
+        shell: bash
+        env:
+          KEY_B64: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          KEYFILE="${RUNNER_TEMP}/apple_api_key.p8"
+          printf '%s' "$KEY_B64" | base64 --decode > "$KEYFILE"
+          chmod 600 "$KEYFILE"
+          echo "path=$KEYFILE" >> "$GITHUB_OUTPUT"
+
       - name: Build (signed + notarized)
         if: steps.signing.outputs.sign == 'true'
         working-directory: desktop
         env:
-          # electron-builder reads these directly; it imports the certificate
-          # into a temporary keychain and notarizes via notarytool.
-          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE }}
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Signing: the Developer ID Application certificate, base64 .p12.
+          CSC_LINK: ${{ secrets.MACOS_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+          # Notarization: App Store Connect API key.
+          APPLE_API_KEY: ${{ steps.apikey.outputs.path }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist -- --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+
+      # The private key is short-lived on the runner anyway, but leaving it for
+      # the rest of the job is free risk.
+      - name: Remove the notarization key
+        if: always() && steps.apikey.outputs.path != ''
+        shell: bash
+        run: rm -f "${{ steps.apikey.outputs.path }}"
 
       - name: Build (unsigned)
         if: steps.signing.outputs.sign != 'true'

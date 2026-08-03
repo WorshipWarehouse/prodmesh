@@ -88,13 +88,28 @@ until something opens the database.
 Set these repository secrets; without them the build still runs and produces an
 unsigned app, which is fine for testing and not fine for a volunteer:
 
+Signing and notarization are separate credentials and separate steps: the
+certificate proves who built it, the API key asks Apple to bless it.
+
 | Secret | What it is |
 |---|---|
-| `APPLE_CERTIFICATE` | Developer ID Application cert, `.p12`, base64-encoded |
-| `APPLE_CERTIFICATE_PASSWORD` | the `.p12` password |
-| `APPLE_ID` | the Apple ID that owns the developer account |
-| `APPLE_APP_SPECIFIC_PASSWORD` | app-specific password for notarization |
-| `APPLE_TEAM_ID` | 10-character team id |
+| `MACOS_CERT_P12` | Developer ID Application cert exported from Keychain as `.p12`, **base64-encoded** |
+| `MACOS_CERT_P12_PASSWORD` | the password chosen when exporting that `.p12` |
+| `APPLE_API_KEY_P8` | App Store Connect API key `.p8`, **base64-encoded** |
+| `APPLE_API_KEY_ID` | the key's id (the `XXXXXXXXXX` in `AuthKey_XXXXXXXXXX.p8`) |
+| `APPLE_API_ISSUER_ID` | issuer UUID from App Store Connect → Users and Access → Integrations |
+
+An App Store Connect API key rather than an Apple ID + app-specific password:
+`notarytool` prefers it, and it does not break the day someone changes the
+Apple ID's password or its 2FA.
+
+Both files are base64-encoded because a GitHub secret holds text, not bytes.
+The `.p8` is decoded back to a file on the runner (notarytool needs a path),
+into `RUNNER_TEMP` rather than the workspace — the workspace gets archived as
+build artefacts.
+
+Apple issues the `.p8` **once**; there is no way to download it again. Keep the
+original somewhere safe before base64-encoding it into a secret.
 
 Unsigned, a volunteer meets *"prodmesh cannot be opened because the developer
 cannot be verified"* — which substantially defeats the point of shipping a
