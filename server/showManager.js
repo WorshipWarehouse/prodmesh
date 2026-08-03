@@ -218,8 +218,29 @@ function youtubeConfigFor(roomId) {
   if (!cfg) return null;
   const show = shows.get(roomId);
   if (!show) return cfg;
-  const pinned = showConfig.getConfig(roomId, show.planId)?.videos?.[show.timeId];
-  return pinned ? { ...cfg, videoId: pinned } : cfg;
+
+  const videos = showConfig.getConfig(roomId, show.planId)?.videos;
+  if (!videos || !(show.timeId in videos)) return cfg; // auto — find what's live
+
+  const pinned = videos[show.timeId];
+  // Explicitly not streamed: returning null stops the watcher from starting at
+  // all, so this service spends no quota and — the point — cannot record a
+  // broadcast left running from an earlier one against a service nobody
+  // watched online.
+  if (pinned === null) return null;
+  return { ...cfg, videoId: pinned };
+}
+
+/** Test seam: resolve as if `timeId` of `planId` were the active show. */
+export function youtubeConfigForTest(roomId, planId, timeId) {
+  const prior = shows.get(roomId);
+  shows.set(roomId, { planId, timeId });
+  try {
+    return youtubeConfigFor(roomId);
+  } finally {
+    if (prior) shows.set(roomId, prior);
+    else shows.delete(roomId);
+  }
 }
 
 function startStreamWatcher(roomId) {

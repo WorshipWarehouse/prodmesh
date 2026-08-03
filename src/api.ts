@@ -768,10 +768,11 @@ export interface ShowConfig {
   startItemId: string | null; // PP lands on this PC item → show autostarts
   endItemId: string | null; // last slide of this PC item → show auto-completes
   map: Record<string, { ppIndex: number; ppName: string | null } | null>;
-  /** Pinned YouTube broadcast per SERVICE TIME. A channel pre-creates one
-   *  broadcast per service, so 8:00 and 9:30 are different videos on one plan.
-   *  Empty = record whatever is live on the channel, which is normally right. */
-  videos: Record<string, string>;
+  /** YouTube broadcast per SERVICE TIME, tri-state. Key ABSENT = auto (record
+   *  whatever is live); `null` = not streamed (record nothing, don't look);
+   *  a string = pinned to that broadcast. A channel pre-creates one broadcast
+   *  per service, so 8:00 and 9:30 are different videos on one plan. */
+  videos: Record<string, string | null>;
 }
 
 /** A live or scheduled broadcast on the room's channel, for the pin picker. */

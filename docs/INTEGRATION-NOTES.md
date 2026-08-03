@@ -135,9 +135,22 @@ before it shipped.)
 
 Normally **nothing needs pinning**. The watcher searches the channel for
 whatever is live, and since the 8:00 broadcast is what's live at 8:00, each
-service already records the right one. Pins are the recourse for the week that
-isn't — stored per service time in `show_config.videos` (`{ '<timeId>':
-'<videoId>' }`), edited on Event Detail.
+service already records the right one.
+
+`show_config.videos` is therefore **tri-state per service time**, and the first
+two are not the same thing:
+
+| Stored | Meaning |
+|---|---|
+| key absent | auto — record whatever is live |
+| `null` | **not streamed** — record nothing, don't even look |
+| `'<videoId>'` | pinned to that broadcast |
+
+"Not streamed" matters because a plan often has five service times of which two
+are broadcast. On auto, the other three would happily record a stream left
+running from an earlier service and attribute those viewers to a service nobody
+watched online. It also means the watcher never starts for that service, so no
+quota is spent looking for a broadcast that was never going to exist.
 
 The picker there lists live + scheduled broadcasts, and **shows the scheduled
 time, not just the title**: pre-created broadcasts are all called "Sunday

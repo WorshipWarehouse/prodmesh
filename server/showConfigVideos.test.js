@@ -31,11 +31,23 @@ test('two service times on one plan hold different broadcasts', () => {
   });
 });
 
-test('an empty pin means "auto" and is dropped rather than stored', () => {
+test('the three states are distinct: absent = auto, null = not streamed, id = pinned', () => {
+  // The absent/null distinction is load-bearing. A plan with five service
+  // times often streams two; on auto the other three would record a broadcast
+  // left running from an earlier service and attribute it to a service nobody
+  // watched online.
   const saved = showConfig.setConfig(ROOM, PLAN, {
-    videos: { 't-8am': '', 't-930': null, 't-eve': 'keptOne' },
+    videos: { 't-8am': 'vid8amAAA', 't-930': null, 't-11am': '' },
   });
-  assert.deepEqual(saved.videos, { 't-eve': 'keptOne' });
+  assert.equal(saved.videos['t-8am'], 'vid8amAAA', 'pinned');
+  assert.equal(saved.videos['t-930'], null, 'not streamed — kept, not dropped');
+  assert.equal('t-11am' in saved.videos, false, 'auto — the default is not stored');
+
+  // And it survives the round trip through SQLite's JSON column.
+  const read = showConfig.getConfig(ROOM, PLAN);
+  assert.equal(read.videos['t-930'], null);
+  assert.equal('t-930' in read.videos, true, 'null must not be lost as "absent"');
+  assert.equal('t-11am' in read.videos, false);
 });
 
 test('pins survive alongside the automation settings in one record', () => {

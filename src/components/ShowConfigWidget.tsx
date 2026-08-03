@@ -26,6 +26,11 @@ function broadcastLabel(b: YouTubeBroadcast) {
   return `${b.live ? '● LIVE · ' : ''}${stamp} · ${b.title}`;
 }
 
+// Sentinels for the select only — never stored. The stored form is
+// key-absent / null / id, which keeps the default state out of the record.
+const AUTO = '';
+const NONE = '\u0000none';
+
 const EMPTY: ShowConfig = { startItemId: null, endItemId: null, map: {}, videos: {} };
 
 // Per-event show automation (one config per event, shared by all its service
@@ -78,7 +83,10 @@ export function ShowConfigWidget({
 
   const trackable = items.filter((i) => (i.type ?? 'item') !== 'header');
   const serviceTimes = times.filter((t) => t.type === 'service');
-  const pinCount = Object.keys(draft.videos ?? {}).length;
+  // Both "pinned" and "not streamed" are decisions worth surfacing on the
+  // collapsed header — an unexpected "not streamed" is exactly the thing
+  // someone needs to notice before Sunday.
+  const setCount = Object.keys(draft.videos ?? {}).length;
   const ppItems = (pp?.items ?? []).filter((i) => i.type !== 'header');
   const overrideCount = Object.values(draft.map).filter(Boolean).length;
 
@@ -155,8 +163,8 @@ export function ShowConfigWidget({
           <button className="showcfg__maptoggle" onClick={() => setYtOpen((o) => !o)}>
             {ytOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             YouTube broadcast
-            {pinCount > 0 && (
-              <span className="showcfg__mapcount">{pinCount} pinned</span>
+            {setCount > 0 && (
+              <span className="showcfg__mapcount">{setCount} set</span>
             )}
           </button>
 
@@ -172,7 +180,8 @@ export function ShowConfigWidget({
                 <p className="widget__hint">
                   Each service records whichever broadcast is live at the time, which is normally
                   right even when the channel pre-creates one per service. Pin a specific broadcast
-                  only to override that.
+                  to override that — or mark a service <em>Not streamed</em>, which stops it
+                  recording a broadcast left running from an earlier service.
                 </p>
                 {castErr && <p className="showcfg__mismatch">Couldn’t list broadcasts: {castErr}</p>}
                 {serviceTimes.map((t) => (
@@ -187,18 +196,26 @@ export function ShowConfigWidget({
                     </span>
                     <SelectField
                       className="showcfg__select"
-                      value={draft.videos?.[t.id] ?? ''}
+                      value={
+                        !(t.id in (draft.videos ?? {}))
+                          ? AUTO
+                          : draft.videos[t.id] === null
+                            ? NONE
+                            : (draft.videos[t.id] as string)
+                      }
                       onChange={(e) => {
                         const v = e.target.value;
                         setDraft((d) => {
                           const videos = { ...(d.videos ?? {}) };
-                          if (v) videos[t.id] = v;
-                          else delete videos[t.id];
+                          if (v === AUTO) delete videos[t.id];
+                          else if (v === NONE) videos[t.id] = null;
+                          else videos[t.id] = v;
                           return { ...d, videos };
                         });
                       }}
                     >
-                      <option value="">Auto — whatever is live</option>
+                      <option value={AUTO}>Auto — whatever is live</option>
+                      <option value={NONE}>Not streamed — record nothing</option>
                       {casts.map((b) => (
                         <option key={b.videoId} value={b.videoId}>
                           {broadcastLabel(b)}
@@ -207,8 +224,11 @@ export function ShowConfigWidget({
                       {/* A pin whose broadcast has since left the live/scheduled
                           list must stay selectable, or saving would silently
                           drop it. */}
-                      {draft.videos?.[t.id] && !casts.some((b) => b.videoId === draft.videos[t.id]) && (
-                        <option value={draft.videos[t.id]}>{draft.videos[t.id]} (not listed)</option>
+                      {typeof draft.videos?.[t.id] === 'string'
+                        && !casts.some((b) => b.videoId === draft.videos[t.id]) && (
+                        <option value={draft.videos[t.id] as string}>
+                          {draft.videos[t.id]} (not listed)
+                        </option>
                       )}
                     </SelectField>
                   </div>

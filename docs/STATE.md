@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **292 server tests** with **123 frontend interaction/configuration tests**
+  combines **293 server tests** with **123 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -357,8 +357,12 @@ Notes:
      different videos and a room-level pin would double-report one of them.
      Pins live in `show_config.videos` keyed by timeId, picked on Event Detail
      from the channel's live + scheduled broadcasts (labelled with the
-     scheduled time, since they all share a title). Usually unnecessary: the
-     watcher finds whatever is live, which is already right per service.
+     scheduled time, since they all share a title). Tri-state: absent = auto,
+     `null` = **not streamed**, id = pinned. "Not streamed" is not the same as
+     "nothing pinned" — a plan with five service times may broadcast two, and
+     on auto the rest would record a stream left running from an earlier
+     service. Usually nothing needs setting: the watcher finds whatever is
+     live, which is already right per service.
      **A hidden counter reads as `null`, never `0`** — a fabricated attendance
      figure is worse than a blank one, which is also why there is no automatic
      mock (`youtube: { mock: true }` is a dev fixture, like `analysis.mock`).
