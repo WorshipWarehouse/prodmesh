@@ -256,10 +256,22 @@ Notes:
     ServicePanel, Services and ServiceReport off bespoke `setInterval` onto
     `useQuery` (RoomCard and ServicePanel now share one cache key, so a room's
     card and its panel make one Planning Center request between them).
+  - **Backpressure conflates, never queues**: `res.write()` returning false was
+    ignored, and Node buffers past that point without bound — an
+    unauthenticated memory-exhaustion vector on a no-auth endpoint, and a real
+    cost whenever a booth Mac sleeps. Now at most one pending frame per topic
+    per connection, newest wins, flushed on `drain`. Correct *because every
+    topic is a state snapshot*; would be wrong for an event-shaped topic, and
+    the comment in `streamHub.js` says so. Frames are also serialized once per
+    publish rather than once per subscriber.
   - Tests: `streamHub.test.js` (isolated — it resets the registry, so it must
     not import `index.js`) and `streamApi.test.js` (the endpoint, real app) are
     deliberately separate files. jsdom has no `EventSource`, so one is stubbed
     globally in `src/test/setup.ts`.
+  - **Known limits if devices ever publish metrics into this** (ADR 0010's
+    closing section): `MAX_TOPICS` is 64 per connection, and subscription is by
+    exact topic with no wildcards. Neither is a redesign. Ingest and metric
+    storage are separate questions, deliberately untouched.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is

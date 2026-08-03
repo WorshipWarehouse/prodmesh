@@ -63,6 +63,21 @@ One SSE connection per browser tab, carrying named topics.
   pushes immediately, so every screen in the building moves together instead
   of each discovering it on its own interval.
 
+- **Slow subscribers conflate, they never queue.** `res.write()` returns false
+  once the socket buffer is full and Node then buffers without bound, so
+  ignoring it makes an unauthenticated endpoint a memory-exhaustion vector —
+  and more mundanely, a booth Mac that sleeps costs the server memory for as
+  long as it sleeps. Under backpressure the hub keeps at most **one pending
+  frame per topic per connection**, newest wins, flushed on `drain`. This is
+  correct *because every topic carries a state snapshot*: a client only ever
+  renders the newest value, so superseded ones cost nothing to drop and the
+  final state is still right. It would be wrong for an event-shaped topic
+  ("a cue fired"), where a superseded value is a lost event — nothing
+  publishes one today, and anything that does needs its own path.
+- **One serialization per publish**, not one per subscriber. Irrelevant at
+  three browsers; decisive if devices ever publish metrics at rate to several
+  dashboards.
+
 `/api/rooms/:id/show/stream` **stays**, reimplemented as an adapter over the
 same three topics. Room-Mac homepages and bookmarks point at views that use it,
 and it is the one URL an operator can open raw to see whether the server is
@@ -93,3 +108,18 @@ surfaces cannot drift.
 
 The widget registry and stored dashboard layouts. This ADR is the transport
 they will need; the layout model is its own decision.
+
+## Known limits, if devices ever publish into this
+
+The transport generalizes to non-room producers — a Pi, a server, Dante
+Director — becoming topics like `device:<id>:cpu`. Two things would need
+revisiting first, neither of them a redesign:
+
+- **`MAX_TOPICS` is 64 per connection**, sized for a page of widgets. A
+  metrics wall of fifty devices with several series each blows past it.
+- **Subscription is by exact topic.** A metrics dashboard would rather say
+  `device:*:temp` than enumerate. Wildcard subscription is a hub-side change;
+  the refcount would then key on the resolved topic, not the pattern.
+
+Ingest (how a device gets a value *in*) and whether SQLite is the right store
+for high-rate metrics are separate questions this ADR does not touch.
