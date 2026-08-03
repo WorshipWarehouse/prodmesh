@@ -4,7 +4,7 @@
 # root, which carries a frontend toolchain nobody's Applications folder needs.
 
 appId: org.prodmesh.dashboard
-productName: prodmesh
+productName: ProdMesh
 copyright: prodmesh
 
 directories:
@@ -19,8 +19,10 @@ asar: true
 asarUnpack:
   - "**/node_modules/better-sqlite3/**"
 
-# A 1024px source; electron-builder derives .icns and .ico from it.
-icon: ../art/prodmesh-icon.png
+# build-resources/icon.png (1024px, from art/prodmesh-icon.png) is picked up by
+# convention — electron-builder derives .icns and .ico from it. Named by
+# convention rather than pointed at with a relative path, which resolves
+# differently depending on which directory the build is invoked from.
 
 files:
   - "**/*"

@@ -29,7 +29,12 @@ import { networkInterfaces } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-app.setName('prodmesh');
+// The name the OS shows — menu bar, Applications folder, "Quit ProdMesh".
+//
+// It ALSO determines app.getPath('userData'), i.e. where a church's database
+// lives. Changing it later silently orphans every existing install's data, so
+// it is settled here once and must not be edited again.
+app.setName('ProdMesh');
 
 const PORT = Number(process.env.PORT) || 8080;
 
@@ -124,8 +129,10 @@ function showWindow() {
     width: 460,
     height: 420,
     resizable: false,
-    title: 'prodmesh',
+    title: 'ProdMesh',
     show: false,
+    // Windows and Linux take the window icon from here; macOS uses the bundle.
+    icon: join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       // The window renders local status only and must never be a way into the
@@ -157,7 +164,7 @@ function trayIcon() {
 function updateTray() {
   if (!tray) return;
   const running = state.status === 'running';
-  tray.setToolTip(running ? `prodmesh — ${dashboardUrl()}` : 'prodmesh — not running');
+  tray.setToolTip(running ? `ProdMesh — ${dashboardUrl()}` : 'ProdMesh — not running');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: running ? `Running on port ${state.port}` : `Not running${state.error ? ' — see status' : ''}`, enabled: false },
     { type: 'separator' },
@@ -169,7 +176,7 @@ function updateTray() {
     { label: 'Show logs', click: () => shell.openPath(app.getPath('logs')) },
     { type: 'separator' },
     { label: `Version ${app.getVersion()}`, enabled: false },
-    { label: 'Quit prodmesh', click: () => quit() },
+    { label: 'Quit ProdMesh', click: () => quit() },
   ]));
 }
 
@@ -186,7 +193,7 @@ async function quit() {
       buttons: ['Cancel', 'Quit prodmesh'],
       defaultId: 0,
       cancelId: 0,
-      message: 'Quit prodmesh?',
+      message: 'Quit ProdMesh?',
       detail: 'Every screen pointed at this machine will stop working until it is started again.',
     });
     if (response !== 1) return;
@@ -207,6 +214,13 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', showWindow);
 
   app.whenReady().then(async () => {
+    // An UNPACKED run (npm start) shows Electron's own dock icon, because the
+    // icon otherwise comes from the .app bundle that does not exist yet.
+    // Packaged builds already have it, so this is dev-only.
+    if (process.platform === 'darwin' && !app.isPackaged) {
+      app.dock?.setIcon(join(__dirname, 'assets', 'icon.png'));
+    }
+
     // CI: start the server, report, exit. This is the only check that the
     // native module rebuilt against ELECTRON's ABI actually loads — plain
     // `node` cannot run this tree at all, because better-sqlite3 here is

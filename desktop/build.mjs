@@ -88,6 +88,9 @@ for (const f of ['main.js', 'preload.cjs', 'status.html']) {
   cpSync(join(HERE, f), join(OUT, 'desktop', f));
 }
 cpSync(join(HERE, 'assets'), join(OUT, 'desktop', 'assets'), { recursive: true });
+// The app icon travels with the staged app as well as being packaged, so an
+// unpacked dev run can set the dock icon instead of showing Electron's.
+cpSync(join(HERE, 'build-resources', 'icon.png'), join(OUT, 'desktop', 'assets', 'icon.png'));
 
 // ── manifest ─────────────────────────────────────────────────────────────────
 // The version comes from the repo root, so Admin → System and the tray agree
@@ -95,8 +98,10 @@ cpSync(join(HERE, 'assets'), join(OUT, 'desktop', 'assets'), { recursive: true }
 writeFileSync(
   join(OUT, 'package.json'),
   `${JSON.stringify({
+    // `name` stays lowercase (npm requires it); `productName` is what the OS
+    // shows — the menu bar, the Applications folder, the installer.
     name: 'prodmesh',
-    productName: 'prodmesh',
+    productName: 'ProdMesh',
     version: rootPkg.version.replace(/-dev$/, ''), // installers reject a -dev suffix
     description: rootPkg.description ?? 'Production dashboard for churches',
     main: 'desktop/main.js',
