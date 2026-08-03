@@ -124,6 +124,27 @@ explicitly, because a bare 403 sends someone hunting for a permissions problem
 that isn't there. The watcher backs off 30 minutes on it; retrying cannot help
 until the daily UTC reset.
 
+### Which broadcast belongs to which service
+
+The room owns the **channel**; a **service time** owns the video. A church's
+channel pre-creates one broadcast per service, so an 8:00 and a 9:30 on the
+same Sunday plan are *different videos in the same room* — a room-level video
+pin would attribute both to one broadcast and report identical numbers twice.
+(That was the first shape of this and it was wrong; caught in field feedback
+before it shipped.)
+
+Normally **nothing needs pinning**. The watcher searches the channel for
+whatever is live, and since the 8:00 broadcast is what's live at 8:00, each
+service already records the right one. Pins are the recourse for the week that
+isn't — stored per service time in `show_config.videos` (`{ '<timeId>':
+'<videoId>' }`), edited on Event Detail.
+
+The picker there lists live + scheduled broadcasts, and **shows the scheduled
+time, not just the title**: pre-created broadcasts are all called "Sunday
+Service" and the clock is the only thing that tells them apart. It costs
+100 + 100 (two `search.list`) + **1** (`videos.list` batches up to 50 ids), so
+it is loaded only when that section is expanded, never on page view.
+
 ### Gotchas
 
 - `concurrentViewers` is a **string** in the JSON, not a number.

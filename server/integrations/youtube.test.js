@@ -165,6 +165,45 @@ test('a failing API never rejects at the caller — a show must not depend on it
   assert.equal(seen[0], null);
 });
 
+test('listBroadcasts merges live + scheduled and fetches times in ONE batched call', async () => {
+  // search.list is 100 units each; videos.list takes up to 50 ids for 1. The
+  // scheduled time is the whole reason for that third call — pre-created
+  // broadcasts share a title and are only distinguishable by when they start.
+  handler = (u) => {
+    if (u.pathname.endsWith('/search')) {
+      return u.searchParams.get('eventType') === 'live'
+        ? { items: [{ id: { videoId: 'liveOne' } }] }
+        : { items: [{ id: { videoId: 'later' } }, { id: { videoId: 'sooner' } }] };
+    }
+    return {
+      items: [
+        { id: 'later', snippet: { title: 'Sunday Service' },
+          liveStreamingDetails: { scheduledStartTime: '2026-08-09T16:30:00Z' } },
+        { id: 'sooner', snippet: { title: 'Sunday Service' },
+          liveStreamingDetails: { scheduledStartTime: '2026-08-09T15:00:00Z' } },
+        { id: 'liveOne', snippet: { title: 'Nights of Worship' },
+          liveStreamingDetails: { actualStartTime: '2026-08-09T14:00:00Z' } },
+      ],
+    };
+  };
+
+  const out = await yt.listBroadcasts('UC1');
+  assert.equal(calls.filter((c) => c.path === 'videos').length, 1, 'details must be ONE batched call');
+  assert.equal(calls.find((c) => c.path === 'videos').params.id.split(',').length, 3);
+  // Soonest first, so the live one (already started) leads.
+  assert.deepEqual(out.map((b) => b.videoId), ['liveOne', 'sooner', 'later']);
+  assert.equal(out[0].live, true);
+  assert.equal(out[1].scheduledStart, '2026-08-09T15:00:00Z');
+  // Identical titles: the caller needs the time to tell these apart.
+  assert.equal(out[1].title, out[2].title);
+});
+
+test('listBroadcasts skips the details call when the channel has nothing on', async () => {
+  handler = () => ({ items: [] });
+  assert.deepEqual(await yt.listBroadcasts('UC1'), []);
+  assert.equal(calls.filter((c) => c.path === 'videos').length, 0, 'no ids, no quota spent');
+});
+
 test('mock mode produces a plausible curve and makes no requests at all', async () => {
   const ctl = new AbortController();
   const seen = [];

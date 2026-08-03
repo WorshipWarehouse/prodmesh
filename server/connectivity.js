@@ -304,13 +304,18 @@ export function setProPresenter(roomId, config) {
 
 /**
  * Normalize + validate a YouTube Live config; null clears it (the room isn't
- * streamed). Either a channel id (we find whatever is live on it) or a fixed
- * video id — the channel is the normal case, since a church's video id changes
- * every week and nobody wants to re-enter it.
+ * streamed). A CHANNEL only — the room owns the channel, a service time owns
+ * the video.
  *
- * Ids are charset-checked, not merely length-checked, because both are
- * interpolated into a request URL. YouTube ids are `[A-Za-z0-9_-]`; anything
- * that could reshape a URL is refused, the same reasoning as validateHost().
+ * There is deliberately no room-level video id. A church's channel pre-creates
+ * one broadcast per service, so an 8:00 and a 9:30 on the same Sunday are
+ * different videos in the same room; pinning at the room would attribute both
+ * to one broadcast and report identical numbers twice. Per-service pins live
+ * in show_config (`videos`), edited on Event Detail. Normally nothing needs
+ * pinning: the watcher finds whatever is live on the channel.
+ *
+ * The id is charset-checked, not merely length-checked, because it is
+ * interpolated into a request URL — same reasoning as validateHost().
  */
 export function validateYouTube(input) {
   if (input === null) return null;
@@ -326,9 +331,8 @@ export function validateYouTube(input) {
   };
 
   const channelId = id(input.channelId, 'Channel ID', 64);
-  const videoId = id(input.videoId, 'Video ID', 32);
-  if (!channelId && !videoId) return null; // nothing to look at = not configured
-  return { channelId, videoId };
+  if (!channelId) return null; // no channel = the room isn't streamed
+  return { channelId };
 }
 
 /** The stored YouTube config for a room (null if it isn't streamed). */

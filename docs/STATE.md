@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-03.
+Last updated: 2026-08-04.
 
 ## Sites & rooms
 
@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **283 server tests** with **123 frontend interaction/configuration tests**
+  combines **292 server tests** with **123 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -352,6 +352,13 @@ Notes:
      on the room page. New `room:<id>:youtube` topic + `viewers` widget; Show
      Report gains peak/avg/duration and an inline-SVG sparkline (no chart
      library — the no-CDN rule makes every dependency a bundle decision).
+     **The room owns the CHANNEL; a service time owns the video** — a channel
+     pre-creates one broadcast per service, so 8:00 and 9:30 on one plan are
+     different videos and a room-level pin would double-report one of them.
+     Pins live in `show_config.videos` keyed by timeId, picked on Event Detail
+     from the channel's live + scheduled broadcasts (labelled with the
+     scheduled time, since they all share a title). Usually unnecessary: the
+     watcher finds whatever is live, which is already right per service.
      **A hidden counter reads as `null`, never `0`** — a fabricated attendance
      figure is worse than a blank one, which is also why there is no automatic
      mock (`youtube: { mock: true }` is a dev fixture, like `analysis.mock`).

@@ -107,6 +107,59 @@ export async function findLiveVideo(channelId, signal) {
 }
 
 /**
+ * The channel's broadcasts worth choosing between: everything live now plus
+ * everything scheduled. Used by the Event Detail picker so an operator selects
+ * "Sunday Service · 8:00 AM" rather than copying an id out of YouTube Studio.
+ *
+ * Cost: 100 + 100 for the two searches, then **1** for the details of up to 50
+ * ids in a single videos.list. The scheduled start is the reason for that third
+ * call — search.list does not return liveStreamingDetails, and a church whose
+ * broadcasts are all titled "Sunday Service" can only tell them apart by time.
+ *
+ * Never throws: the picker degrades to an empty list, and the id can still be
+ * typed by hand.
+ */
+export async function listBroadcasts(channelId, signal) {
+  const search = async (eventType) => {
+    const body = await apiGet(
+      'search',
+      { part: 'id', channelId, eventType, type: 'video', maxResults: 25, order: 'date' },
+      signal,
+    );
+    return (body?.items ?? []).map((i) => i.id?.videoId).filter(Boolean);
+  };
+
+  const [live, upcoming] = await Promise.all([search('live'), search('upcoming')]);
+  const ids = [...new Set([...live, ...upcoming])].slice(0, 50);
+  if (!ids.length) return [];
+
+  const body = await apiGet(
+    'videos',
+    { part: 'snippet,liveStreamingDetails', id: ids.join(',') },
+    signal,
+  );
+
+  return (body?.items ?? [])
+    .map((item) => {
+      const d = item.liveStreamingDetails ?? {};
+      return {
+        videoId: item.id,
+        title: item.snippet?.title ?? '(untitled)',
+        // What the operator actually recognises: when it is meant to start.
+        scheduledStart: d.scheduledStartTime ?? null,
+        actualStart: d.actualStartTime ?? null,
+        live: Boolean(d.actualStartTime) && !d.actualEndTime,
+      };
+    })
+    // Soonest first, live ones effectively at the top since they have started.
+    .sort((a, b) => {
+      const at = Date.parse(a.actualStart ?? a.scheduledStart ?? '') || Infinity;
+      const bt = Date.parse(b.actualStart ?? b.scheduledStart ?? '') || Infinity;
+      return at - bt;
+    });
+}
+
+/**
  * Live details for a video: { live, viewers, title }.
  * `viewers` is null when the broadcaster has hidden the counter — which is a
  * real configuration, not an error, so it must not read as a failure.

@@ -200,9 +200,31 @@ function streamNeeded(roomId) {
   return hub.subscriberCount(streamTopic(roomId)) > 0 || shows.has(roomId);
 }
 
+/**
+ * The room's YouTube config, with the ACTIVE SERVICE's pinned broadcast layered
+ * on when there is one.
+ *
+ * The room owns the channel; a service time owns the video. A church's channel
+ * pre-creates one broadcast per service, so 8:00 and 9:30 are different videos
+ * on the same plan — pinning at the room would attribute both to one broadcast
+ * and report identical numbers twice.
+ *
+ * With nothing pinned the watcher searches the channel for whatever is live,
+ * which is already correct per service. The pin is the recourse for the week
+ * that isn't.
+ */
+function youtubeConfigFor(roomId) {
+  const cfg = rooms[roomId]?.youtube;
+  if (!cfg) return null;
+  const show = shows.get(roomId);
+  if (!show) return cfg;
+  const pinned = showConfig.getConfig(roomId, show.planId)?.videos?.[show.timeId];
+  return pinned ? { ...cfg, videoId: pinned } : cfg;
+}
+
 function startStreamWatcher(roomId) {
   if (streamWatchers.has(roomId)) return;
-  const cfg = rooms[roomId]?.youtube;
+  const cfg = youtubeConfigFor(roomId);
   if (!youtube.isConfigured(cfg)) return;
   // A key-less install would otherwise poll forever getting the same error.
   if (!cfg.mock && !youtube.hasCredentials()) return;
@@ -228,7 +250,7 @@ function restartStreamWatcher(roomId) {
   streamWatchers.delete(roomId);
   streams.delete(roomId);
   const show = shows.get(roomId);
-  if (show && !show.streamStats && youtube.isConfigured(rooms[roomId]?.youtube)) {
+  if (show && !show.streamStats && youtube.isConfigured(youtubeConfigFor(roomId))) {
     show.streamStats = streamStore.runningStats(instanceId(show)); // record mid-show
   }
   if (streamNeeded(roomId)) startStreamWatcher(roomId);
@@ -511,7 +533,9 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
   publishShow(roomId);
   startPoller(show);
   startSplWatcher(roomId); // capture runs with the show, not the browsers
-  startStreamWatcher(roomId);
+  // restart, not start: a watcher may already be running for a viewer, on the
+  // room's unpinned config. The show may pin a different broadcast.
+  restartStreamWatcher(roomId);
   startShowLogging(show);
   return show;
 }
@@ -545,7 +569,10 @@ export function endShow(roomId) {
   shows.delete(roomId);
   removeShowFile(roomId);
   stopSplWatcher(roomId); // no-op if viewers still want the live meter
-  stopStreamWatcher(roomId);
+  // Same reason as at start: the pin retires with the show, so a watcher kept
+  // alive by viewers has to drop back to the room's channel.
+  if (streamNeeded(roomId)) restartStreamWatcher(roomId);
+  else stopStreamWatcher(roomId);
   stopShowLogging(show);
   publishShow(roomId);
   return getState(roomId);
@@ -632,6 +659,8 @@ export function refreshConfig(roomId, planId) {
   const show = shows.get(roomId);
   if (show && show.planId === planId) {
     show.config = showConfig.getConfig(roomId, planId);
+    // A pin edited mid-service takes effect now, not at the next show.
+    restartStreamWatcher(roomId);
     publishShow(roomId);
   }
 }

@@ -553,11 +553,11 @@ export interface CompanionConfig {
   modes: ModeConfig[];
 }
 
-/** Where a room's livestream lives. A channel id is the normal case — the
- *  video id changes every week and nobody wants to re-enter it. */
+/** Where a room's livestream lives. The room owns the CHANNEL; which video a
+ *  given service used is pinned per service time in the show config, because a
+ *  channel pre-creates one broadcast per service. */
 export interface YouTubeConfig {
   channelId: string | null;
-  videoId: string | null;
 }
 
 export interface RoomConnectivity {
@@ -768,7 +768,25 @@ export interface ShowConfig {
   startItemId: string | null; // PP lands on this PC item → show autostarts
   endItemId: string | null; // last slide of this PC item → show auto-completes
   map: Record<string, { ppIndex: number; ppName: string | null } | null>;
+  /** Pinned YouTube broadcast per SERVICE TIME. A channel pre-creates one
+   *  broadcast per service, so 8:00 and 9:30 are different videos on one plan.
+   *  Empty = record whatever is live on the channel, which is normally right. */
+  videos: Record<string, string>;
 }
+
+/** A live or scheduled broadcast on the room's channel, for the pin picker. */
+export interface YouTubeBroadcast {
+  videoId: string;
+  title: string;
+  scheduledStart: string | null;
+  actualStart: string | null;
+  live: boolean;
+}
+
+export const getYouTubeBroadcasts = (roomId: string) =>
+  getJson<{ configured: boolean; broadcasts: YouTubeBroadcast[]; error?: string }>(
+    `/api/rooms/${encodeURIComponent(roomId)}/youtube/broadcasts`,
+  );
 
 export interface PpPlaylist {
   playlistName: string | null;

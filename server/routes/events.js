@@ -13,6 +13,7 @@ import * as checklist from '../checklistStore.js';
 import * as chkTemplates from '../checklistTemplates.js';
 import * as showCfg from '../showConfig.js';
 import * as ppro from '../integrations/proPresenter.js';
+import * as youtube from '../integrations/youtube.js';
 import * as auth from '../authStore.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 import { applyMode, modeLockError } from '../roomModes.js';
@@ -112,6 +113,27 @@ router.get('/api/rooms/:id/event/:planId', async (req, res) => {
 });
 
 // ── Show automation config (Event Detail → Show Config widget) ───────────────
+
+// The channel's live + scheduled broadcasts, for the Event Detail picker.
+//
+// Gated with the config it feeds, and for a second reason: each call costs
+// ~201 YouTube quota units (two searches at 100, one batched details read at
+// 1). That is nothing for an operator opening a picker a few times a week and
+// a lot for an open endpoint anyone can hammer.
+router.get('/api/rooms/:id/youtube/broadcasts', requirePermission('shows.configure'), async (req, res) => {
+  const cfg = rooms[req.params.id]?.youtube;
+  if (!cfg?.channelId) return res.json({ configured: false, broadcasts: [] });
+  if (!youtube.hasCredentials()) {
+    return res.json({ configured: true, broadcasts: [], error: 'No YouTube API key configured' });
+  }
+  try {
+    res.json({ configured: true, broadcasts: await youtube.listBroadcasts(cfg.channelId) });
+  } catch (err) {
+    // A failed listing must not block configuring the event — the id can still
+    // be pinned by hand, and the auto path needs no pin at all.
+    res.json({ configured: true, broadcasts: [], error: String(err.message ?? err) });
+  }
+});
 
 router.put('/api/rooms/:id/event/:planId/show-config', requirePermission('shows.configure'), (req, res) => {
   if (!rooms[req.params.id]) return res.status(404).json({ error: 'Unknown room' });

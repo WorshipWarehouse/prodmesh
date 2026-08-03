@@ -266,3 +266,11 @@
   background: var(--warn-soft);
   border: 1px solid var(--warn-border);
 }
+
+/* Service time label in the broadcast picker — the clock is what tells two
+   identically-titled broadcasts apart. */
+.showcfg__when {
+  margin-left: 6px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}

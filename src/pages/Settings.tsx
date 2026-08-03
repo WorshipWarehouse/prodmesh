@@ -1854,21 +1854,17 @@ function PcServiceTypesEditor({ roomId, initial, status }: { roomId: string; ini
 // channel. A fixed video id is the escape hatch for a one-off broadcast.
 interface YouTubeDraft {
   channelId: string;
-  videoId: string;
 }
 
 const toYtDraft = (cfg: YouTubeConfig | null): YouTubeDraft => ({
   channelId: cfg?.channelId ?? '',
-  videoId: cfg?.videoId ?? '',
 });
 
 function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeConfig | null }) {
   const f = useDraft(toYtDraft(initial), async (d) => {
     const stored = await saveYouTube(
       roomId,
-      d.channelId.trim() || d.videoId.trim()
-        ? { channelId: d.channelId.trim() || null, videoId: d.videoId.trim() || null }
-        : null,
+      d.channelId.trim() ? { channelId: d.channelId.trim() } : null,
     );
     return toYtDraft(stored);
   });
@@ -1877,7 +1873,7 @@ function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeCo
   return (
     <EditorSection
       title="YouTube Live"
-      help="Records how many people watched the stream, for the show report. Needs a YouTube API key under Admin → General → Integrations. Viewer counts are only available while a broadcast is live — YouTube does not report them afterwards, so nothing is recorded for services that ran before this was set up."
+      help="Records how many people watched the stream, for the show report. Needs a YouTube API key under Admin → General → Integrations. Viewer counts are only available while a broadcast is live — YouTube does not report them afterwards, so nothing is recorded for services that ran before this was set up. Find the channel ID in YouTube Studio → Settings → Channel → Advanced."
       saveLabel="Save YouTube"
       form={f}
     >
@@ -1890,17 +1886,11 @@ function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeCo
             onChange={(e) => f.patch({ channelId: e.target.value })}
           />
         </Field>
-        <Field label="Video ID" width="grow">
-          <input
-            className="field"
-            placeholder="optional — pins one broadcast"
-            value={draft.videoId}
-            onChange={(e) => f.patch({ videoId: e.target.value })}
-          />
-        </Field>
       </FormRow>
       <p className="settings__muted">
-        Leave both blank if this room isn’t streamed.
+        Blank if this room isn’t streamed. Each service records whatever is live
+        on the channel at the time — pick a specific broadcast on an event’s page
+        only when that needs overriding.
       </p>
     </EditorSection>
   );
