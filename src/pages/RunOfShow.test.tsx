@@ -1,8 +1,9 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { RunOfShow } from './RunOfShow';
+import { emitTopic } from '../test/fakeEventSource';
 import type { ServicePlan, ShowState } from '../api';
 
 const api = vi.hoisted(() => ({
@@ -19,36 +20,17 @@ vi.mock('../api', async (importOriginal) => ({
   ...api,
 }));
 
-// The page subscribes via `es.addEventListener('state', …)` — a controllable
-// fake lets tests push server show-state frames like the real SSE stream does.
-class FakeEventSource {
-  static instances: FakeEventSource[] = [];
-  url: string;
-  closed = false;
-  private listeners = new Map<string, Set<(e: MessageEvent) => void>>();
-  constructor(url: string) {
-    this.url = url;
-    FakeEventSource.instances.push(this);
-  }
-  addEventListener(type: string, fn: (e: MessageEvent) => void) {
-    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
-    this.listeners.get(type)!.add(fn);
-  }
-  removeEventListener(type: string, fn: (e: MessageEvent) => void) {
-    this.listeners.get(type)?.delete(fn);
-  }
-  close() {
-    this.closed = true;
-  }
-  emit(type: string, data: unknown) {
-    for (const fn of this.listeners.get(type) ?? new Set()) {
-      fn({ data: JSON.stringify(data) } as MessageEvent);
-    }
-  }
+// The page subscribes through useTopic, which holds ONE EventSource on
+// /api/stream carrying `msg` frames of {topic, data}. Split a combined
+// ShowState into the three topics the server actually publishes it as.
+async function emitState(state: ShowState) {
+  const { timer = null, spl = null, ...show } = state;
+  await emitTopic({
+    'room:north-main:show': show,
+    'room:north-main:timer': timer,
+    'room:north-main:spl': spl,
+  });
 }
-
-const emitState = (state: ShowState) =>
-  act(() => FakeEventSource.instances.at(-1)!.emit('state', state));
 
 const item = (id: string, title: string, type: string | null = 'item') => ({
   id, sequence: null, title, type, length: null, key: null, leader: null, description: null,
@@ -96,8 +78,6 @@ function renderPage() {
 }
 
 beforeEach(() => {
-  FakeEventSource.instances = [];
-  vi.stubGlobal('EventSource', FakeEventSource);
   api.getRoom.mockResolvedValue({
     id: 'north-main', name: 'Main Auditorium', site: 'north', hasCompanion: true, modes: [],
   });
@@ -107,17 +87,13 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
 describe('show identity', () => {
   it('ignores another show in the room: no live controls, just a link to it', async () => {
     renderPage();
     expect(await screen.findByRole('button', { name: 'Start Show' })).toBeInTheDocument();
 
     // Active show in this room, but for a DIFFERENT plan/time.
-    emitState({ ...liveHere, planId: 'plan-OTHER', timeId: 't-other' });
+    await emitState({ ...liveHere, planId: 'plan-OTHER', timeId: 't-other' });
 
     expect(await screen.findByText('Another show is live in this room')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Go to it' }))
@@ -130,7 +106,7 @@ describe('show identity', () => {
     renderPage();
     await screen.findByRole('button', { name: 'Start Show' });
 
-    emitState(liveHere);
+    await emitState(liveHere);
 
     expect(await screen.findByRole('button', { name: 'End Show' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Prev' })).toBeInTheDocument();
@@ -142,7 +118,7 @@ describe('show identity', () => {
     renderPage();
     await screen.findByRole('button', { name: 'Start Show' });
 
-    emitState({ ...liveHere, timeId: 't-second-service' });
+    await emitState({ ...liveHere, timeId: 't-second-service' });
 
     expect(await screen.findByText('Another show is live in this room')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'End Show' })).not.toBeInTheDocument();
@@ -192,7 +168,7 @@ describe('Prev/Next header skipping', () => {
     renderPage();
     await screen.findByRole('button', { name: 'Start Show' });
 
-    emitState(liveHere); // current = i-welcome
+    await emitState(liveHere); // current = i-welcome
     await screen.findByRole('button', { name: 'Next' });
 
     // Welcome → (skip WORSHIP header) → Song One
@@ -248,7 +224,7 @@ describe('completed show', () => {
     expect(screen.queryByText('Elapsed since start')).not.toBeInTheDocument();
 
     // Even a running PP timer (counting to the next service) must not unfreeze it.
-    emitState({
+    await emitState({
       active: false,
       timer: { uuid: null, name: 'Walk In', state: 'running', remainingSeconds: 300, targetSecondsOfDay: null, countsDownToTime: false },
     });
@@ -267,17 +243,17 @@ describe('SPL meter zones', () => {
     const { container } = renderPage();
     await screen.findByRole('button', { name: 'Start Show' });
 
-    emitState(spl(89.9));
+    await emitState(spl(89.9));
     expect(screen.getByText(/89\.9/)).toBeInTheDocument();
     expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--ok');
 
-    emitState(spl(90)); // at target — warn starts at the boundary
+    await emitState(spl(90)); // at target — warn starts at the boundary
     expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--warn');
 
-    emitState(spl(94.9));
+    await emitState(spl(94.9));
     expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--warn');
 
-    emitState(spl(95)); // at limit — over starts at the boundary
+    await emitState(spl(95)); // at limit — over starts at the boundary
     expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--over');
   });
 });
@@ -300,12 +276,12 @@ describe('countdown source priority', () => {
     // No timer yet → clock math against the Planning Center time.
     expect(await screen.findByText('1:00:00')).toBeInTheDocument();
 
-    emitState({ active: false, timer: timer('running') });
+    await emitState({ active: false, timer: timer('running') });
     expect(screen.getByText('05:00')).toBeInTheDocument();
     expect(screen.getByText(/Walk In/)).toBeInTheDocument();
     expect(screen.queryByText('1:00:00')).not.toBeInTheDocument();
 
-    emitState({ active: false, timer: timer('stopped') });
+    await emitState({ active: false, timer: timer('stopped') });
     await waitFor(() => expect(screen.getByText('1:00:00')).toBeInTheDocument());
     expect(screen.queryByText('05:00')).not.toBeInTheDocument();
     expect(screen.queryByText(/Walk In/)).not.toBeInTheDocument();

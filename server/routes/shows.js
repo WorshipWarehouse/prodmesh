@@ -4,11 +4,20 @@ import express from 'express';
 
 import { rooms } from '../roomsStore.js';
 import * as show from '../showManager.js';
+import * as hub from '../streamHub.js';
 import { requirePermission } from '../httpAuth.js';
 
 const router = express.Router();
 
-// Room-level show state stream (SSE). Browsers are pure views into this.
+/**
+ * Room-level show state stream (SSE), the original single-room endpoint.
+ *
+ * Superseded by /api/stream, but kept: room-Mac homepages and bookmarks point
+ * at views that use it, and it is the one URL an operator can open raw to see
+ * whether the server is alive. It is now an ADAPTER — it subscribes to the
+ * room's three topics and re-emits the combined `state` envelope on any of
+ * them, so both surfaces are fed by one set of watchers and cannot drift.
+ */
 router.get('/api/rooms/:id/show/stream', (req, res) => {
   const roomId = req.params.id;
   // Unlike every sibling route this never checked the room existed, so any
@@ -16,18 +25,23 @@ router.get('/api/rooms/:id/show/stream', (req, res) => {
   // watcher, which polls that room's ProPresenter once a second for as long
   // as the connection is held. Unknown rooms are refused before any of that.
   if (!rooms[roomId]) return res.status(404).json({ error: 'Unknown room' });
-  res.set({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  });
-  res.flushHeaders?.();
-  const hb = setInterval(() => res.write(': ping\n\n'), 20000);
-  show.subscribe(roomId, res);
-  req.on('close', () => {
-    clearInterval(hb);
-    show.unsubscribe(roomId, res);
+
+  hub.openStream(req, res);
+
+  // Any of the three topics firing means "the envelope changed" — getState()
+  // reassembles it from all three, so the topic and value are unused here.
+  // Coalesced to one send per tick: subscribing delivers three opening
+  // snapshots, and this endpoint's contract is one paint, not three identical
+  // ones.
+  let pending = false;
+  const flush = () => {
+    pending = false;
+    res.write(`event: state\ndata: ${JSON.stringify(show.getState(roomId))}\n\n`);
+  };
+  hub.subscribe(res, show.roomTopics(roomId), () => {
+    if (pending) return;
+    pending = true;
+    queueMicrotask(flush);
   });
 });
 

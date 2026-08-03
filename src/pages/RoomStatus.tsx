@@ -5,28 +5,27 @@ import {
   getRoom,
   getRoomPlan,
   getRoomState,
-  getShow,
   setRoomMode,
   OverrideRequiredError,
   type RoomMeta,
   type RoomMode,
   type RoomState,
+  type ShowState,
 } from '../api';
 import { useQuery } from '../lib/useQuery';
+import { useTopic, roomTopic } from '../lib/stream';
 import { WidgetGrid } from '../components/Widget';
 import { ServicePanel } from '../components/ServicePanel';
 import { Accordion } from '../components/Accordion';
 import { Tile } from '../components/Tile';
 import { useChurch } from '../layout/church';
 
-const POLL_MS = 4000;
-
 // When a show is live in this room, say so LOUDLY: which service, since when,
 // and one tap to the live Run of Show. (The Home tile already shows LIVE —
 // this is the page that tile lands on, so it must carry the thread.)
 function LiveBanner({ roomId }: { roomId: string }) {
-  const show = useQuery(`show:${roomId}`, () => getShow(roomId), { pollMs: 5000, staleMs: 2000 });
-  const active = show.data?.active ? show.data : null;
+  const show = useTopic<ShowState>(roomTopic.show(roomId));
+  const active = show?.active ? show : null;
   const planQ = useQuery(
     active?.planId ? `plan:${roomId}:${active.planId}` : null,
     () => getRoomPlan(roomId, active!.planId!),
@@ -72,7 +71,6 @@ export function RoomStatus() {
   const { roomId = '' } = useParams();
   const church = useChurch();
   const [room, setRoom] = useState<RoomMeta | null>(null);
-  const [state, setState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<RoomMode | null>(null); // confirm dialog
   const [pin, setPin] = useState('');
@@ -89,19 +87,16 @@ export function RoomStatus() {
     };
   }, [roomId]);
 
-  const refresh = useCallback(async () => {
-    try {
-      setState(await getRoomState(roomId));
-    } catch {
-      /* keep last state */
-    }
-  }, [roomId]);
-
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-  }, [refresh]);
+  // Mode is pushed from the room's shared watcher rather than polled per
+  // browser. The one-shot fetch alongside it is only for first paint — this
+  // page renders nothing until it has a state, and waiting on the stream's
+  // connect for that would put a "Loading…" in front of the operator. After
+  // the first push, the push always wins.
+  const pushed = useTopic<RoomState>(roomTopic.mode(roomId));
+  const initial = useQuery(`room-state:${roomId}`, () => getRoomState(roomId), {
+    staleMs: 30_000,
+  }).data;
+  const state = pushed ?? initial ?? null;
 
   const protection = state?.protection;
   const isLocked = useCallback(
@@ -126,8 +121,7 @@ export function RoomStatus() {
     setBusy(true);
     setPinError(null);
     try {
-      const next = await setRoomMode(roomId, pending.id, locked ? pin : undefined);
-      setState(next);
+      await setRoomMode(roomId, pending.id, locked ? pin : undefined);
       setPending(null);
     } catch (err) {
       if (err instanceof OverrideRequiredError) {
@@ -137,9 +131,11 @@ export function RoomStatus() {
       }
     } finally {
       setBusy(false);
-      refresh();
+      // No refetch: the server pushes the new mode as soon as the press lands
+      // (routes/rooms.js bumps the room's watcher), so every screen in the
+      // building moves together rather than this one moving first.
     }
-  }, [pending, roomId, pin, isLocked, refresh]);
+  }, [pending, roomId, pin, isLocked]);
 
   if (error) {
     return (

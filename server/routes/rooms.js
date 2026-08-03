@@ -6,6 +6,7 @@ import { rooms } from '../roomsStore.js';
 import { publicRoom } from '../roomModel.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 import { readRoomState, applyMode, modeLockError } from '../roomModes.js';
+import { bump } from '../roomStateWatcher.js';
 
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.post('/api/rooms/:id/mode', requirePermission('rooms.mode.change'), async
 
   try {
     const result = await applyMode(room, mode);
+    bump(room.id); // push the new mode to every watching screen now, not in 4s
     auditSuccess(req, 'rooms.mode.change', { resourceType: 'room-mode', resourceId: mode.id });
     res.json({ ok: true, mode: mode.id, ...result });
   } catch (err) {

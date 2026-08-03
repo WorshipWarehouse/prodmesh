@@ -16,13 +16,16 @@ Every other screen (room Macs, booth displays) is **just a browser** pointed at
 that one server. There is exactly **one server to run and update**.
 
 ```
-Browser (Quick Access · Room Status · Settings)
-      │  /api/*
+Browser (Home · Services · Analytics · Admin · Room pages)
+      │  /api/*            request/response  → useQuery
+      │  /api/stream       one SSE, N topics → useTopic
       ▼
 Express server (server/)
   ├─ proxy → Bitfocus Companion (per room, :8000)   read var / press button
-  ├─ integrations/ → Planning Center (services)     auth→fetch→normalize→cache
-  ├─ settings store (server/data/*.json)            PINs, lockout schedules
+  ├─ integrations/ → Planning Center, ProPresenter, Smaart/RTA
+  ├─ streamHub.js → topics + refcounted watchers    (ADR 0010)
+  ├─ SQLite (prodmesh.db)                           topology, config, facts
+  ├─ server/data/*.json                             secrets + bootstrap only
   └─ serves the built SPA (dist/) in production
 ```
 
@@ -30,39 +33,45 @@ Express server (server/)
 
 - Frontend: **React 19 + TypeScript + Vite**, **React Router**. Dark, glanceable.
 - Backend: **Express 5**, plain ESM JavaScript (no build step), Node 20 (`.nvmrc`).
-- Tests: **`node --test`** (backend). CI: GitHub Actions (build + test).
-- No database — JSON files on disk for runtime settings.
+- Tests: **`node --test`** (backend), **Vitest + Testing Library** (frontend).
+  CI: GitHub Actions (build + both test layers + lint).
+- **SQLite** (`better-sqlite3`) owns server-managed configuration and
+  operational facts (ADR 0006, ADR 0009). Only deployment bootstrap and
+  restricted secrets stay in `server/data/*.json`.
 
 ## Layers & where things live
 
 | Concern | Location |
 |---|---|
-| Quick Access tile grid (structural) | `src/config/dashboard.config.ts` |
+| Topology (sites, rooms, tiles) | SQLite, served by `GET /api/config`; seeded by `server/topologySeed.js` |
 | Tile types & rendering | `src/types.ts`, `src/tiles/registry.tsx`, `src/components/Tile.tsx` |
-| Pages | `src/pages/` (QuickAccess, RoomStatus, Settings) |
-| API client | `src/api.ts` |
-| Room control config (structural) | `server/rooms.config.js` |
+| Pages | `src/pages/` |
+| API client (request/response) | `src/api.ts` + `src/lib/useQuery.ts` |
+| Live values (push) | `src/lib/stream.ts` (`useTopic`) |
+| Room control config | `server/roomsStore.js` from SQLite; `server/rooms.config.js` is a fresh-install seed |
 | Companion client | `server/companion.js` |
-| Runtime settings (operational) | `server/settings.js` → `server/data/settings.json` |
+| Runtime settings (operational) | `server/settings.js` |
 | Lockout engine | `server/settings.js` (`computeProtection`, `isModeLocked`) |
 | Integrations | `server/integrations/*.js` |
+| Live topics + watcher lifecycle | `server/streamHub.js`, `server/showManager.js`, `server/roomStateWatcher.js` |
 | Secrets | `server/secrets.js` → `server/data/secrets.json` |
-| HTTP surface | `server/index.js` |
+| HTTP surface | `server/index.js` + `server/routes/*.js` |
 | Config validation | `server/validate.js` (runs at startup) |
 | Deploy/update | `deploy/*.sh` |
 
 ## The patterns that keep it from sprawling
 
-1. **Config-driven tiles + registry.** The launcher is data (`dashboard.config.ts`).
+1. **Config-driven tiles + registry.** The launcher is data, served from SQLite.
    A new tile *type* = one variant in `types.ts` + one entry in `registry.tsx`;
-   everything else renders it automatically. New machine/tool = a data edit.
+   everything else renders it automatically. New machine/tool = a data edit made
+   in Admin → Campuses, no rebuild.
 
-2. **Two config tiers.**
-   - *Structural* (rooms, Companion hosts, button locations, PC service-type ids)
-     lives in code (`rooms.config.js`), set up carefully and rarely. Getting it
-     wrong fires the wrong AV action, so it is **not** casually UI-editable.
-   - *Operational* (PINs, lockout schedules) lives in the runtime store and is
-     edited via the Settings UI. Over time, more migrates tier-1 → tier-2.
+2. **The database owns configuration.** Rooms, Companion hosts, button
+   locations and PC service-type ids all live in SQLite and are edited in
+   Admin (ADR 0009). `rooms.config.js` is now only a fresh-install seed. Getting
+   this config wrong fires the wrong AV action, so the *editing* is permission-
+   gated and validated — the old answer, keeping it in code, made every church
+   depend on whoever could edit and redeploy.
 
 3. **Integration pattern:** each external service is a self-contained module doing
    **auth → fetch → normalize → cache**, with a **mock-first** fallback. See
@@ -78,10 +87,18 @@ Express server (server/)
 
 ## Key flows
 
-- **Room state:** RoomStatus polls `GET /api/rooms/:id/state` every 4s → server
-  reads the Companion custom variable (or mock) and maps it to a mode. It mirrors
-  Companion's truth regardless of who changed it (our page, a Stream Deck, a
-  trigger). (No push API exists — see ADR notes / polling is deliberate.)
+- **Live values:** one SSE connection per browser at `/api/stream?topics=…`
+  (ADR 0010). A widget names a topic (`room:<id>:mode`, `:show`, `:timer`,
+  `:spl`); the hub refcounts subscribers and starts/stops the producing watcher
+  accordingly, so no room is polled for nobody's benefit. `useTopic` on the
+  client holds the single connection and reconnects, debounced, as the topic
+  set changes.
+- **Room state:** the server polls Companion once per room while anyone is
+  watching `room:<id>:mode`, and publishes on change. It mirrors Companion's
+  truth regardless of who changed it (our page, a Stream Deck, a trigger) —
+  Companion has no push API, so *someone* must poll; the point is that it is
+  one poller, not one per browser. `GET /api/rooms/:id/state` remains for
+  one-off reads and first paint.
 - **Mode change:** `POST /api/rooms/:id/mode` presses the mapped Companion button.
   If the mode is locked in a protected window, the server requires the Override
   PIN (`403 override_required` otherwise).
@@ -136,13 +153,19 @@ Express server (server/)
   Services doesn't reliably know the physical room. See ADR 0001.
 - **launchd/systemd don't inherit your PATH** — the service installer bakes in the
   absolute `node` path.
+- **Browsers allow six concurrent connections per origin on HTTP/1.1**, and
+  this box has no TLS and so no HTTP/2. That is why live data is one
+  multiplexed stream rather than one per room: past six, the seventh
+  `EventSource` never opens and nothing reports an error. See ADR 0010.
 
 ## Testing & CI
 
-`npm test` runs `node --test` over `server/*.test.js`: pure helpers, config
-validation, the settings/lock engine, the PC integration (mock + cache), and full
-API auth + lockout flows against mock-mode rooms (no Companion/PC needed). CI runs
-build + test on push/PR. Frontend component tests are deferred (see STATE.md).
+`npm test` runs both layers: `node --test` over `server/*.test.js` (pure
+helpers, config validation, the settings/lock engine, the PC integration, the
+stream hub, and full API auth + lockout flows against mock-mode rooms — no
+Companion/PC needed) and Vitest + Testing Library over `src/**/*.test.tsx`. CI
+runs build + both + lint on push. See [TESTING.md](TESTING.md), and the section
+in CLAUDE.md on what green can and cannot certify.
 
 ## Decisions
 

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getRooms, getRoomService, type RoomMeta, type ServicePlan } from '../api';
+import { useQuery } from '../lib/useQuery';
 import { inCampus, useCampus } from '../layout/campus';
 import { roomLabel, useChurch } from '../layout/church';
 
@@ -29,43 +29,28 @@ function fmtTimes(plan: ServicePlan) {
 export function Services() {
   const { campusId } = useCampus();
   const church = useChurch();
-  const [events, setEvents] = useState<EventRow[] | null>(null);
-  const [anyLive, setAnyLive] = useState(false);
-
-  useEffect(() => {
-    let on = true;
-    const load = async () => {
-      try {
-        const all = await getRooms();
-        if (!on) return;
-        const results = await Promise.all(
-          all.map((room) =>
-            getRoomService(room.id)
-              .then((s) =>
-                s.configured
-                  ? s.plans.map((plan) => ({ room, plan, live: s.live, startsAt: firstServiceStart(plan) }))
-                  : [],
-              )
-              .catch(() => [] as EventRow[]),
-          ),
-        );
-        if (!on) return;
-        const rows = results.flat().sort((a, b) => (a.startsAt ?? Infinity) - (b.startsAt ?? Infinity));
-        setEvents(rows);
-        setAnyLive(rows.some((r) => r.live));
-      } catch {
-        /* keep last data */
-      }
-    };
-    load();
-    const iv = setInterval(load, REFRESH_MS);
-    return () => {
-      on = false;
-      clearInterval(iv);
-    };
-  }, []);
+  const events = useQuery<EventRow[]>(
+    'services',
+    async () => {
+      const all = await getRooms();
+      const results = await Promise.all(
+        all.map((room) =>
+          getRoomService(room.id)
+            .then((s) =>
+              s.configured
+                ? s.plans.map((plan) => ({ room, plan, live: s.live, startsAt: firstServiceStart(plan) }))
+                : [],
+            )
+            .catch(() => [] as EventRow[]),
+        ),
+      );
+      return results.flat().sort((a, b) => (a.startsAt ?? Infinity) - (b.startsAt ?? Infinity));
+    },
+    { pollMs: REFRESH_MS, staleMs: REFRESH_MS },
+  ).data;
 
   const visible = (events ?? []).filter((e) => inCampus(campusId, e.room.site));
+  const anyLive = (events ?? []).some((e) => e.live);
 
   return (
     <div className="services">

@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-07-06.
+Last updated: 2026-08-03.
 
 ## Sites & rooms
 
@@ -89,7 +89,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **125 server tests** with **16 frontend interaction/configuration tests**
+  combines **258 server tests** with **106 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -231,6 +231,35 @@ Notes:
   churches with a server or homelab. It does **not** serve the booth-Mac
   church, which is what the planned tray launcher is for — Docker is not an
   answer to "how do we install this" for a volunteer with one machine.
+- **One topic stream per browser** (2026-08-03, ADR 0010 — first piece of 1.1):
+  live data moved from one SSE per room carrying a fixed envelope to one SSE
+  per browser carrying named topics. `server/streamHub.js` owns the topic
+  registry and the refcounted producer lifecycle (`registerTopic(pattern,
+  { valid, start, stop, snapshot })`); `GET /api/stream?topics=…` emits
+  `{topic, data}`; `src/lib/stream.ts` holds the single connection and
+  `useTopic()` is the push-side companion to `useQuery`. The room is now four
+  topics — `show`, `timer`, `spl` and the new **`mode`**.
+  - **Why**: a Dashboard view spanning six rooms would have opened six
+    `EventSource`s, and browsers cap HTTP/1.1 at **six connections per origin**
+    — with no TLS (deliberate, see the threat model) there is no HTTP/2 to
+    escape into, so the sixth stream silently never opens.
+  - **`room:<id>:mode` replaces per-browser polling.** `readRoomState()` hits
+    Companion uncached and every RoomCard ran its own interval firing three
+    requests — Home with six rooms in three browsers was 54 Companion reads a
+    minute. Now: one poller per room however many are watching, published on
+    change, and `bump()` after a mode press pushes immediately, so every screen
+    in the building moves together instead of up to 30s apart.
+  - `/api/rooms/:id/show/stream` **still works** — reimplemented as an adapter
+    over the same three topics, so room-Mac homepages and bookmarks are
+    unaffected and the two surfaces cannot drift.
+  - Client migrations: RunOfShow, RoomCard and RoomStatus onto `useTopic`;
+    ServicePanel, Services and ServiceReport off bespoke `setInterval` onto
+    `useQuery` (RoomCard and ServicePanel now share one cache key, so a room's
+    card and its panel make one Planning Center request between them).
+  - Tests: `streamHub.test.js` (isolated — it resets the registry, so it must
+    not import `index.js`) and `streamApi.test.js` (the endpoint, real app) are
+    deliberately separate files. jsdom has no `EventSource`, so one is stubbed
+    globally in `src/test/setup.ts`.
 - **Storage direction:** ADR 0009 supersedes the earlier JSON-for-config split.
   Server-managed configuration and operational facts live in SQLite; only
   deployment bootstrap and restricted secrets remain outside it. Portability is
@@ -285,8 +314,31 @@ Notes:
    port 8080, logs in `~/prodmesh/logs/server.log`, RunAtLoad + KeepAlive). The
    Producer bridges the production LAN and the audio network, so it reaches
    Smaart directly.
-7. **Later widgets on Run of Show:** YouTube Live viewers, SMAART loudness, on-air.
-8. **Safe change — preview / diff / rollback for room programming.** (Idea, not
+7. **1.1 — in progress.** Three features, sequenced scaffolding → YouTube →
+   launcher:
+   - ~~Streaming/widget scaffolding for custom Dashboard views~~ transport
+     **done 2026-08-03** (ADR 0010, above). Remaining: the widget registry
+     (mirroring `src/tiles/registry.tsx`) and arbitrary 1–12 column spans on
+     `WidgetGrid` — `.widgets` is already a 12-col grid, only the span
+     vocabulary (`half`/`third`/`two-thirds`) is narrow. The Dashboard *feature*
+     — stored, editable layouts — is 1.5; 1.1 only lays the track.
+   - **YouTube Live viewership** in Show Reports as a mini-graph KPI. Shaped by
+     one constraint: `concurrentViewers` **vanishes when the stream ends** and
+     is absent if the broadcaster hides the counter, so the graph can only be
+     our own recording — a sampling integration structurally identical to SPL
+     (`stream_samples` mirroring `spl_samples`, keyed by the same instanceId,
+     aggregated into `show_summaries`). API key only, no OAuth: `videos.list`
+     costs 1 quota unit against 10k/day, `search.list` (finding the live video)
+     costs 100 — so search once at show start, then poll `videos.list`. A fifth
+     `room_connectivity` integration, edited on the room page.
+   - **Desktop launcher** (Electron, matching Companion) for the booth-Mac
+     church that can't run Docker. `server/deployment.js` gains a `desktop`
+     kind; `PRODMESH_DATA_DIR` → `app.getPath('userData')`. The work is
+     `better-sqlite3` needing an Electron-ABI rebuild per platform, plus macOS
+     signing/notarization — unsigned means a volunteer meets Gatekeeper, which
+     substantially defeats the feature.
+8. **Later widgets on Run of Show:** SMAART loudness, on-air.
+9. **Safe change — preview / diff / rollback for room programming.** (Idea, not
    yet designed.) A control surface gets programmed once and then frozen: a
    volunteer who is unsure what a mode edit will actually *do* will simply not
    touch it, because Sunday is coming and a wrong guess is visible to the whole

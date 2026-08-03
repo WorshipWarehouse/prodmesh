@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 import { writeJsonAtomic } from './atomicFile.js';
 
 import { rooms } from './roomsStore.js';
+import * as hub from './streamHub.js';
 import { onConnectivityChange } from './connectivity.js';
 import * as ppro from './integrations/proPresenter.js';
 import * as pco from './integrations/planningCenter.js';
@@ -31,21 +32,28 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SHOWS_DIR = join(process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data'), 'shows');
 
 const shows = new Map(); // roomId -> runtime show (only while active)
-const subscribers = new Map(); // roomId -> Set<res> (persists across show start/end)
 const timers = new Map(); // roomId -> published PP timer state (or null)
 const timerWatchers = new Map(); // roomId -> AbortController (runs while subscribed)
 const spls = new Map(); // roomId -> published SPL state (or null)
 const splWatchers = new Map(); // roomId -> AbortController (runs while subscribed)
 
+// Topic names this module publishes. The room's live state is three
+// independent facets, not one envelope: a slide change should not re-send the
+// SPL meter, and a widget that only wants loudness should not make the server
+// poll ProPresenter's timers.
+export const showTopic = (roomId) => `room:${roomId}:show`;
+export const timerTopic = (roomId) => `room:${roomId}:timer`;
+export const splTopic = (roomId) => `room:${roomId}:spl`;
+
 const instanceId = (show) => `${show.planId}__${show.timeId}`;
 const showFile = (roomId) => join(SHOWS_DIR, `${roomId.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`);
 
-// ── Public state + SSE fan-out ────────────────────────────────────────────────
-export function getState(roomId) {
-  const timer = timers.get(roomId) ?? null;
-  const spl = spls.get(roomId) ?? null;
+// ── Public state + topic fan-out ──────────────────────────────────────────────
+
+/** Just the show facet — what `room:<id>:show` carries. */
+function showState(roomId) {
   const show = shows.get(roomId);
-  if (!show) return { active: false, timer, spl };
+  if (!show) return { active: false };
   return {
     active: true,
     roomId,
@@ -55,39 +63,51 @@ export function getState(roomId) {
     follow: show.follow,
     ppConnected: show.ppConnected,
     current: show.current,
-    timer,
-    spl,
   };
 }
 
-function subs(roomId) {
-  if (!subscribers.has(roomId)) subscribers.set(roomId, new Set());
-  return subscribers.get(roomId);
+/**
+ * The combined envelope: still what `GET /api/rooms/:id/show` answers and what
+ * the legacy per-room stream emits, assembled from the three facets rather
+ * than being the thing they are carved out of.
+ */
+export function getState(roomId) {
+  return {
+    ...showState(roomId),
+    timer: timers.get(roomId) ?? null,
+    spl: spls.get(roomId) ?? null,
+  };
 }
 
-function broadcast(roomId) {
-  const data = `event: state\ndata: ${JSON.stringify(getState(roomId))}\n\n`;
-  for (const res of subs(roomId)) res.write(data);
-}
+const publishShow = (roomId) => hub.publish(showTopic(roomId), showState(roomId));
+const publishTimer = (roomId) => hub.publish(timerTopic(roomId), timers.get(roomId) ?? null);
+const publishSpl = (roomId) => hub.publish(splTopic(roomId), spls.get(roomId) ?? null);
 
-export function subscribe(roomId, res) {
-  subs(roomId).add(res);
-  res.write(`event: state\ndata: ${JSON.stringify(getState(roomId))}\n\n`);
-  startTimerWatcher(roomId);
-  startSplWatcher(roomId);
-}
+// The show topic's producer is the show itself, which runs whether or not a
+// browser is attached — so it has no start/stop, only a snapshot. The timer
+// and SPL topics are the opposite: their watchers exist to feed viewers, so
+// the hub's refcount is what starts and stops them. That is the property this
+// whole refactor exists to preserve — nobody polls ProPresenter for a room no
+// one is looking at.
+hub.registerTopic('room:*:show', {
+  valid: (roomId) => Boolean(rooms[roomId]),
+  snapshot: (roomId) => showState(roomId),
+});
+hub.registerTopic('room:*:timer', {
+  valid: (roomId) => Boolean(rooms[roomId]),
+  start: startTimerWatcher,
+  stop: stopTimerWatcher,
+  snapshot: (roomId) => timers.get(roomId) ?? null,
+});
+hub.registerTopic('room:*:spl', {
+  valid: (roomId) => Boolean(rooms[roomId]),
+  start: startSplWatcher,
+  stop: stopSplWatcher,
+  snapshot: (roomId) => spls.get(roomId) ?? null,
+});
 
-export function unsubscribe(roomId, res) {
-  subs(roomId).delete(res);
-  if (subs(roomId).size === 0) {
-    stopTimerWatcher(roomId);
-    stopSplWatcher(roomId);
-    // Drop the entry too. subs() creates a Set for ANY key, so leaving empty
-    // ones behind meant one permanent Map entry per distinct roomId ever
-    // requested — unbounded growth driven by an unauthenticated endpoint.
-    subscribers.delete(roomId);
-  }
-}
+/** Topics the legacy combined `state` event is assembled from. */
+export const roomTopics = (roomId) => [showTopic(roomId), timerTopic(roomId), splTopic(roomId)];
 
 // ── PP timer watcher ─────────────────────────────────────────────────────────
 //  The room's "Service Start Timer" counts down BETWEEN services (a Message
@@ -129,7 +149,7 @@ function timerSleep(ms, signal) {
 //  SQLite only while a show is live; the live meter is broadcast either way.
 
 function splNeeded(roomId) {
-  return subs(roomId).size > 0 || shows.has(roomId);
+  return hub.subscriberCount(splTopic(roomId)) > 0 || shows.has(roomId);
 }
 
 function startSplWatcher(roomId) {
@@ -141,7 +161,7 @@ function startSplWatcher(roomId) {
   analysis.watchSpl(cfg, (s) => onSpl(roomId, s), ctl.signal).catch(() => {
     if (!ctl.signal.aborted) {
       spls.set(roomId, null);
-      broadcast(roomId);
+      publishSpl(roomId);
     }
   });
 }
@@ -167,15 +187,15 @@ function restartSplWatcher(roomId) {
     show.splStats = splStore.runningStats(instanceId(show)); // start recording mid-show
   }
   if (splNeeded(roomId)) startSplWatcher(roomId);
-  broadcast(roomId);
+  publishSpl(roomId);
 }
 
 function restartTimerWatcher(roomId) {
   timerWatchers.get(roomId)?.abort();
   timerWatchers.delete(roomId);
   timers.delete(roomId);
-  if (subs(roomId).size > 0) startTimerWatcher(roomId);
-  broadcast(roomId);
+  if (hub.subscriberCount(timerTopic(roomId)) > 0) startTimerWatcher(roomId);
+  publishTimer(roomId);
 }
 
 function restartPoller(show) {
@@ -269,7 +289,7 @@ function onSpl(roomId, sample) {
           }
         : null,
   });
-  broadcast(roomId);
+  publishSpl(roomId);
 }
 
 async function watchTimers(roomId, pp, signal) {
@@ -287,7 +307,7 @@ async function watchTimers(roomId, pp, signal) {
     if (key !== lastKey) {
       lastKey = key;
       timers.set(roomId, next);
-      broadcast(roomId);
+      publishTimer(roomId);
     }
     await timerSleep(next ? 1000 : 5000, signal); // back off while PP is offline
   }
@@ -390,7 +410,7 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
   // Seed running SPL stats from any samples already recorded (reopened show).
   if (analysis.isConfigured(room.analysis)) show.splStats = splStore.runningStats(instanceId(show));
   persistShow(show);
-  broadcast(roomId);
+  publishShow(roomId);
   startPoller(show);
   startSplWatcher(roomId); // capture runs with the show, not the browsers
   startShowLogging(show);
@@ -427,7 +447,7 @@ export function endShow(roomId) {
   removeShowFile(roomId);
   stopSplWatcher(roomId); // no-op if viewers still want the live meter
   stopShowLogging(show);
-  broadcast(roomId);
+  publishShow(roomId);
   return getState(roomId);
 }
 
@@ -445,7 +465,7 @@ export function setCurrent(roomId, { itemId, follow } = {}) {
     const idx = show.items.findIndex((i) => i.id === itemId);
     applyCurrent(show, itemId, show.itemById.get(itemId)?.title, idx >= 0 ? idx : null);
   }
-  broadcast(roomId);
+  publishShow(roomId);
   return getState(roomId);
 }
 
@@ -454,7 +474,7 @@ function startPoller(show) {
   const pp = rooms[show.roomId]?.proPresenter;
   if (!ppro.isConfigured(pp)) {
     show.ppConnected = false;
-    broadcast(show.roomId);
+    publishShow(show.roomId);
     return;
   }
   ppro
@@ -462,7 +482,7 @@ function startPoller(show) {
     .catch(() => {
       if (!show.abort.signal.aborted) {
         show.ppConnected = false;
-        broadcast(show.roomId);
+        publishShow(show.roomId);
       }
     });
 }
@@ -490,7 +510,7 @@ function onPoll(show, s) {
       return;
     }
   }
-  broadcast(show.roomId);
+  publishShow(show.roomId);
 }
 
 // Set the current item and record the transition (once) into the timeline.
@@ -512,7 +532,7 @@ export function refreshConfig(roomId, planId) {
   const show = shows.get(roomId);
   if (show && show.planId === planId) {
     show.config = showConfig.getConfig(roomId, planId);
-    broadcast(roomId);
+    publishShow(roomId);
   }
 }
 
