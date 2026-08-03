@@ -39,10 +39,33 @@ broke on 21.1.
 
 ### Chunked streaming
 
-`?chunked=true` on `/v1/presentation/slide_index` **pushes** — every slide
-advance arrives sub-second, carrying `presentation_id.uuid/name` and (on 21.4)
-`total_cues` / `remaining_cues`. Verified live on **both 21.1 and 21.4**.
+`?chunked=true` on `/v1/presentation/slide_index` **pushes** sub-second,
+carrying `presentation_id.uuid/name` and (on 21.4) `total_cues` /
+`remaining_cues`. Verified live on **both 21.1 and 21.4**.
 `/v1/playlist/active?chunked=true` also pushes item changes on 21.4.
+
+**It does not push every slide.** ProPresenter *coalesces* rapid advances: a
+slide that is passed through quickly is never pushed at all. Measured
+2026-08-04 against the raw endpoint with no dashboard in the path — four
+`GET /v1/trigger/next` calls 200 ms apart moved PP from index 40 to 44, and
+the stream pushed **40, 42, 43, 44**. Single-stepping is contiguous (37→38,
+39→40), so 41 was a real index that was simply never announced. An earlier run
+skipped 36 the same way. This is not a framing or parsing bug on our side —
+prodmesh's own SSE reproduced PP's output exactly, index for index.
+
+The consequence: **a coalesced slide can only be found by the watchdog poll**,
+so how stale the slide bar gets is the watchdog interval, currently 5s while
+the stream is trusted. This is what "the progress bar missed a slide, then
+caught up" is. Nothing can do better at the source — a slide that existed for
+200 ms and was never pushed cannot be observed by any polling rate a booth
+machine should be running.
+
+Note the safety net is narrower than it looks: `pollRunState` untrusts the
+stream when the watchdog sees a slide the stream never pushed, but if the
+operator has already moved on by the time the watchdog fires, the poll and the
+stream agree on the *newer* index and no divergence is detected. So coalescing
+does not reliably demote the stream — nor should it, since the stream is still
+working correctly.
 
 `pollRunState` auto-detects streaming, relaxes to a 5s watchdog while it trusts
 the stream, and reverts to full-rate polling on disconnect, three failed
