@@ -104,10 +104,45 @@ surfaces cannot drift.
   that boot the app must live in different files (`streamHub.test.js` vs
   `streamApi.test.js`) — the usual one-process-per-boot-state rule.
 
+## The widget registry (added 2026-08-04)
+
+`src/widgets/registry.tsx` mirrors `src/tiles/registry.tsx` — the pattern that
+already works here. A widget type is one entry plus one component.
+
+The load-bearing constraint is the **props contract**: a widget receives
+`{ roomId, config }` and nothing else. A stored layout is data, so a widget can
+only be placed from data if it can get everything it needs from data. Which
+means widgets fetch their own state instead of receiving it as props.
+
+That reads like duplicated work and isn't, provided both sides use the same
+cache key — hence `src/lib/keys.ts`. Subscriptions refcount through `useTopic`;
+requests share through `useQuery`. Verified on the live Run of Show page: one
+`/api/stream` carrying exactly `show`, `spl`, `timer`, and one plan request
+serving both the page and its countdown. Getting this wrong is silent — a
+mismatched key doesn't break anything, it just doubles the request — which is
+why the keys are centralized rather than spelled out per call site.
+
+**Not everything on a screen is a widget.** Run of Show's Start/End/Prev/Next
+stays a page component: no dashboard would place it, and giving it a config
+contract would be inventing a requirement to satisfy a pattern. The registry
+holds `countdown` and `loudness`, which are genuinely relocatable — the
+countdown follows the room's next service when no plan is pinned, so a lobby
+screen doesn't need reconfiguring weekly.
+
+Run of Show renders through the registry rather than importing the components,
+deliberately: it is the first consumer of the path a stored layout will take,
+so a wrong contract is wrong there first.
+
+Spans became arbitrary 1–12 columns (`.widgets` was already `repeat(12, 1fr)`);
+`half`/`third`/`two-thirds` remain aliases. `spanColumns()` range-checks even
+though `WidgetSpan` says it can't need to — spans arrive from the database,
+where the type is a promise nothing has enforced.
+
 ## Not decided here
 
-The widget registry and stored dashboard layouts. This ADR is the transport
-they will need; the layout model is its own decision.
+Stored dashboard layouts: the schema, the editor, and how a layout is scoped to
+a room or campus. This ADR is the transport and the component contract they
+will need; the layout model is its own decision.
 
 ## Known limits, if devices ever publish into this
 
