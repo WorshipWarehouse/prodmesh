@@ -15,6 +15,7 @@ import * as ppro from '../integrations/proPresenter.js';
 import * as auth from '../authStore.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 import { applyMode, modeLockError } from '../roomModes.js';
+import { bump } from '../roomStateWatcher.js';
 
 const router = express.Router();
 
@@ -199,6 +200,7 @@ router.post('/api/rooms/:id/event/:planId/checklist/:itemId', requirePermission(
       const lockError = modeLockError(req, room.id, mode.id, req.body?.overridePin);
       if (lockError) return res.status(403).json(lockError);
       await applyMode(room, mode); // throws → 502 below, item stays unchecked
+      bump(room.id); // an automated checklist item moves the mode; screens follow
     }
 
     checklist.setItem(room.id, plan.id, item.id, done);

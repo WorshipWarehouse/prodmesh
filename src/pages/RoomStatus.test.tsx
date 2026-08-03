@@ -9,7 +9,6 @@ const api = vi.hoisted(() => ({
   getRoom: vi.fn(),
   getRoomState: vi.fn(),
   setRoomMode: vi.fn(),
-  getShow: vi.fn(),
   getRoomPlan: vi.fn(),
 }));
 
@@ -27,6 +26,7 @@ vi.mock('../components/ServicePanel', () => ({
 
 import { OverrideRequiredError } from '../api';
 import { clearQueryCache } from '../lib/useQuery';
+import { emitTopic } from '../test/fakeEventSource';
 import { ChurchContext } from '../layout/church';
 
 const room: RoomMeta = {
@@ -86,8 +86,6 @@ beforeEach(() => {
   api.getRoom.mockResolvedValue(room);
   api.getRoomState.mockResolvedValue(baseState);
   api.setRoomMode.mockReset();
-  api.getShow.mockReset();
-  api.getShow.mockResolvedValue({ active: false });
   api.getRoomPlan.mockReset();
   api.getRoomPlan.mockResolvedValue({
     live: true,
@@ -113,14 +111,9 @@ describe('mode buttons', () => {
     expect(panel.getByRole('button', { name: 'Standby' })).toBeEnabled();
   });
 
-  it('confirms an unlocked change and applies the server response', async () => {
+  it('confirms an unlocked change and follows the mode the server pushes back', async () => {
     const next = { ...baseState, mode: 'show', raw: 'show' };
-    // confirmMode refreshes state afterwards — from then on the server
-    // reports the new mode (before the change it still reports walkin).
-    api.setRoomMode.mockImplementation(async () => {
-      api.getRoomState.mockResolvedValue(next);
-      return next;
-    });
+    api.setRoomMode.mockResolvedValue(next);
     const user = userEvent.setup();
     renderPage();
 
@@ -132,7 +125,11 @@ describe('mode buttons', () => {
     // No PIN prompt for an unlocked mode — overridePin stays undefined.
     expect(api.setRoomMode).toHaveBeenCalledWith('north-main', 'show', undefined);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    const active = screen.getByRole('button', { name: /^Show/ });
+
+    // The page does NOT paint the response; the server bumps the room's mode
+    // watcher after the press so every screen moves on the same push.
+    await emitTopic({ 'room:north-main:mode': next });
+    const active = await screen.findByRole('button', { name: /^Show/ });
     expect(active).toBeDisabled();
     expect(within(active).getByText('Active now')).toBeInTheDocument();
   });
@@ -211,11 +208,13 @@ describe('live-show banner', () => {
   });
 
   it('announces the live service with its time and links to the Run of Show', async () => {
-    api.getShow.mockResolvedValue({
-      active: true, roomId: 'north-main', planId: 'plan-1', timeId: 't-svc',
-      startedAt: new Date('2026-07-26T15:58:00Z').getTime(),
-    });
     renderPage();
+    await emitTopic({
+      'room:north-main:show': {
+        active: true, roomId: 'north-main', planId: 'plan-1', timeId: 't-svc',
+        startedAt: new Date('2026-07-26T15:58:00Z').getTime(),
+      },
+    });
 
     expect(await screen.findByText('LIVE')).toBeInTheDocument();
     expect(await screen.findByText('July 27 Service')).toBeInTheDocument();
@@ -226,9 +225,11 @@ describe('live-show banner', () => {
   });
 
   it('falls back gracefully when the plan is no longer fetchable', async () => {
-    api.getShow.mockResolvedValue({ active: true, planId: 'plan-old', timeId: 'default' });
     api.getRoomPlan.mockRejectedValue(new Error('Plan not found'));
     renderPage();
+    await emitTopic({
+      'room:north-main:show': { active: true, planId: 'plan-old', timeId: 'default' },
+    });
 
     expect(await screen.findByText('LIVE')).toBeInTheDocument();
     expect(screen.getByText('Show in progress')).toBeInTheDocument();

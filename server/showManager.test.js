@@ -8,6 +8,7 @@ import { WebSocketServer } from 'ws';
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-show-'));
 process.env.PRODMESH_SHOW_POLL_MS = '30'; // PP poll: 800ms → 30ms
 const sm = await import('./showManager.js');
+const hub = await import('./streamHub.js');
 const pco = await import('./integrations/planningCenter.js');
 const timeline = await import('./timeline.js');
 const conn = await import('./connectivity.js');
@@ -125,8 +126,9 @@ test('auto-complete ignores PP’s stale last-slide flash when the end item is r
 test('a connectivity save restarts the SPL watcher with the new config', async () => {
   const srvA = fakeRta(85);
   const srvB = fakeRta(90);
-  const res = { write: () => {} }; // fake SSE subscriber keeps the watcher wanted
-  sm.subscribe(ROOM, res);
+  // A subscriber on the room's SPL topic is what keeps the watcher wanted.
+  const res = { write: () => {} };
+  hub.subscribe(res, [sm.splTopic(ROOM)]);
   try {
     // The room has no analysis source → no meter.
     assert.equal(sm.getState(ROOM).spl, null);
@@ -143,7 +145,7 @@ test('a connectivity save restarts the SPL watcher with the new config', async (
     conn.setAnalysis(ROOM, null);
     assert.equal(sm.getState(ROOM).spl, null);
   } finally {
-    sm.unsubscribe(ROOM, res);
+    hub.unsubscribe(res);
     conn.setAnalysis(ROOM, null); // leave the shared room as this test found it
     await srvA.close();
     await srvB.close();

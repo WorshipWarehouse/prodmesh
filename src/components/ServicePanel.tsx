@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getRoomService, type RoomService } from '../api';
+import { getRoomService } from '../api';
+import { useQuery } from '../lib/useQuery';
 import { OrderOfService } from './OrderOfService';
 import { Widget } from './Widget';
 
@@ -26,19 +27,13 @@ export function ServicePanel({
   roomId: string;
   span?: 'half' | 'third' | 'two-thirds';
 }) {
-  const [service, setService] = useState<RoomService | null>(null);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    const load = () => getRoomService(roomId).then((s) => active && setService(s)).catch(() => {});
-    load();
-    const iv = setInterval(load, REFRESH_MS);
-    return () => {
-      active = false;
-      clearInterval(iv);
-    };
-  }, [roomId]);
+  // Same cache key as RoomCard's: a Home page showing this room's card and its
+  // panel makes one Planning Center request between them, not two.
+  const service = useQuery(`room-service:${roomId}`, () => getRoomService(roomId), {
+    pollMs: REFRESH_MS,
+    staleMs: REFRESH_MS,
+  }).data;
 
   // Nothing to show if this room has no Planning Center mapping.
   if (!service || !service.configured) return null;

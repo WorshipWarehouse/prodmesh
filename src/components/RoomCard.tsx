@@ -1,15 +1,14 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Lock, Radio } from 'lucide-react';
 import {
   getRoomService,
-  getRoomState,
-  getShow,
   type RoomMeta,
   type RoomService,
   type RoomState,
   type ShowState,
 } from '../api';
+import { useQuery } from '../lib/useQuery';
+import { useTopic, roomTopic } from '../lib/stream';
 
 const REFRESH_MS = 30 * 1000;
 
@@ -28,28 +27,24 @@ function fmtNextTime(service: RoomService | null) {
 // One room on the campus Home: current mode, live-show badge, next event.
 // The whole card clicks into the room's status/operate page.
 export function RoomCard({ room }: { room: RoomMeta }) {
-  const [state, setState] = useState<RoomState | null>(null);
-  const [show, setShow] = useState<ShowState | null>(null);
-  const [service, setService] = useState<RoomService | null>(null);
-
-  useEffect(() => {
-    let on = true;
-    const load = () => {
-      getRoomState(room.id).then((s) => on && setState(s)).catch(() => on && setState(null));
-      getShow(room.id).then((s) => on && setShow(s)).catch(() => {});
-      getRoomService(room.id).then((s) => on && setService(s)).catch(() => {});
-    };
-    load();
-    const iv = setInterval(load, REFRESH_MS);
-    return () => {
-      on = false;
-      clearInterval(iv);
-    };
-  }, [room.id]);
+  // Mode and show state are pushed: Home showing six rooms used to run six
+  // intervals firing three requests each, per browser, and each mode read went
+  // all the way to Companion uncached. Now one shared connection carries them,
+  // the server polls each room once however many screens are watching, and a
+  // mode change appears immediately instead of up to 30s later.
+  const state = useTopic<RoomState>(roomTopic.mode(room.id));
+  const show = useTopic<ShowState>(roomTopic.show(room.id));
+  // The plan is a Planning Center fetch on a slow clock, not a live value —
+  // useQuery shares one request and one interval across every card and page
+  // that wants it.
+  const service = useQuery(`room-service:${room.id}`, () => getRoomService(room.id), {
+    pollMs: REFRESH_MS,
+    staleMs: REFRESH_MS,
+  }).data;
 
   const mode = room.modes.find((m) => m.id === state?.mode) ?? null;
   const next = service?.plans[0] ?? null;
-  const nextTime = fmtNextTime(service);
+  const nextTime = fmtNextTime(service ?? null);
 
   return (
     <Link to={`/room/${room.id}`} className="roomcard">

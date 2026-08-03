@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { getReport, getRoomPlan, type ServicePlan, type TimingReport } from '../api';
+import { useQuery } from '../lib/useQuery';
 
 function mmss(sec: number) {
   const s = Math.max(0, Math.round(sec));
@@ -23,23 +24,20 @@ export function ServiceReport() {
   const { roomId = '', planId = '' } = useParams();
   const [params] = useSearchParams();
   const timeId = params.get('time');
-  const [report, setReport] = useState<TimingReport | null>(null);
   const [plan, setPlan] = useState<ServicePlan | null>(null);
 
   useEffect(() => {
     getRoomPlan(roomId, planId).then((r) => setPlan(r.plan)).catch(() => {});
   }, [roomId, planId]);
 
-  const load = useCallback(() => {
-    getReport(roomId, planId, timeId).then(setReport).catch(() => {});
-  }, [roomId, planId, timeId]);
-
   // Refresh while the service is live; useful glancing at it during the debrief.
-  useEffect(() => {
-    load();
-    const iv = setInterval(load, 5000);
-    return () => clearInterval(iv);
-  }, [load]);
+  const reportQ = useQuery<TimingReport | null>(
+    `report:${roomId}:${planId}:${timeId ?? ''}`,
+    () => getReport(roomId, planId, timeId),
+    { pollMs: 5000, staleMs: 2000 },
+  );
+  const report = reportQ.data ?? null;
+  const load = reportQ.refetch;
 
   const backToRun = `/room/${roomId}/run/${planId}${timeId ? `?time=${timeId}` : ''}`;
 

@@ -29,6 +29,7 @@ import {
   type SplState,
 } from '../api';
 import { OrderOfService } from '../components/OrderOfService';
+import { useTopic, roomTopic } from '../lib/stream';
 
 function timeLabel(t: PlanTime | null) {
   if (!t) return '';
@@ -186,7 +187,6 @@ export function RunOfShow() {
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [plan, setPlan] = useState<ServicePlan | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [state, setState] = useState<ShowState>({ active: false });
   const [busy, setBusy] = useState(false);
   const [completedAt, setCompletedAt] = useState<number | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -198,18 +198,22 @@ export function RunOfShow() {
     getRoomPlan(roomId, planId).then((r) => setPlan(r.plan)).catch(() => setError('Plan not found'));
   }, [roomId, planId]);
 
-  // The server is the source of truth; we just render its show state.
-  useEffect(() => {
-    const es = new EventSource(`/api/rooms/${roomId}/show/stream`);
-    es.addEventListener('state', (e) => {
-      try {
-        setState(JSON.parse((e as MessageEvent).data));
-      } catch {
-        /* ignore */
-      }
-    });
-    return () => es.close();
-  }, [roomId]);
+  // The server is the source of truth; we just render its state. Three topics
+  // rather than one envelope, so a slide change doesn't re-render the meter,
+  // and so the page only makes the server do the timer and SPL work it is
+  // actually showing.
+  const liveShow = useTopic<ShowState>(roomTopic.show(roomId));
+  const timer = useTopic<ShowState['timer']>(roomTopic.timer(roomId));
+  const spl = useTopic<ShowState['spl']>(roomTopic.spl(roomId));
+
+  // Start/End return the new state too. The push normally beats the response
+  // (the server publishes before it replies), but if the stream is mid-
+  // reconnect it won't — and Start Show appearing to do nothing is the worst
+  // possible moment for that. So an action's result is held until the next
+  // push arrives, identified by `liveShow` becoming a different object.
+  const [acted, setActed] = useState<{ from: unknown; state: ShowState } | null>(null);
+  const show = acted && acted.from === liveShow ? acted.state : (liveShow ?? { active: false });
+  const state: ShowState = { ...show, timer: timer ?? null, spl: spl ?? null };
 
   // A previously ended show stays "Complete" even after reopening this page —
   // the timeline's completion stamp is the source of truth. Refetched when the
@@ -254,9 +258,9 @@ export function RunOfShow() {
   const act = async (fn: () => Promise<ShowState>) => {
     setBusy(true);
     try {
-      setState(await fn());
+      setActed({ from: liveShow, state: await fn() });
     } catch {
-      /* SSE will reconcile */
+      /* the stream reconciles */
     } finally {
       setBusy(false);
     }
@@ -269,10 +273,10 @@ export function RunOfShow() {
     setBusy(true);
     try {
       const next = await startShow(roomId, planId, timeId, { rehearsal: true });
-      setState(next);
+      setActed({ from: liveShow, state: next });
       if (next.timeId) setParams({ time: next.timeId }, { replace: true });
     } catch {
-      /* SSE will reconcile */
+      /* the stream reconciles */
     } finally {
       setBusy(false);
     }
