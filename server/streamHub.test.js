@@ -12,9 +12,32 @@ import { join } from 'node:path';
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-hub-'));
 const hub = await import('./streamHub.js');
 
-const fakeRes = () => {
+// `accepts` models the socket buffer: once it is 0, write() returns false the
+// way Node's does when the kernel buffer is full, and nothing moves until the
+// test fires 'drain'.
+const fakeRes = (accepts = Infinity) => {
   const written = [];
-  return { written, write: (chunk) => written.push(chunk) };
+  const drainListeners = [];
+  return {
+    written,
+    write(chunk) {
+      written.push(chunk);
+      accepts -= 1;
+      // Node accepts the write that fills the buffer and returns false on it:
+      // "taken, now stop". Anything after that is buffered in memory — which
+      // is precisely the growth conflation exists to prevent.
+      return accepts > 0;
+    },
+    once(event, fn) {
+      if (event === 'drain') drainListeners.push(fn);
+    },
+    /** Let the socket accept `n` more writes and deliver the drain event. */
+    drain(n) {
+      accepts = n;
+      const fns = drainListeners.splice(0);
+      for (const fn of fns) fn();
+    },
+  };
 };
 
 const frames = (res) =>
@@ -125,6 +148,86 @@ test('a custom sink replaces the default frame writer', () => {
   hub.publish('thing:one', 2);
   assert.deepEqual(got, [['thing:one', 1], ['thing:one', 2]]);
   assert.deepEqual(res.written, [], 'the sink owns the wire; nothing default-writes');
+});
+
+// ── Backpressure ─────────────────────────────────────────────────────────────
+
+test('a backed-up subscriber gets the LATEST value per topic, not a backlog', () => {
+  hub.registerTopic('room:*:spl', {});
+  const res = fakeRes(1); // accepts the first write, then reports full
+  hub.subscribe(res, ['room:a:spl']);
+
+  hub.publish('room:a:spl', { current: 80 }); // goes out, socket now full
+  hub.publish('room:a:spl', { current: 81 }); // conflated…
+  hub.publish('room:a:spl', { current: 82 }); // …superseded
+  hub.publish('room:a:spl', { current: 83 }); // …superseded again
+  assert.equal(res.written.length, 1, 'nothing queues behind a full socket');
+
+  res.drain(10);
+  assert.equal(res.written.length, 2, 'one catch-up frame, not three');
+  assert.deepEqual(frames(res).at(-1), { topic: 'room:a:spl', data: { current: 83 } });
+});
+
+test('conflation is per topic — a room\'s loudness never supersedes its mode', () => {
+  hub.registerTopic('room:*:spl', {});
+  hub.registerTopic('room:*:mode', {});
+  const res = fakeRes(1);
+  hub.subscribe(res, ['room:a:spl', 'room:a:mode']);
+
+  hub.publish('room:a:spl', { current: 80 }); // out; socket full after this
+  hub.publish('room:a:spl', { current: 88 });
+  hub.publish('room:a:mode', { mode: 'show' });
+  hub.publish('room:a:spl', { current: 91 });
+
+  res.drain(10);
+  const delivered = frames(res).slice(1);
+  assert.deepEqual(delivered, [
+    { topic: 'room:a:spl', data: { current: 91 } },
+    { topic: 'room:a:mode', data: { mode: 'show' } },
+  ]);
+});
+
+test('a socket still full after draining keeps conflating', () => {
+  hub.registerTopic('thing:*', {});
+  const res = fakeRes(1);
+  hub.subscribe(res, ['thing:a', 'thing:b']);
+
+  hub.publish('thing:a', 1); // out; full
+  hub.publish('thing:a', 2);
+  hub.publish('thing:b', 3);
+
+  res.drain(0); // room for exactly one, then full again
+  assert.equal(res.written.length, 2);
+  hub.publish('thing:b', 4); // must conflate, not queue
+
+  res.drain(10);
+  assert.deepEqual(frames(res).at(-1), { topic: 'thing:b', data: 4 });
+  assert.equal(res.written.length, 3, 'b was delivered once, at its newest value');
+});
+
+test('the frame is serialized once per publish, not once per subscriber', () => {
+  let serialized = 0;
+  hub.registerTopic('thing:*', {});
+  const subs = Array.from({ length: 5 }, () => fakeRes());
+  for (const res of subs) hub.subscribe(res, ['thing:one']);
+
+  // A value that counts how often JSON.stringify walks it.
+  hub.publish('thing:one', { toJSON: () => { serialized += 1; return 'v'; } });
+
+  assert.equal(serialized, 1, 'one serialization for the whole fan-out');
+  for (const res of subs) assert.equal(res.written.length, 1, 'every subscriber still got it');
+});
+
+test('a dropped connection takes its conflated frames with it', () => {
+  hub.registerTopic('thing:*', {});
+  const res = fakeRes(1);
+  hub.subscribe(res, ['thing:one']);
+  hub.publish('thing:one', 1);
+  hub.publish('thing:one', 2); // pending
+
+  hub.unsubscribe(res);
+  res.drain(10); // the drain fires after the client is gone
+  assert.equal(res.written.length, 1, 'nothing is written to a closed connection');
 });
 
 test('unsubscribe is idempotent and forgets the connection entirely', () => {

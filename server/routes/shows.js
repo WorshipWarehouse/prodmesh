@@ -33,14 +33,16 @@ router.get('/api/rooms/:id/show/stream', (req, res) => {
   // Coalesced to one send per tick: subscribing delivers three opening
   // snapshots, and this endpoint's contract is one paint, not three identical
   // ones.
-  let pending = false;
+  let queued = false;
   const flush = () => {
-    pending = false;
-    res.write(`event: state\ndata: ${JSON.stringify(show.getState(roomId))}\n\n`);
+    queued = false;
+    // Rendered at write time, not queue time, so a frame conflated behind a
+    // backed-up socket still carries the envelope as it is when it goes out.
+    hub.send(res, 'state', () => `event: state\ndata: ${JSON.stringify(show.getState(roomId))}\n\n`);
   };
   hub.subscribe(res, show.roomTopics(roomId), () => {
-    if (pending) return;
-    pending = true;
+    if (queued) return;
+    queued = true;
     queueMicrotask(flush);
   });
 });

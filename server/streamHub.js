@@ -87,12 +87,73 @@ function frame(topic, data) {
   return `event: msg\ndata: ${JSON.stringify({ topic, data })}\n\n`;
 }
 
-/** Fan a value out to this topic's subscribers and retain it for joiners. */
+/**
+ * Fan a value out to this topic's subscribers and retain it for joiners.
+ *
+ * The frame is serialized at most ONCE per publish, however many subscribers
+ * there are — `render` memoizes, and sinks that reshape the value (the legacy
+ * show stream) simply ignore it. With a handful of browsers this is invisible;
+ * with metric-producing devices publishing at rate to several dashboards it is
+ * the difference between one JSON.stringify and one per subscriber per sample.
+ */
 export function publish(topic, data) {
   retained.set(topic, data);
   const subs = topicSubs.get(topic);
   if (!subs?.size) return;
-  for (const res of subs) sinks.get(res)?.(topic, data);
+  let payload;
+  const render = () => (payload ??= frame(topic, data));
+  for (const res of subs) sinks.get(res)?.(topic, data, render);
+}
+
+// ── Backpressure: conflate, never queue ──────────────────────────────────────
+//  `res.write()` returns false once the socket buffer is full, and Node then
+//  buffers everything after that in memory with no bound. Ignoring that return
+//  value is an unauthenticated memory-exhaustion vector — /api/stream needs no
+//  auth, so a client that connects and simply never reads is two lines of
+//  socket code. The benign version is commoner: a booth Mac that sleeps, or a
+//  tab on a stalled link, while SPL publishes about once a second per room.
+//
+//  The answer is conflation rather than a queue, and it is correct HERE
+//  specifically because every topic carries a STATE SNAPSHOT — "the mode is X",
+//  "loudness is now Y". A client only ever renders the newest value, so
+//  dropping superseded ones costs nothing and the final state is still right.
+//  Memory is then bounded by design: at most one pending frame per topic per
+//  connection, and topics per connection are already capped.
+//
+//  This does NOT hold for event-shaped topics — "a cue fired", "an alert was
+//  raised" — where a superseded value is a lost event. Nothing publishes one
+//  today; anything that does needs its own path, not this one.
+
+const pending = new Map(); // res -> Map<key, () => string>, only while backed up
+
+function drain(res) {
+  const queued = pending.get(res);
+  if (!queued) return;
+  for (const [key, render] of queued) {
+    queued.delete(key);
+    if (res.write(render()) === false) {
+      res.once?.('drain', () => drain(res));
+      return; // still full — the rest stays conflated until the next drain
+    }
+  }
+  pending.delete(res);
+}
+
+/**
+ * Write to a subscriber, collapsing anything it can't keep up with. `key` is
+ * the conflation unit: a second value for the same key while the socket is
+ * backed up replaces the first rather than queueing behind it.
+ */
+export function send(res, key, render) {
+  const queued = pending.get(res);
+  if (queued) {
+    queued.set(key, render);
+    return;
+  }
+  if (res.write(render()) === false) {
+    pending.set(res, new Map());
+    res.once?.('drain', () => drain(res));
+  }
 }
 
 /**
@@ -101,13 +162,20 @@ export function publish(topic, data) {
  * dashboard must not blank the other eleven.
  *
  * `sink` overrides how values reach this subscriber. The default writes one
- * `msg` frame per value; the legacy per-room show stream uses it to re-shape
- * three topics into the single combined envelope it has always emitted.
+ * `msg` frame per value, conflated per topic under backpressure; the legacy
+ * per-room show stream uses it to re-shape three topics into the single
+ * combined envelope it has always emitted.
  */
 export function subscribe(res, topics, sink) {
   const mine = subscriberTopics.get(res) ?? new Set();
   subscriberTopics.set(res, mine);
-  if (!sinks.has(res)) sinks.set(res, sink ?? ((topic, data) => res.write(frame(topic, data))));
+  if (!sinks.has(res)) {
+    // Conflate per topic: a room's newer mode supersedes its older one, but
+    // never another room's, and never its loudness.
+    const write = (topic, data, render) =>
+      send(res, topic, render ?? (() => frame(topic, data)));
+    sinks.set(res, sink ?? write);
+  }
   for (const topic of topics) {
     if (mine.has(topic) || !isValidTopic(topic)) continue;
     if (mine.size >= MAX_TOPICS) break;
@@ -134,6 +202,7 @@ export function unsubscribe(res) {
   if (!mine) return;
   subscriberTopics.delete(res);
   sinks.delete(res);
+  pending.delete(res); // a gone connection's conflated frames go with it
   for (const topic of mine) {
     const subs = topicSubs.get(topic);
     if (!subs) continue;
@@ -181,4 +250,5 @@ export function reset() {
   subscriberTopics.clear();
   sinks.clear();
   retained.clear();
+  pending.clear();
 }
