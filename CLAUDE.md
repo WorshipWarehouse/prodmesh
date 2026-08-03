@@ -61,10 +61,38 @@ Branches with nothing user-visible (server refactors, test additions) may merge
 once tests are green and a live boot is verified. Anything a user can see or
 click waits for the maintainer.
 
-**main is the deployment channel.** The production box runs
-`deploy/update.sh` — `git pull --ff-only`, `npm ci` when package files changed,
-build, service restart. Anything merged to main can land on a live system.
+**main is the integration branch; tags are the deployment channel.** Trunk-based
+— there is no `develop` or `nightly`, because a second long-lived branch exists
+to coordinate multiple developers and several released versions at once, and
+this project has neither.
+
+`deploy/update.sh` checks out the **newest `vX.Y.Z` tag**, not the tip of main
+(`--edge` opts into main for the maintainer's own box). It never moves
+backwards: a box already ahead of the newest release is left alone rather than
+rolled back. Docker publishes `:main` from main and `:latest` only from `v*`
+tags, so an external church on `:latest` gets releases only.
+
+So merging to main is *not* the moment anything reaches a room. That is
+deliberate: merging means the work is finished, tagging means "this is safe in
+a room on a Sunday", and those are different judgements. It matters because
+Admin → System has an Update button a volunteer can press.
+
 Avoid gratuitous server restarts; SSE clients disconnect.
+
+**Cutting a release.** On main, with the phase complete and the maintainer
+having run it in the building:
+
+1. `package.json` version → the release number (drop the `-dev` suffix).
+   `server/deployment.js` reports this, so skipping it makes a 1.1 box
+   truthfully claim to be 1.0.
+2. Update `docs/STATE.md` — what shipped, what is still mock.
+3. Commit (`Release vX.Y.Z`), tag `vX.Y.Z` **on that commit**, push both.
+4. Bump `package.json` to the next `-dev` so main is never mistaken for a
+   release.
+
+Tag per phase, not per merge. Between releases main carries `-dev`, which is
+what Admin → System will show on an edge box — accurate, and obviously not a
+release.
 
 ## Threat model
 
