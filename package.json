@@ -1,7 +1,7 @@
 {
   "name": "church-production-dashboard",
   "private": true,
-  "version": "1.1.0-dev",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "PRODMESH_LOCAL_TEST=1 concurrently -n web,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",

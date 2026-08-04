@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-04.
+Last updated: 2026-08-04 (v1.1.0).
 
 ## Sites & rooms
 
@@ -326,8 +326,8 @@ Notes:
    port 8080, logs in `~/prodmesh/logs/server.log`, RunAtLoad + KeepAlive). The
    Producer bridges the production LAN and the audio network, so it reaches
    Smaart directly.
-7. **1.1 — in progress.** Three features, sequenced scaffolding → YouTube →
-   launcher:
+7. ~~**1.1**~~ **SHIPPED 2026-08-04 (v1.1.0).** Three features, sequenced
+   scaffolding → YouTube → launcher:
    - ~~Streaming/widget scaffolding for custom Dashboard views~~ **done**
      (ADR 0010): transport 2026-08-03, widget registry 2026-08-04. Widgets take
      `{roomId, config}` and **nothing else** — a stored layout is data, so a
@@ -392,9 +392,19 @@ Notes:
        installers only from a `v*` tag, and smoke-tests the packaged app
        **under Electron** (`PRODMESH_SMOKE=1`) — plain `node` cannot load the
        tree at all, and an ABI mismatch is the likeliest way this ships broken.
-     - **Remaining: macOS signing.** The five `APPLE_*` secrets in
-       `desktop/README.md` are not set yet, so builds are unsigned and a
-       volunteer would meet Gatekeeper. Needed before `v1.1.0`.
+     - **Signed, notarized and stapled.** Verified on the CI artifact itself:
+       `spctl` reports `accepted, source=Notarized Developer ID`, and a clean
+       Mac opened it with no Gatekeeper prompt. (`spctl` on the *.dmg* says
+       "no usable signature" — expected; electron-builder staples the app and
+       wraps it in an unsigned DMG, and Gatekeeper judges the app.) Windows
+       builds unsigned: SmartScreen shows an "unrecognized app" prompt that a
+       user can click through, and removing it needs a separate certificate.
+     - Four bugs came from real CI runs rather than being reasoned away:
+       Windows `.cmd` resolution (`ENOENT`, then `EINVAL` — Node refuses to
+       execFile a `.cmd` without `shell:true` since the CVE-2024-27980 fix); a
+       smoke test pointed at the shared staging tree, which after a multi-arch
+       build holds only the last architecture; and a sandboxed preload with no
+       `shell`, which made the one button in the UI silently do nothing.
 8. **Later widgets on Run of Show:** SMAART loudness, on-air.
 9. **Safe change — preview / diff / rollback for room programming.** (Idea, not
    yet designed.) A control surface gets programmed once and then frozen: a
