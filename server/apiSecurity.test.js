@@ -121,7 +121,11 @@ test('show start/end/current require shows.operate; reads stay public', async ()
 
     const denied = await post(`/api/rooms/${ROOM}/show/${action}`, {}, operatorToken, station.token);
     assert.equal(denied.status, 403, `unpermitted ${action}`);
-    assert.equal((await denied.json()).permission, 'shows.operate');
+    const body = await denied.json();
+    assert.equal(body.permission, 'shows.operate');
+    // The label is what the browser puts on screen ("… does not have
+    // 'Operate shows'"), so a refusal that omits it degrades to the raw id.
+    assert.equal(body.label, 'Operate shows');
   }
   // Booth screens are anonymous viewers — the read side must stay open.
   assert.equal((await fetch(`${base}/api/rooms/${ROOM}/show`)).status, 200);

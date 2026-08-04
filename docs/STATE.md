@@ -101,6 +101,15 @@ Notes:
   Checklists subpages. The account menu requires confirmation before returning a
   station to read-only mode. When a user has a Planning Center Services Person ID,
   their Services profile thumbnail is shown as their avatar.
+- **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes
+  the auth status AppShell already fetches, so a page can hide a control it
+  would only be refused for. Run of Show uses it for every `shows.operate`
+  action; a read-only station gets a "Log in to operate" button, an operator
+  without the permission gets a sentence instead of a dead button. A refusal
+  that still reaches the server carries the permission's human label, so the
+  identity dialog can name what is missing rather than showing a bare login
+  form to someone already logged in. The server remains the boundary — this is
+  guidance, and a failed action now says why inline instead of being swallowed.
 - **Station management** (feature branch): Admin → Stations lists registered
   browsers with current-station and last-seen status. Administrators can rename
   stations, assign campus/room context, or revoke them. Revocation invalidates

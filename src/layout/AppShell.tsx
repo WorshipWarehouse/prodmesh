@@ -26,6 +26,7 @@ import { AssistanceBar } from '../components/AssistanceBar';
 import { AssistanceDialog } from '../components/AssistanceDialog';
 import { ALL_CAMPUSES, CampusContext } from './campus';
 import { ChurchContext, EMPTY_CHURCH } from './church';
+import { IdentityContext } from '../lib/identity';
 import type { Church } from '../types';
 import { Clock } from '../components/Clock';
 import { SelectField } from '../components/SelectField';
@@ -65,6 +66,10 @@ export function AppShell() {
   const [logoStamp, setLogoStamp] = useState<number | null>(null);
   const [identity, setIdentity] = useState<AuthStatus | null>(null);
   const [identityOpen, setIdentityOpen] = useState(false);
+  // The permission a refused action was asking for, so the dialog can say what
+  // is missing rather than showing a bare login form to someone already logged
+  // in — which reads as "your session broke", the wrong diagnosis entirely.
+  const [denied, setDenied] = useState<{ permission: string; label: string } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -114,7 +119,15 @@ export function AppShell() {
   }, [accountOpen, helpOpen]);
 
   useEffect(() => {
-    const open = () => setIdentityOpen(true);
+    const open = (event: Event) => {
+      const detail = (event as CustomEvent<{ permission?: string; label?: string }>).detail;
+      setDenied(
+        detail?.permission
+          ? { permission: detail.permission, label: detail.label ?? detail.permission }
+          : null,
+      );
+      setIdentityOpen(true);
+    };
     const refresh = () => getAuthStatus().then((status) => {
       setIdentity(status);
       if (!status.station) setIdentityOpen(true);
@@ -179,6 +192,7 @@ export function AppShell() {
 
   return (
     <ChurchContext.Provider value={church}>
+    <IdentityContext.Provider value={identity}>
     <CampusContext.Provider value={campus}>
       <div className={`shell${collapsed ? ' shell--rail' : ''}`}>
         <aside className="sidebar">
@@ -341,9 +355,10 @@ export function AppShell() {
             stationRequired={!identity?.station}
             campusId={campusId}
             status={identity}
+            denied={denied}
             onStation={stationRegistered}
-            onLogin={(next) => { setIdentity(next); setIdentityOpen(false); }}
-            onClose={() => setIdentityOpen(false)}
+            onLogin={(next) => { setIdentity(next); setIdentityOpen(false); setDenied(null); }}
+            onClose={() => { setIdentityOpen(false); setDenied(null); }}
           />
         )}
         {confirmLock && (
@@ -361,6 +376,7 @@ export function AppShell() {
         <HelpDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
       </div>
     </CampusContext.Provider>
+    </IdentityContext.Provider>
     </ChurchContext.Provider>
   );
 }

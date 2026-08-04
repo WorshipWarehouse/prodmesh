@@ -18,12 +18,15 @@ import {
   startShow,
   endShow,
   setShowCurrent,
+  requestAuth,
+  PermissionError,
   type RoomMeta,
   type ServicePlan,
   type ShowState,
 } from '../api';
 import { OrderOfService } from '../components/OrderOfService';
 import { useTopic, roomTopic } from '../lib/stream';
+import { useCan, useIdentity } from '../lib/identity';
 import { useQuery, invalidate } from '../lib/useQuery';
 import { planKey, reportKey } from '../lib/keys';
 import { widgetRegistry } from '../widgets/registry';
@@ -34,6 +37,19 @@ import type { WidgetType } from '../widgets/types';
 // part that changes.
 const ROS_WIDGETS: WidgetType[] = ['countdown', 'loudness', 'viewers'];
 
+/** Everything on this page that changes show state is behind this one. */
+const OPERATE = 'shows.operate';
+const OPERATE_LABEL = 'Operate shows';
+
+function failureText(err: unknown): string {
+  if (err instanceof PermissionError) {
+    return err.authenticated
+      ? 'Your account cannot operate shows.'
+      : 'Log in to operate shows.';
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 export function RunOfShow() {
   const { roomId = '', planId = '' } = useParams();
   const [params, setParams] = useSearchParams();
@@ -43,6 +59,12 @@ export function RunOfShow() {
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [roomError, setRoomError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Why the last press did nothing. Never a stale value from a previous
+  // attempt: cleared at the start of every action.
+  const [failure, setFailure] = useState<string | null>(null);
+
+  const canOperate = useCan(OPERATE);
+  const loggedIn = Boolean(useIdentity()?.authenticated);
 
   useEffect(() => {
     getRoom(roomId).then(setRoom).catch(() => setRoomError('Room not found'));
@@ -110,12 +132,17 @@ export function RunOfShow() {
   const idx = trackable.findIndex((i) => i.id === currentId);
   const currentItem = idx >= 0 ? trackable[idx] : null;
 
+  // "The stream reconciles" is true of a state RACE and of nothing else. A
+  // refusal — no permission, a show already live in the room, a rejected plan
+  // id — produces no push at all, so swallowing it left the button looking
+  // dead and the operator with nothing to act on mid-service.
   const act = async (fn: () => Promise<ShowState>) => {
     setBusy(true);
+    setFailure(null);
     try {
       setActed({ from: liveShow, state: await fn() });
-    } catch {
-      /* the stream reconciles */
+    } catch (err) {
+      setFailure(failureText(err));
     } finally {
       setBusy(false);
     }
@@ -126,16 +153,31 @@ export function RunOfShow() {
   // into the URL makes this page (and its report link) track that instance.
   const startRehearsal = async () => {
     setBusy(true);
+    setFailure(null);
     try {
       const next = await startShow(roomId, planId, timeId, { rehearsal: true });
       setActed({ from: liveShow, state: next });
       if (next.timeId) setParams({ time: next.timeId }, { replace: true });
-    } catch {
-      /* the stream reconciles */
+    } catch (err) {
+      setFailure(failureText(err));
     } finally {
       setBusy(false);
     }
   };
+  // Shown wherever the show controls would be. Someone who is not logged in
+  // gets the way forward, not just the wall: the shell's own dialog, opened by
+  // the same event a refused request fires.
+  const notPermitted = loggedIn ? (
+    <span className="ros-track__denied">Your account cannot operate shows.</span>
+  ) : (
+    <>
+      <span className="ros-track__denied">Read-only.</span>
+      <button className="btn btn--sm" onClick={() => requestAuth(OPERATE, OPERATE_LABEL)}>
+        Log in to operate
+      </button>
+    </>
+  );
+
   const step = (delta: number) => {
     const n = idx < 0 ? (delta > 0 ? 0 : -1) : idx + delta;
     if (n >= 0 && n < trackable.length) pick(trackable[n].id);
@@ -186,22 +228,30 @@ export function RunOfShow() {
                     <CheckCircle2 size={15} /> Complete ·{' '}
                     {new Date(completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                   </span>
-                  <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
-                    Reopen show
-                  </button>
-                  <button className="btn btn--ghost btn--sm" disabled={busy} onClick={startRehearsal} title="Practice run — records timing under its own instance, never against the service">
-                    Start Rehearsal
-                  </button>
+                  {canOperate ? (
+                    <>
+                      <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
+                        Reopen show
+                      </button>
+                      <button className="btn btn--ghost btn--sm" disabled={busy} onClick={startRehearsal} title="Practice run — records timing under its own instance, never against the service">
+                        Start Rehearsal
+                      </button>
+                    </>
+                  ) : notPermitted}
                 </>
               ) : (
                 <>
                   <span className="ros-track__status ros-track__status--idle">No show running</span>
-                  <button className="btn btn--primary" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
-                    <Play size={15} /> Start Show
-                  </button>
-                  <button className="btn btn--ghost btn--sm" disabled={busy} onClick={startRehearsal} title="Practice run — records timing under its own instance, never against the service">
-                    Start Rehearsal
-                  </button>
+                  {canOperate ? (
+                    <>
+                      <button className="btn btn--primary" disabled={busy} onClick={() => act(() => startShow(roomId, planId, timeId))}>
+                        <Play size={15} /> Start Show
+                      </button>
+                      <button className="btn btn--ghost btn--sm" disabled={busy} onClick={startRehearsal} title="Practice run — records timing under its own instance, never against the service">
+                        Start Rehearsal
+                      </button>
+                    </>
+                  ) : notPermitted}
                 </>
               )}
             </div>
@@ -224,7 +274,7 @@ export function RunOfShow() {
                     <><Pause size={14} /> Manual override</>
                   )}
                 </span>
-                {ppConnected && !follow && (
+                {ppConnected && !follow && canOperate && (
                   <button className="btn btn--sm" disabled={busy} onClick={() => act(() => setShowCurrent(roomId, { follow: true }))}>
                     Resume follow
                   </button>
@@ -246,18 +296,26 @@ export function RunOfShow() {
                 </div>
               )}
               <div className="ros-track__buttons">
-                <button className="btn" disabled={busy || idx <= 0} onClick={() => step(-1)}>
-                  <ChevronLeft size={16} /> Prev
-                </button>
-                <button className="btn btn--primary" disabled={busy || (idx >= 0 && idx >= trackable.length - 1)} onClick={() => step(1)}>
-                  Next <ChevronRight size={16} />
-                </button>
-                <button className="btn btn--ghost" disabled={busy} onClick={() => act(() => endShow(roomId))}>
-                  <Square size={13} /> End Show
-                </button>
+                {canOperate ? (
+                  <>
+                    <button className="btn" disabled={busy || idx <= 0} onClick={() => step(-1)}>
+                      <ChevronLeft size={16} /> Prev
+                    </button>
+                    <button className="btn btn--primary" disabled={busy || (idx >= 0 && idx >= trackable.length - 1)} onClick={() => step(1)}>
+                      Next <ChevronRight size={16} />
+                    </button>
+                    <button className="btn btn--ghost" disabled={busy} onClick={() => act(() => endShow(roomId))}>
+                      <Square size={13} /> End Show
+                    </button>
+                  </>
+                ) : notPermitted}
               </div>
             </>
           )}
+          {/* Rule 4 of UI_TEXT: an error is must-know, so it is inline and it
+              stays until the next attempt — not a toast that expires while
+              someone is looking at the stage. */}
+          {failure && <p className="ros-track__failure" role="alert">{failure}</p>}
         </div>
       </section>
 
@@ -265,12 +323,20 @@ export function RunOfShow() {
         <h2 className="ros__order-title">Run of Show</h2>
         <p className="ros__hint">
           {isThisShow
-            ? 'Following ProPresenter live. Tap an item to override.'
+            ? canOperate
+              ? 'Following ProPresenter live. Tap an item to override.'
+              : 'Following ProPresenter live.'
             : completedAt
               ? 'This service is complete — see the show report for how it ran.'
-              : 'Start the show to track it live and record timing.'}
+              : canOperate
+                ? 'Start the show to track it live and record timing.'
+                : 'Not started.'}
         </p>
-        <OrderOfService items={plan.items} currentId={currentId} onSelect={isThisShow ? pick : undefined} />
+        <OrderOfService
+          items={plan.items}
+          currentId={currentId}
+          onSelect={isThisShow && canOperate ? pick : undefined}
+        />
       </section>
     </div>
   );

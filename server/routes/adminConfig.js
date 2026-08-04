@@ -14,7 +14,7 @@ import * as secrets from '../secrets.js';
 import * as setup from '../setup.js';
 import * as pco from '../integrations/planningCenter.js';
 import { roomStatus } from '../connectivityStatus.js';
-import { requirePermission, auditSuccess } from '../httpAuth.js';
+import { requirePermission, permissionRequired, auditSuccess } from '../httpAuth.js';
 
 const router = express.Router();
 
@@ -159,7 +159,7 @@ router.post('/api/settings/pins', (req, res) => {
     const wantsAdminPin = req.body?.admin !== undefined;
     const permission = wantsAdminPin ? '*' : 'settings.manage';
     if (!req.legacyAdmin && !auth.hasPermission(req.auth, permission)) {
-      return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission });
+      return res.status(req.auth ? 403 : 401).json(permissionRequired(permission));
     }
   }
   try {
