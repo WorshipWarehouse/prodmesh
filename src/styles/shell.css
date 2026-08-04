@@ -496,11 +496,14 @@
 
 /* ── Main content area ───────────────────────────────────────────────────── */
 .shell__main {
+  /* Named so a page can cancel it and run full-bleed — see .viewbar, which is
+     a toolbar rather than a card and has to sit flush against the edges. */
+  --main-pad: clamp(18px, 2.6vw, 34px);
   flex: 1;
   min-width: 0;
   max-width: 1600px;
   margin: 0 auto;
-  padding: clamp(18px, 2.6vw, 34px);
+  padding: var(--main-pad);
   display: flex;
   flex-direction: column;
   gap: 24px;

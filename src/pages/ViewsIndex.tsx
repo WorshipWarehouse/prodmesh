@@ -1,8 +1,10 @@
-import { Link, useParams } from 'react-router-dom';
-import { LayoutGrid, Monitor } from 'lucide-react';
-import { getRoom, getViews, type ViewSummary } from '../api';
-import { useQuery } from '../lib/useQuery';
+import { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { LayoutGrid, Monitor, Pencil, Plus } from 'lucide-react';
+import { createView, getRoom, getViews } from '../api';
+import { useQuery, invalidate } from '../lib/useQuery';
 import { viewsKey } from '../lib/keys';
+import { useCan } from '../lib/identity';
 
 // A room's dashboards and displays.
 //
@@ -15,20 +17,49 @@ const KINDS = [
     title: 'Dashboards',
     icon: LayoutGrid,
     empty: 'No dashboards yet.',
+    hint: 'A grid you arrange and read in the booth.',
   },
   {
     kind: 'display' as const,
     title: 'Displays',
     icon: Monitor,
     empty: 'No displays yet.',
+    hint: 'A fixed 3×3 screen — a multiview tile or a lobby TV.',
   },
 ];
 
+/** Derive the URL key from the name, the way the topology editor does. */
+const slugify = (name: string) =>
+  name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+
 export function ViewsIndex() {
   const { roomId = '' } = useParams();
+  const navigate = useNavigate();
+  const canEdit = useCan('views.edit');
+  const [creating, setCreating] = useState<'dashboard' | 'display' | null>(null);
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const viewsQ = useQuery(viewsKey(roomId), () => getViews(roomId), { staleMs: 30_000 });
   const roomQ = useQuery(`room:${roomId}`, () => getRoom(roomId), { staleMs: 10 * 60_000 });
+
+  const create = async () => {
+    if (!creating) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { view } = await createView(roomId, { kind: creating, name, slug: slugify(name) });
+      invalidate(viewsKey(roomId));
+      // Straight into the editor: a view with no widgets is not somewhere to
+      // leave someone standing.
+      navigate(`/room/${roomId}/view/${view.slug}/edit`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (viewsQ.error || roomQ.error) {
     return (
@@ -38,11 +69,10 @@ export function ViewsIndex() {
       </div>
     );
   }
+
   const all = viewsQ.data?.views;
   const room = roomQ.data;
   if (!all || !room) return <div className="pagemsg">Loading…</div>;
-
-  const byKind = (kind: ViewSummary['kind']) => all.filter((v) => v.kind === kind);
 
   return (
     <div className="viewsindex">
@@ -53,13 +83,13 @@ export function ViewsIndex() {
         </div>
       </div>
 
-      {KINDS.map(({ kind, title, icon: Icon, empty }) => {
-        const list = byKind(kind);
+      {KINDS.map(({ kind, title, icon: Icon, empty, hint }) => {
+        const list = all.filter((v) => v.kind === kind);
         return (
           <section className="panel" key={kind}>
             <h2 className="panel__title">{title}</h2>
             {list.length === 0 ? (
-              <p className="viewsindex__empty">{empty}</p>
+              <p className="viewsindex__empty">{empty} {hint}</p>
             ) : (
               <ul className="viewsindex__list">
                 {list.map((view) => (
@@ -71,13 +101,58 @@ export function ViewsIndex() {
                         {view.columns}×{view.maxRows ?? '∞'}
                       </span>
                     </Link>
+                    {canEdit && (
+                      <Link
+                        className="iconbtn"
+                        aria-label={`Edit ${view.name}`}
+                        title={`Edit ${view.name}`}
+                        to={`/room/${roomId}/view/${view.slug}/edit`}
+                      >
+                        <Pencil size={15} />
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
+            {canEdit && (
+              <button
+                className="btn btn--sm"
+                onClick={() => { setCreating(kind); setName(''); setError(''); }}
+              >
+                <Plus size={14} /> New {kind}
+              </button>
+            )}
           </section>
         );
       })}
+
+      {creating && (
+        <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="new-view">
+          <div className="confirm__card">
+            <p className="eyebrow">New {creating}</p>
+            <p className="confirm__text" id="new-view">Name it</p>
+            <input
+              className="field"
+              autoFocus
+              value={name}
+              maxLength={60}
+              placeholder={creating === 'display' ? 'Multiview' : 'Front of House'}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && slugify(name) && create()}
+            />
+            {/* Shown, not hidden: it is the address a kiosk gets pointed at. */}
+            {slugify(name) && <p className="confirm__hint mono">/{slugify(name)}</p>}
+            {error && <p className="identity__error">{error}</p>}
+            <div className="confirm__buttons">
+              <button className="confirm__cancel" onClick={() => setCreating(null)}>Cancel</button>
+              <button className="confirm__ok" disabled={busy || !slugify(name)} onClick={create}>
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

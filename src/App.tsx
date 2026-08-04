@@ -12,6 +12,7 @@ import { RunOfShow } from './pages/RunOfShow';
 import { ServiceReport } from './pages/ServiceReport';
 import { ViewsIndex } from './pages/ViewsIndex';
 import { DashboardView } from './pages/DashboardView';
+import { ViewEditorPage } from './pages/ViewEditorPage';
 import { Settings } from './pages/Settings';
 import { Setup } from './pages/Setup';
 import './styles/index.css';
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/room/:roomId/run/:planId/report" element={<ServiceReport />} />
         <Route path="/room/:roomId/views" element={<ViewsIndex />} />
         <Route path="/room/:roomId/view/:slug" element={<DashboardView />} />
+        <Route path="/room/:roomId/view/:slug/edit" element={<ViewEditorPage />} />
         {/* Old bookmark */}
         <Route path="/settings" element={<Navigate to="/admin/general" replace />} />
       </Route>

@@ -87,10 +87,12 @@ test('findFirstFit: empty grid, into a gap, and a full display', () => {
   assert.deepEqual(findFirstFit(GRID.display, [], { w: 3, h: 1 }), { x: 0, y: 0 });
 });
 
-test('rowCount grows a dashboard but never shrinks below its starting canvas', () => {
+test('rowCount is the content height, not the editor canvas', () => {
   const dash = GRID.dashboard;
-  assert.equal(rowCount(dash, []), 5, 'an empty dashboard still looks like a canvas');
-  assert.equal(rowCount(dash, [{ ...box(0, 0, 1, 2) }]), 5);
+  // NOT defaultRows: a live dashboard reserving five rows for one widget is
+  // four rows of nothing on a wall. defaultRows is the editor's problem.
+  assert.equal(rowCount(dash, []), 1);
+  assert.equal(rowCount(dash, [{ ...box(0, 0, 1, 2) }]), 2);
   assert.equal(rowCount(dash, [{ ...box(0, 5, 1, 3) }]), 8, 'deepest placement wins');
   assert.equal(rowCount(GRID.display, []), 3, 'a display is always exactly its grid');
   assert.equal(rowCount(GRID.display, [{ ...box(0, 0, 1, 1) }]), 3);
