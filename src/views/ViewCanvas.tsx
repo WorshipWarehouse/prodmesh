@@ -23,6 +23,7 @@ export function ViewCanvas({
   view,
   grid,
   config,
+  rows: rowsOverride,
   chromeFor,
   overlay,
   className = '',
@@ -33,6 +34,12 @@ export function ViewCanvas({
   grid: Grid;
   /** Context every widget inherits — the menubar's plan/time on a dashboard. */
   config: WidgetConfig;
+  /**
+   * Force a row count. The editor uses this so the canvas RENDERS exactly the
+   * rows its pointer maths divides by — a dashboard normally sizes to its
+   * content, and a drop target you cannot see is one you cannot aim at.
+   */
+  rows?: number;
   /** Editor furniture for one cell. Absent when the view is live. */
   chromeFor?: (placement: ViewPlacement) => ReactNode;
   /** The drag ghost, drawn over the grid in the editor. */
@@ -41,7 +48,7 @@ export function ViewCanvas({
   canvasRef?: React.Ref<HTMLDivElement>;
   onPointerDown?: React.PointerEventHandler<HTMLDivElement>;
 }) {
-  const rows = rowCount(grid, view.widgets as Placement[]);
+  const rows = rowsOverride ?? rowCount(grid, view.widgets as Placement[]);
   const style = {
     '--view-columns': grid.columns,
     '--view-rows': rows,

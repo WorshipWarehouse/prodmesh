@@ -94,10 +94,12 @@ describe('gridLayout', () => {
     expect(findFirstFit(GRID.display, [], { w: 3, h: 1 })).toEqual({ x: 0, y: 0 });
   });
 
-  it('rowCount grows a dashboard but never shrinks below its starting canvas', () => {
+  it('rowCount is the content height, not the editor canvas', () => {
     const dash = GRID.dashboard;
-    expect(rowCount(dash, [])).toBe(5); // an empty dashboard still looks like a canvas
-    expect(rowCount(dash, [at('a', 0, 0, 1, 2)])).toBe(5);
+    // NOT defaultRows: a live dashboard reserving five rows for one widget is
+    // four rows of nothing on a wall. defaultRows is the editor's problem.
+    expect(rowCount(dash, [])).toBe(1);
+    expect(rowCount(dash, [at('a', 0, 0, 1, 2)])).toBe(2);
     expect(rowCount(dash, [at('a', 0, 5, 1, 3)])).toBe(8); // deepest placement wins
     expect(rowCount(GRID.display, [])).toBe(3); // a display is always exactly its grid
     expect(rowCount(GRID.display, [at('a', 0, 0)])).toBe(3);

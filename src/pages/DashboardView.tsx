@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Settings2 } from 'lucide-react';
 import { getRoomService, getView, getViews, type View } from '../api';
 import { ViewCanvas } from '../views/ViewCanvas';
 import { ViewBar } from '../views/ViewBar';
 import { useQuery } from '../lib/useQuery';
 import { roomServiceKey, viewKey, viewsKey } from '../lib/keys';
 import { gridFor } from '../lib/gridLayout';
+import { useCan } from '../lib/identity';
 import type { WidgetConfig } from '../widgets/types';
 
 // A room's dashboard: one header row, then the grid.
@@ -23,6 +24,7 @@ export function DashboardView() {
   // people on the same dashboard from different machines are usually looking
   // for different things.
   const [config, setConfig] = useState<WidgetConfig>({});
+  const canEdit = useCan('views.edit');
 
   const viewQ = useQuery(viewKey(roomId, slug), () => getView(roomId, slug), { staleMs: 60_000 });
   const viewsQ = useQuery(viewsKey(roomId), () => getViews(roomId), { staleMs: 30_000 });
@@ -56,12 +58,29 @@ export function DashboardView() {
         plans={serviceQ.data?.plans ?? []}
         config={config}
         onChange={setConfig}
+        actions={
+          canEdit && (
+            <Link
+              className="iconbtn"
+              aria-label="Edit layout"
+              title="Edit layout"
+              to={`/room/${roomId}/view/${view.slug}/edit`}
+            >
+              <Settings2 size={16} />
+            </Link>
+          )
+        }
       />
 
       {view.widgets.length === 0 ? (
         <div className="viewempty">
           <LayoutGrid size={22} aria-hidden />
           <p>No widgets yet.</p>
+          {canEdit && (
+            <Link className="btn btn--primary btn--sm" to={`/room/${roomId}/view/${view.slug}/edit`}>
+              Add some
+            </Link>
+          )}
         </div>
       ) : view.kind === 'display' ? (
         // Letterboxed to 16:9, because that is the shape it will be on the

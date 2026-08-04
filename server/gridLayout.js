@@ -68,12 +68,17 @@ export function collisions(placements) {
   return pairs;
 }
 
-/** Rows the canvas must render: the deepest placement, but never less than the
- *  grid's starting height, so an empty dashboard still looks like a canvas. */
+/**
+ * Rows the content occupies.
+ *
+ * The deepest placement, NOT padded up to `defaultRows`: a live dashboard that
+ * reserved five rows for one widget would be four rows of nothing on a wall.
+ * `defaultRows` is the EDITOR's starting canvas — somewhere to drop into — and
+ * that is the editor's business, not this function's.
+ */
 export function rowCount(grid, placements) {
-  const deepest = placements.reduce((max, p) => Math.max(max, p.y + p.h), 0);
   if (grid.maxRows != null) return grid.maxRows;
-  return Math.max(deepest, grid.defaultRows ?? 1);
+  return Math.max(1, placements.reduce((max, p) => Math.max(max, p.y + p.h), 0));
 }
 
 /**

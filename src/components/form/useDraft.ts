@@ -47,6 +47,11 @@ export function useDraft<T extends object>(initial: T, save: (draft: T) => Promi
 
   const patch = (p: Partial<T>) => setDraft((d) => ({ ...d, ...p } as T));
 
+  /** Throw the edits away and go back to what is stored. The baseline is the
+   *  only copy of that, which is why this belongs here rather than in callers
+   *  keeping a second one that can drift after a save. */
+  const reset = () => { setDraft(JSON.parse(baseline) as T); setErr(''); };
+
   const submit = async () => {
     setErr(''); setSavedFlash(false); setBusy(true);
     try {
@@ -61,5 +66,5 @@ export function useDraft<T extends object>(initial: T, save: (draft: T) => Promi
     } finally { setBusy(false); }
   };
 
-  return { draft, setDraft, patch, dirty, busy, err, savedFlash, submit };
+  return { draft, setDraft, patch, reset, dirty, busy, err, savedFlash, submit };
 }

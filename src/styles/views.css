@@ -25,7 +25,11 @@
 .viewgrid {
   display: grid;
   grid-template-columns: repeat(var(--view-columns), minmax(0, 1fr));
-  grid-auto-rows: minmax(var(--view-row-height, 150px), auto);
+  /* One row unit means the same thing everywhere — that is what makes a
+     stored h=2 meaningful. Rows may GROW past the unit for tall content; the
+     drag measures the browser's resolved track sizes rather than dividing by
+     a count, so uneven rows stay accurate. */
+  grid-template-rows: repeat(var(--view-rows), minmax(var(--view-row-height, 168px), auto));
   gap: 14px;
 }
 
@@ -33,7 +37,6 @@
    a fault, so its rows divide the height it was given rather than setting it. */
 .viewgrid--fixed {
   grid-template-rows: repeat(var(--view-rows), minmax(0, 1fr));
-  grid-auto-rows: 0; /* nothing may spill past the declared rows */
   height: 100%;
   overflow: hidden;
 }
@@ -338,4 +341,253 @@
 
 .viewempty p {
   margin: 0;
+}
+
+/* ── Editor ──────────────────────────────────────────────────────────────── */
+
+.editbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+
+.editbar__name {
+  flex: 1;
+  min-width: 0;
+  max-width: 340px;
+}
+
+.editbar__name .field {
+  width: 100%;
+  font-weight: 650;
+}
+
+.editbar__slug {
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+
+.editbar__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editbar__saved {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ok);
+  font-size: 0.85rem;
+}
+
+.editbar__err {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.vieweditor {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .vieweditor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vieweditor__canvas {
+  min-width: 0;
+}
+
+.vieweditor__hint {
+  margin: 12px 0 0;
+  color: var(--text-faint);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+/* ── Palette ─────────────────────────────────────────────────────────────── */
+
+.palette {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+}
+
+.palette__title {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.palette__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.palette__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, var(--radius));
+  cursor: grab;
+  /* Mandatory with pointer capture, or the browser scrolls the page instead
+     of dragging the widget on a touchscreen. */
+  touch-action: none;
+}
+
+.palette__item:active {
+  cursor: grabbing;
+}
+
+.palette__item--off {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.palette__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.palette__text strong {
+  font-size: 0.9rem;
+}
+
+.palette__text small {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__size {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+/* ── Cells while editing ─────────────────────────────────────────────────── */
+
+/* The editor draws a spare row past the content (see ViewEditor's row count),
+   so a dashboard can be extended by dropping below it. A drop target you
+   cannot see is one you cannot aim at, and the browser only lays out tracks
+   that were declared. */
+.viewgrid--editing {
+  touch-action: none;
+  outline: 1px dashed var(--border-subtle);
+  outline-offset: 7px;
+}
+
+.viewgrid--editing .viewcell {
+  padding: 0;
+}
+
+/* The widgets stay LIVE while you arrange them — a ticking countdown, a real
+   meter. Only the header strip is interactive; the body is inert. Doing this
+   in CSS is what keeps `interactive` out of WidgetProps, and that contract
+   staying narrow is why a layout can be data at all. */
+.viewgrid--editing .viewcell__body {
+  pointer-events: none;
+  padding: 0 14px 14px;
+  opacity: 0.9;
+}
+
+.viewcell__chrome {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-tile);
+}
+
+.viewcell__grip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+}
+
+.viewcell__grip:active {
+  cursor: grabbing;
+}
+
+/* Keyboard grab mode — the arrow keys now move this card. */
+.viewcell__grip[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.viewcell__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewcell__remove {
+  display: flex;
+  padding: 4px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.viewcell__remove:hover {
+  color: var(--danger);
+}
+
+/* Where the dragged widget would land. */
+.viewghost {
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+
+.viewghost--blocked {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  opacity: 0.35;
+}
+
+.confirm__hint {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-faint);
 }
