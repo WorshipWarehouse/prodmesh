@@ -17,3 +17,10 @@ deploy
 docs
 *.md
 !README.md
+
+# EXCEPT the user guide: it is compiled into the frontend at build time (see
+# vite-plugin-help.ts), so these are a BUILD INPUT, not documentation. Without
+# them `npm run build` fails with ENOENT on docs/wiki, and an image that did
+# build would ship with its Help drawer empty — on a container install that is
+# just as likely to be offline as a booth Mac.
+!docs/wiki

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { marked } from 'marked';
 import type { Plugin } from 'vite';
@@ -58,6 +58,18 @@ export interface HelpPage {
 }
 
 function build(docsDir: string): HelpPage[] {
+  // A missing directory surfaces from the bundler as a bare ENOENT on scandir,
+  // which says nothing about why. It has one real cause: a build context that
+  // excluded docs/ — the Docker build did exactly that until .dockerignore
+  // learned to keep the guide.
+  if (!existsSync(docsDir)) {
+    throw new Error(
+      `Help content not found at ${docsDir}. The guide is a BUILD INPUT, not `
+      + 'documentation — check that docs/wiki is present in the build context '
+      + '(see .dockerignore).',
+    );
+  }
+
   const present = new Set(
     readdirSync(docsDir).filter((f) => f.endsWith('.md')).map((f) => f.replace(/\.md$/, '')),
   );
