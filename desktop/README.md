@@ -95,11 +95,17 @@ makes updating safe.
 only from a `v*` tag, matching the rule that tags — not main — are the
 deployment channel.
 
-The smoke test runs the packaged app under **Electron** with
-`PRODMESH_SMOKE=1`: it starts the server, prints its state, and exits non-zero
-if it did not come up. It cannot run under plain `node` (see the ABI note), and
-an ABI mismatch is the single most likely way this app ships broken — invisible
-until something opens the database.
+The smoke test runs the **packaged binary** with `PRODMESH_SMOKE=1`: it starts
+the server, prints its state, and exits non-zero if it did not come up. Native
+module problems are the likeliest way this app ships broken and are invisible
+until something opens the database, so this is the check that matters most.
+
+It deliberately does not test `desktop/.build`. That tree is shared across
+architectures, and electron-builder rebuilds the native module into it once
+per arch — so after a mac `[arm64, x64]` build it holds whichever ran last and
+will not load on the runner. Each packaged app got its own correct binary, and
+the packaged app is what ships, so that is what gets tested. Only the runner's
+own architecture is exercised; the cross-built one cannot be run there.
 
 ### macOS signing
 

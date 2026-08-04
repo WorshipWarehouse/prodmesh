@@ -145,14 +145,6 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run dist -- --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
 
-      # The launcher's whole promise is "double-click and a dashboard appears",
-      # so a build producing an app that cannot start is worse than no build.
-      #
-      # It runs under ELECTRON, not node: better-sqlite3 in this tree is built
-      # against Electron's ABI and plain node cannot load it at all. That is
-      # precisely what makes this check worth having — an ABI mismatch is the
-      # single most likely way this app ships broken, and it is invisible until
-      # something opens the database.
       # The status window is the only interactive surface in the launcher, and
       # its one button silently did nothing once — a sandboxed preload has no
       # `shell`, so the call failed in the renderer console where nobody looks.
@@ -160,13 +152,35 @@ jobs:
         working-directory: desktop
         run: npm test
 
+      # The launcher's whole promise is "double-click and a dashboard appears",
+      # so a build producing an app that cannot start is worse than no build.
+      #
+      # This runs the PACKAGED BINARY, not desktop/.build. The staging tree is
+      # shared across architectures and electron-builder rebuilds the native
+      # module into it once per arch, so after a mac [arm64, x64] build it
+      # holds whichever came last — x64 — and cannot load on an arm64 runner.
+      # The packaged app is the thing being shipped and each one got its own
+      # correctly-built binary, so it is also the honest thing to test.
+      #
+      # Only the runner's own architecture is exercised; the cross-built app
+      # cannot be executed here.
       - name: Smoke-test the packaged app
         working-directory: desktop
         shell: bash
         env:
           PRODMESH_SMOKE: '1'
           PORT: '8123'
-        run: node_modules/.bin/electron .build
+        run: |
+          set -e
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            APP=$(ls -d release/mac-arm64/ProdMesh.app 2>/dev/null || ls -d release/mac/ProdMesh.app)
+            BIN="$APP/Contents/MacOS/ProdMesh"
+          else
+            BIN="release/win-unpacked/ProdMesh.exe"
+          fi
+          echo "smoke-testing $BIN"
+          [ -e "$BIN" ] || { echo "::error::packaged binary not found at $BIN"; ls -R release | head -40; exit 1; }
+          "$BIN"
 
       - uses: actions/upload-artifact@v4
         with:

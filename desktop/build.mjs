@@ -35,13 +35,22 @@ const OUT = join(HERE, '.build');
 // compiled into dist/ by Vite and are not needed as packages.
 const RUNTIME_DEPS = ['express', 'better-sqlite3', 'ws'];
 
-// On Windows these are .cmd shims, and execFileSync does not resolve them —
-// it fails with `spawnSync npm ENOENT`, which reads like npm is missing when
-// it is merely spelled differently. (shell:true would also work and brings
-// quoting problems that this does not.)
+// Running npm and electron-rebuild takes two Windows-specific steps, and
+// missing either produces an error that reads like the tool is absent:
+//
+//   1. they are .cmd shims there, so the bare name is ENOENT;
+//   2. since the fix for CVE-2024-27980, Node REFUSES to execFile a .cmd or
+//      .bat at all without shell:true — that one surfaces as EINVAL.
+//
+// shell:true then means the shell re-parses the arguments, so any that could
+// contain a space (every path here) has to be quoted by us.
 const WIN = process.platform === 'win32';
 const NPM = WIN ? 'npm.cmd' : 'npm';
 const bin = (name) => join(HERE, 'node_modules', '.bin', WIN ? `${name}.cmd` : name);
+const q = (a) => (WIN && /[\s"]/.test(a) ? `"${a}"` : a);
+
+const run = (file, args, opts) =>
+  execFileSync(WIN ? q(file) : file, args.map(q), { ...opts, shell: WIN });
 
 const rootPkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'));
@@ -134,7 +143,7 @@ console.log('→ Installing runtime dependencies…');
 // node-gyp, which needs Python's distutils; Python 3.12 removed it, so the
 // install fails outright on a current machine for a binary we were going to
 // throw away. Skip it and build the one we actually need, below.
-execFileSync(NPM, ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
+run(NPM, ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
   cwd: OUT,
   stdio: 'inherit',
 });
@@ -148,7 +157,7 @@ const electronVersion = JSON.parse(
 ).version;
 
 console.log(`→ Rebuilding native modules for Electron ${electronVersion}…`);
-execFileSync(
+run(
   bin('electron-rebuild'),
   ['--module-dir', OUT, '--version', electronVersion, '--force'],
   { cwd: OUT, stdio: 'inherit' },
