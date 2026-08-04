@@ -14,7 +14,7 @@ There are three ways to install it. Pick one.
 |---|---|---|---|
 | **[Desktop app](#desktop-app)** | One booth Mac (or Windows PC), no server | Nothing — download and run | Downloading a new installer |
 | **[Docker](#docker)** | A church with a server, NAS, or homelab | Docker | `docker compose pull` |
-| **[Manual / git install](#manual--git-install)** | Comfortable with a terminal; running from a git checkout | Node.js, git | `deploy/update.sh` |
+| **[Manual / git install](#manual-git-install)** | Comfortable with a terminal; running from a git checkout | Node.js, git | `deploy/update.sh` |
 
 Whichever you pick, the dashboard serves on **port 8080** by default, and every
 other screen in the building reaches it the same way: point a browser at

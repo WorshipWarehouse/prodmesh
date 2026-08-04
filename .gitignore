@@ -30,3 +30,4 @@ server/data/
 desktop/.build/
 desktop/release/
 desktop/node_modules/
+site/

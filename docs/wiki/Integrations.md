@@ -21,7 +21,7 @@ Two places hold integration settings:
 
 **Gives you:** service plans, times, and order-of-service items on the
 Services and Calendar pages, plus the search used to link a user to their
-Planning Center person (see [User Management](User-Management)).
+Planning Center person (see [User Management](User-Management.md)).
 
 **Required?** Optional. Without it, service pages show sample plans instead
 of real ones.
@@ -39,7 +39,7 @@ of real ones.
 Planning Center doesn't reliably know which physical room a service happens
 in — that's exactly why room-to-service-type mapping is configured here
 rather than read from Planning Center. See
-[Integration Caveats](Integration-Caveats).
+[Integration Caveats](Integration-Caveats.md).
 
 ## Bitfocus Companion
 
@@ -78,7 +78,7 @@ connection.
 - **Host** — the ProPresenter machine's address.
 - **Port** — ProPresenter's own API port. This is per-machine and can change
   across restarts unless it's pinned in ProPresenter's own Network
-  preferences — see [Integration Caveats](Integration-Caveats) before
+  preferences — see [Integration Caveats](Integration-Caveats.md) before
   assuming a stored port is stale.
 - **Countdown timer** — the name of the ProPresenter timer prodmesh should
   read for the pre-service countdown.
@@ -110,7 +110,7 @@ Smaart additionally has a checkbox to **start/stop SPL logging with shows**,
 so a show starting turns Smaart's logging on and a show ending turns it back
 off (only if the show turned it on) — this needs a calibrated input in
 Smaart to have any effect. See
-[Integration Caveats](Integration-Caveats) for the single biggest gotcha
+[Integration Caveats](Integration-Caveats.md) for the single biggest gotcha
 here: a connected, metering Smaart still reports nothing until logging is
 actually running.
 
@@ -134,7 +134,7 @@ Normally nothing else needs pinning: prodmesh watches the channel for
 whatever broadcast is live during a service and records that one. A specific
 broadcast can be pinned instead from an event's page, for the rare case where
 the automatic match needs overriding — see
-[Integration Caveats](Integration-Caveats) for why viewer counts can't be
+[Integration Caveats](Integration-Caveats.md) for why viewer counts can't be
 recovered after the fact.
 
 ## Slack
