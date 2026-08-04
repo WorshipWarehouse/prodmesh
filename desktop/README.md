@@ -129,6 +129,39 @@ build artefacts.
 Apple issues the `.p8` **once**; there is no way to download it again. Keep the
 original somewhere safe before base64-encoding it into a secret.
 
+#### Checking the certificate before you set the secrets
+
+```bash
+./desktop/check-signing-cert.sh ~/Desktop/prodmesh-cert.p12
+./desktop/check-signing-cert.sh ~/Desktop/prodmesh-cert.p12.b64 ~/Desktop/pw.txt
+```
+
+The same check the workflow's preflight makes, so a pass here means a pass
+there. It separates the three failures that otherwise look identical: not
+valid base64, wrong password, and a `.p12` carrying the certificate but not
+its private key.
+
+**Set secrets with redirection, not a paste.** `gh secret set NAME < file`
+sends the file's exact bytes. A paste is where a truncation or a stray newline
+gets in — and `gh` does not strip a trailing newline, so a password file
+ending in one produces a secret that cannot open the certificate. The checker
+reads files byte-exactly for that reason and warns about trailing whitespace.
+
+#### Exporting the certificate
+
+```bash
+security export -t identities -f pkcs12 -o ~/Desktop/prodmesh-cert.p12
+```
+
+`-t identities` takes the certificate **and** its private key. Keychain Access
+exports only the certificate unless you select the identity itself, which
+produces a `.p12` that imports without error and then cannot sign anything.
+
+Reading it back with OpenSSL 3 needs `-legacy` (Apple writes PKCS#12 with
+legacy encryption), which is why `openssl pkcs12` may report no key on a
+perfectly good export. macOS's own `security import` — which is what
+electron-builder uses — does not care.
+
 Unsigned, a volunteer meets *"prodmesh cannot be opened because the developer
 cannot be verified"* — which substantially defeats the point of shipping a
 double-clickable app.
