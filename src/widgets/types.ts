@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import type { ViewKind } from '../lib/gridLayout';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Widget contract.
@@ -55,13 +56,58 @@ export function spanColumns(span: WidgetSpan | undefined): number | null {
   return Number.isInteger(n) && n >= 1 && n <= 12 ? n : null;
 }
 
+/** Size on a View's 2D canvas, in grid units. */
+export interface WidgetSize {
+  w: number;
+  h: number;
+}
+
 export interface WidgetDef {
-  /** Shown in a future layout picker. */
+  /** Shown in the layout picker. */
   title: string;
   /** One line on what it shows — the picker's subtitle. */
   description: string;
   component: ComponentType<WidgetProps>;
+
+  /** Size in grid units on a View canvas (6 wide on a dashboard, 3 on a
+   *  display). Every widget has ONE authored size — a 1×1 loudness meter and a
+   *  6×5 one are two designs, not one design scaled — which is why there is no
+   *  resize handle. */
+  size: WidgetSize;
+
+  /**
+   * One per view? Defaults to true.
+   *
+   * A flag rather than a blanket rule, because the real invariant is that a
+   * placement be IDENTIFIABLE. Today most widgets carry no config, so the type
+   * alone identifies them and one-per-view falls out for free. A future
+   * multi-instance widget — two Smaart engines in one room, one for the stream
+   * and one for the house — sets `unique: false` and earns an identity in its
+   * config. Mirrored in server/validate.js, which is authoritative.
+   */
+  unique?: boolean;
+
+  /** Which view kinds may hold it. Defaults to both. A widget that takes
+   *  actions must exclude 'display': a display is DEFINED as non-interactive. */
+  kinds?: ViewKind[];
+
+  /**
+   * LEGACY: column span on the 12-column FLOW grid (`.widgets`,
+   * `.ros__widgets`), which reflows to one column below 880px. Different
+   * question from `size`, and not convertible: `third` is 4/12, `w:2` is 2/6,
+   * and `two-thirds` has no clean 6-column equivalent. Dies with spanColumns()
+   * the day Run of Show renders a stored view instead of a hard-coded row.
+   */
   defaultSpan: WidgetSpan;
 }
 
 export type WidgetType = 'countdown' | 'loudness' | 'viewers';
+
+/** May this widget go on a view of this kind? */
+export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>
+  (def.kinds ?? ['dashboard', 'display']).includes(kind);
+
+/** One per view unless it says otherwise. */
+export const widgetIsUnique = (def: WidgetDef): boolean => def.unique !== false;
+
+export type { ViewKind };

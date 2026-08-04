@@ -1012,6 +1012,80 @@ export const setShowCurrent = (roomId: string, body: { itemId?: string; follow?:
 
 export const getServicesOverview = () => getJson<ServicesOverview>('/api/services');
 
+// ── Views (dashboards & displays) ────────────────────────────────────────────
+
+export interface ViewPlacement {
+  id: string;
+  /** A plain string, NOT WidgetType: a view written by a newer build may name
+   *  a widget this one has never heard of, and the renderer holds the slot
+   *  rather than dropping it and reflowing the grid. */
+  type: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  config: WidgetConfigJson;
+}
+
+/** Mirrors the server's per-placement config — the same shape as WidgetConfig. */
+export interface WidgetConfigJson {
+  planId?: string;
+  timeId?: string;
+}
+
+export interface ViewSummary {
+  id: string;
+  roomId: string;
+  kind: 'dashboard' | 'display';
+  name: string;
+  slug: string;
+  columns: number;
+  maxRows: number | null;
+  position: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** A view with its layout. The index endpoint omits `widgets`. */
+export interface View extends ViewSummary {
+  widgets: ViewPlacement[];
+}
+
+export const getViews = (roomId: string) =>
+  getJson<{ views: ViewSummary[] }>(`/api/rooms/${encodeURIComponent(roomId)}/views`);
+
+/** Resolves a slug OR an id, so renaming a view cannot orphan a screen. */
+export const getView = (roomId: string, key: string) =>
+  getJson<{ view: View }>(
+    `/api/rooms/${encodeURIComponent(roomId)}/views/${encodeURIComponent(key)}`,
+  );
+
+export const createView = (
+  roomId: string,
+  input: { kind: 'dashboard' | 'display'; name: string; slug: string },
+) => postJson<{ view: View }>(`/api/rooms/${encodeURIComponent(roomId)}/views`, input);
+
+export async function saveView(
+  viewId: string,
+  input: { name: string; slug: string; widgets: Omit<ViewPlacement, 'id'>[] },
+): Promise<View> {
+  const res = await fetch(`/api/views/${encodeURIComponent(viewId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify(input),
+  });
+  await requireOk(res);
+  return ((await res.json()) as { view: View }).view;
+}
+
+export async function deleteView(viewId: string): Promise<void> {
+  const res = await fetch(`/api/views/${encodeURIComponent(viewId)}`, {
+    method: 'DELETE',
+    headers: requestHeaders(),
+  });
+  await requireOk(res);
+}
+
 // ── History (Analytics) ──────────────────────────────────────────────────────
 
 export interface HistoryShow {

@@ -18,6 +18,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     title: 'Countdown',
     description: 'Time until the service starts, following the room’s ProPresenter timer.',
     component: CountdownWidget,
+    size: { w: 2, h: 1 },
     defaultSpan: 'third',
   },
 
@@ -25,6 +26,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     title: 'Loudness',
     description: 'Live SPL against the room’s target and limit, with C-A when available.',
     component: LoudnessWidget,
+    size: { w: 2, h: 1 },
     defaultSpan: 'third',
   },
 
@@ -32,6 +34,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     title: 'Live viewers',
     description: 'Concurrent YouTube viewers while the room is streaming.',
     component: ViewersWidget,
+    size: { w: 2, h: 1 },
     defaultSpan: 'third',
   },
 };
