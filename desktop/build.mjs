@@ -35,6 +35,14 @@ const OUT = join(HERE, '.build');
 // compiled into dist/ by Vite and are not needed as packages.
 const RUNTIME_DEPS = ['express', 'better-sqlite3', 'ws'];
 
+// On Windows these are .cmd shims, and execFileSync does not resolve them —
+// it fails with `spawnSync npm ENOENT`, which reads like npm is missing when
+// it is merely spelled differently. (shell:true would also work and brings
+// quoting problems that this does not.)
+const WIN = process.platform === 'win32';
+const NPM = WIN ? 'npm.cmd' : 'npm';
+const bin = (name) => join(HERE, 'node_modules', '.bin', WIN ? `${name}.cmd` : name);
+
 const rootPkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'));
 
@@ -112,6 +120,8 @@ writeFileSync(
     // "which commit is this church running" is the first question support
     // needs answered. Without it Admin → System reports commit "unknown".
     prodmeshCommit: commit(),
+    // electron-builder needs this to publish a release, and warns without it.
+    repository: rootPkg.repository ?? 'github:jbeale/prodmesh',
     dependencies: Object.fromEntries(RUNTIME_DEPS.map((d) => [d, pinned(d)])),
   }, null, 2)}\n`,
 );
@@ -124,7 +134,7 @@ console.log('→ Installing runtime dependencies…');
 // node-gyp, which needs Python's distutils; Python 3.12 removed it, so the
 // install fails outright on a current machine for a binary we were going to
 // throw away. Skip it and build the one we actually need, below.
-execFileSync('npm', ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
+execFileSync(NPM, ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], {
   cwd: OUT,
   stdio: 'inherit',
 });
@@ -139,7 +149,7 @@ const electronVersion = JSON.parse(
 
 console.log(`→ Rebuilding native modules for Electron ${electronVersion}…`);
 execFileSync(
-  join(HERE, 'node_modules', '.bin', 'electron-rebuild'),
+  bin('electron-rebuild'),
   ['--module-dir', OUT, '--version', electronVersion, '--force'],
   { cwd: OUT, stdio: 'inherit' },
 );

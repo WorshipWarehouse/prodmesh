@@ -65,6 +65,39 @@ jobs:
             echo "sign=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Prove the two certificate secrets agree BEFORE electron-builder uses
+      # them. Its failure for a wrong password is a PKCS12 stack trace ending
+      # "MAC verification failed during PKCS12 import (wrong password?)", which
+      # names neither secret and reads like a corrupt certificate. This says
+      # which one to fix.
+      - name: Preflight the signing certificate
+        if: steps.signing.outputs.sign == 'true'
+        shell: bash
+        env:
+          CERT_B64: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PW: ${{ secrets.MACOS_CERT_P12_PASSWORD }}
+        run: |
+          P12="${RUNNER_TEMP}/preflight.p12"
+          KC="${RUNNER_TEMP}/preflight.keychain"
+          if ! printf '%s' "$CERT_B64" | base64 --decode > "$P12" 2>/dev/null || [ ! -s "$P12" ]; then
+            echo "::error::MACOS_CERT_P12 is not valid base64. Set it with: gh secret set MACOS_CERT_P12 < cert.p12.b64"
+            exit 1
+          fi
+          security create-keychain -p "" "$KC"
+          security unlock-keychain -p "" "$KC"
+          if ! security import "$P12" -k "$KC" -P "$CERT_PW" -T /usr/bin/codesign >/dev/null 2>&1; then
+            echo "::error::MACOS_CERT_P12_PASSWORD does not open MACOS_CERT_P12. The certificate itself decoded fine, so re-set the PASSWORD secret — a trailing newline or a truncated paste is the usual cause. Use: gh secret set MACOS_CERT_P12_PASSWORD < password.txt"
+            security delete-keychain "$KC"; exit 1
+          fi
+          FOUND=$(security find-identity -v -p codesigning "$KC" | grep -c "Developer ID Application" || true)
+          security delete-keychain "$KC"
+          rm -f "$P12"
+          if [ "$FOUND" -lt 1 ]; then
+            echo "::error::The .p12 opened but holds no \"Developer ID Application\" identity with a private key. Export it with: security export -t identities -f pkcs12"
+            exit 1
+          fi
+          echo "✓ certificate and password agree, and it carries a Developer ID Application identity"
+
       # notarytool authenticates with an App Store Connect API key rather than
       # an Apple ID + app-specific password. It has to exist as a FILE on disk,
       # so the base64 secret is decoded into the runner's temp dir — never the
