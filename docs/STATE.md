@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-04 (v1.1.0).
+Last updated: 2026-08-04 (v1.1.0 released).
 
 ## Sites & rooms
 
@@ -399,6 +399,19 @@ Notes:
        wraps it in an unsigned DMG, and Gatekeeper judges the app.) Windows
        builds unsigned: SmartScreen shows an "unrecognized app" prompt that a
        user can click through, and removing it needs a separate certificate.
+     - **Documentation** (`docs/wiki/`): nine user-facing pages — Home,
+       Installation, First-Run-Setup, Run-of-Show, Checklists,
+       Rooms-and-Campuses, User-Management, Integrations and
+       Integration-Caveats. Written for volunteers, verified against source
+       rather than paraphrased from comments. `Integration-Caveats` is the
+       one that saves time on a Sunday: Smaart needing inputs calibrated AND
+       logging, ProPresenter coalescing rapid slide advances, and YouTube
+       viewer counts existing only while a broadcast is live.
+     - Writing those docs found three drifts between code and its own
+       comments: Admin → System pointed at a tray item that did not exist,
+       the launcher's first-run window only opened on an error despite a
+       comment claiming otherwise, and the README's Node version disagreed
+       with `.nvmrc`. All fixed before the tag.
      - Four bugs came from real CI runs rather than being reasoned away:
        Windows `.cmd` resolution (`ENOENT`, then `EINVAL` — Node refuses to
        execFile a `.cmd` without `shell:true` since the CVE-2024-27980 fix); a
