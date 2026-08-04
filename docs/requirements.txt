@@ -1,0 +1,3 @@
+# Documentation site only — never installed on a prodmesh box.
+#   pip install -r docs/requirements.txt
+mkdocs-material==9.5.49

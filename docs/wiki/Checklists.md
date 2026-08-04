@@ -74,7 +74,7 @@ that are common across the rooms an event type actually runs in.
 
 ## See also
 
-- [Run of Show](Run-of-Show) — the rest of the Event Detail page: Show
+- [Run of Show](Run-of-Show.md) — the rest of the Event Detail page: Show
   Automation and the live service tracker the checklist sits above.
-- [Rooms and Campuses](Rooms-and-Campuses) — how a room's modes and Companion
+- [Rooms and Campuses](Rooms-and-Campuses.md) — how a room's modes and Companion
   connection (and its schedule lockouts) are configured.

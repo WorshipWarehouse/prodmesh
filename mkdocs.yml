@@ -1,0 +1,87 @@
+# Public documentation site → https://jbeale.github.io/prodmesh/
+#
+# Deliberately NOT a GitHub wiki. A wiki is a separate git repository, which
+# means docs cannot be reviewed with the code that changed and drift silently
+# — this project has already caught three such drifts. The pages live in the
+# repo, are reviewed like code, and this file only decides how they are
+# rendered.
+#
+# MkDocs is Python, so it adds nothing to the npm tree: no new node
+# dependency, no effect on `npm ci` on a booth Mac, and not one byte in the
+# application bundle.
+#
+#   pip install -r docs/requirements.txt
+#   mkdocs serve     # preview at http://127.0.0.1:8000
+#   mkdocs build     # → site/
+
+site_name: prodmesh
+site_description: Production dashboard for churches — room control, run of show, and service data on one LAN box.
+site_url: https://jbeale.github.io/prodmesh/
+repo_url: https://github.com/jbeale/prodmesh
+repo_name: jbeale/prodmesh
+edit_uri: edit/main/docs/wiki/
+
+# The user guide only. ARCHITECTURE, STATE and the ADRs stay in the repo for
+# developers — publishing them here would bury a volunteer looking for why
+# Smaart shows no SPL.
+docs_dir: docs/wiki
+site_dir: site
+
+theme:
+  name: material
+  language: en
+  palette:
+    # The dashboard is dark because it lives in a dim booth; the docs get read
+    # in both places, so both schemes are offered and the OS decides first.
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: light blue
+      toggle: { icon: material/weather-sunny, name: Switch to light mode }
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle: { icon: material/weather-night, name: Switch to dark mode }
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.action.edit
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: Installation.md
+      - First-run setup: First-Run-Setup.md
+  - Using prodmesh:
+      - Run of Show: Run-of-Show.md
+      - Checklists: Checklists.md
+      - Rooms and campuses: Rooms-and-Campuses.md
+      - User management: User-Management.md
+  - Connecting your gear:
+      - Integrations: Integrations.md
+      - Integration caveats: Integration-Caveats.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight: { anchor_linenums: true }
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jbeale/prodmesh

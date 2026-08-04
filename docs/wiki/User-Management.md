@@ -125,7 +125,7 @@ Security**:
   entirely). Keep it, but treat named users and groups as the normal way to
   grant access once they're set up.
 - **Override PIN** — unrelated to login. It exists to bypass a scheduled room
-  mode *lockout* (see [Rooms and Campuses](Rooms-and-Campuses)) — someone
+  mode *lockout* (see [Rooms and Campuses](Rooms-and-Campuses.md)) — someone
   standing at a booth during a protected window who genuinely needs to change
   the mode. Clearing it (leaving it unset) simply means mode locks can't be
   overridden by PIN at all.

@@ -176,7 +176,7 @@ service the page is about.
 
 ## See also
 
-- [Checklists](Checklists) — the per-event-type startup checklist on Event
+- [Checklists](Checklists.md) — the per-event-type startup checklist on Event
   Detail, above Show Automation.
-- [Rooms and Campuses](Rooms-and-Campuses) — configuring the ProPresenter,
+- [Rooms and Campuses](Rooms-and-Campuses.md) — configuring the ProPresenter,
   analysis, and YouTube connections a room's Run of Show depends on.

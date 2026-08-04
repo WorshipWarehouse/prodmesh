@@ -14,21 +14,21 @@ with AV gear, not necessarily with servers or Docker.
 
 ## Start here
 
-- **[Installation](Installation)** — pick a desktop app, Docker, or a manual
+- **[Installation](Installation.md)** — pick a desktop app, Docker, or a manual
   git install, and get the server running.
-- **[First-Run Setup](First-Run-Setup)** — the wizard that runs the first time
+- **[First-Run Setup](First-Run-Setup.md)** — the wizard that runs the first time
   anyone opens it: admin PIN, church name, first campus and rooms.
 
 ## Everything else
 
-- **[Run of Show](Run-of-Show)** — following ProPresenter live through a
+- **[Run of Show](Run-of-Show.md)** — following ProPresenter live through a
   service, and the planned-vs-actual report afterward.
-- **[User Management](User-Management)** — admin PIN, individual logins, and
+- **[User Management](User-Management.md)** — admin PIN, individual logins, and
   what each permission controls.
-- **[Checklists](Checklists)** — startup checklists tied to Companion buttons.
-- **[Rooms and Campuses](Rooms-and-Campuses)** — modeling your building:
+- **[Checklists](Checklists.md)** — startup checklists tied to Companion buttons.
+- **[Rooms and Campuses](Rooms-and-Campuses.md)** — modeling your building:
   campuses, rooms, and what each room connects to.
-- **[Integrations](Integrations)** — connecting Planning Center, Companion,
+- **[Integrations](Integrations.md)** — connecting Planning Center, Companion,
   ProPresenter, Smaart, and Slack.
-- **[Integration Caveats](Integration-Caveats)** — device and API quirks worth
+- **[Integration Caveats](Integration-Caveats.md)** — device and API quirks worth
   knowing before you rely on them during a service.

@@ -128,13 +128,13 @@ no PIN to override it would just fail closed, so the system doesn't advertise
 any lock as active until a PIN is set. Someone with the
 `rooms.mode.override_lock` permission can bypass the PIN prompt entirely.
 
-A checklist item that presses a mode button (see [Checklists](Checklists))
+A checklist item that presses a mode button (see [Checklists](Checklists.md))
 goes through the exact same lockout check — it can't be used to bypass a
 protected window.
 
 ## See also
 
-- [Run of Show](Run-of-Show) — what a room's ProPresenter, analysis, and
+- [Run of Show](Run-of-Show.md) — what a room's ProPresenter, analysis, and
   YouTube connections drive once a service is live.
-- [Checklists](Checklists) — the per-event-type checklists that can press a
+- [Checklists](Checklists.md) — the per-event-type checklists that can press a
   room's Companion button, subject to the same lockouts described above.
