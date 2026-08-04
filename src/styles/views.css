@@ -128,15 +128,32 @@
    to another are the same gesture, which buys back the whole row a heading
    would have cost. */
 
+.viewbar,
+.editbar {
+  /* Full-bleed: cancel the shell's padding so the bar sits flush against the
+     sidebar and the top of the window. Inset and rounded, it read as a card
+     that happened to be at the top — the one thing on the page that is chrome
+     rather than content, drawn like content. A toolbar has edges, not
+     corners. */
+  margin: calc(-1 * var(--main-pad)) calc(-1 * var(--main-pad)) 0;
+  width: calc(100% + 2 * var(--main-pad));
+  border-radius: 0;
+  border-width: 0 0 1px;
+  /* Held while a tall dashboard scrolls: which service you are looking at is
+     not something to have to scroll back up for. */
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
 .viewbar {
   display: flex;
   align-items: stretch;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 8px;
+  padding: 10px var(--main-pad);
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
 }
 
 .viewbar__ctl {
@@ -349,10 +366,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 10px;
+  padding: 10px var(--main-pad);
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
 }
 
 .editbar__name {
