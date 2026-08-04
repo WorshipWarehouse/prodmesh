@@ -24,6 +24,7 @@ import './roomStateWatcher.js'; // registers the room:*:mode topic
 import roomsRouter from './routes/rooms.js';
 import showsRouter from './routes/shows.js';
 import streamRouter from './routes/stream.js';
+import viewsRouter from './routes/views.js';
 import eventsRouter from './routes/events.js';
 import calendarRouter from './routes/calendar.js';
 import assistanceRouter from './routes/assistance.js';
@@ -83,6 +84,7 @@ app.use(calendarRouter);
 app.use(assistanceRouter);
 app.use(showsRouter);
 app.use(streamRouter);
+app.use(viewsRouter);
 app.use(authRouter);
 app.use(adminConfigRouter);
 app.use(systemRouter);

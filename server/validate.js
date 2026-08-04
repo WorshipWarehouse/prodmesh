@@ -1,6 +1,8 @@
 // Startup validation for the structural room config. Throws a clear, actionable
 // error instead of letting a typo surface as a cryptic runtime failure later.
 
+import { MAX_ROWS_HARD, collisions, fits, gridFor, normalize } from './gridLayout.js';
+
 function fail(msg) {
   throw new Error(`Invalid rooms.config.js: ${msg}`);
 }
@@ -183,4 +185,120 @@ function validateTile(tile, claim, text) {
     default: // placeholder
       return base;
   }
+}
+
+// ── Views (dashboards and displays) ─────────────────────────────────────────
+// Same discipline as the topology above: caps on everything, and a normalized
+// copy containing only known fields so junk never persists.
+
+const VIEW_KINDS = new Set(['dashboard', 'display']);
+
+/**
+ * The widget catalogue, duplicated from src/widgets/registry.tsx exactly as
+ * TILE_TYPES duplicates src/tiles/registry.tsx — the server is JS, the
+ * frontend is TS, and there is no build step between them.
+ *
+ * `unique` is whether a view may hold more than one. It is a flag rather than
+ * a blanket rule because the real invariant is that a placement be
+ * IDENTIFIABLE: today most widgets carry no config, so the type alone
+ * identifies them and one-per-view falls out for free. A future multi-instance
+ * widget (two Smaart engines in one room — one for the stream, one for the
+ * house) sets unique:false and earns an identity in its config.
+ *
+ * `display` is whether it may go on a read-only screen. A widget that takes
+ * actions may not: a display is DEFINED as non-interactive.
+ */
+const WIDGET_TYPES = new Map([
+  ['countdown', { unique: true, display: true }],
+  ['loudness', { unique: true, display: true }],
+  ['viewers', { unique: true, display: true }],
+]);
+
+const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room
+
+/**
+ * Validate a view's editable content. Throws on bad shape — callers map that
+ * to HTTP 400.
+ *
+ * `columns`/`max_rows` are NOT accepted from the client: they are derived from
+ * `kind` here and written by the store. A client that could choose its own
+ * grid could choose a 12000-column one.
+ */
+export function validateView(input) {
+  if (!input || typeof input !== 'object') throw new Error('view must be an object');
+
+  const kind = input.kind;
+  if (!VIEW_KINDS.has(kind)) throw new Error('View kind must be dashboard or display');
+  const grid = gridFor(kind);
+
+  const name = String(input.name ?? '').trim();
+  if (!name || name.length > 60) throw new Error('View name must be 1–60 characters');
+
+  const slug = String(input.slug ?? '').trim();
+  if (!TOPO_ID.test(slug)) {
+    throw new Error(`View id "${slug}" must be lowercase letters, numbers, and dashes`);
+  }
+
+  const input_widgets = Array.isArray(input.widgets) ? input.widgets : [];
+  if (input_widgets.length > MAX_WIDGETS_PER_VIEW) {
+    throw new Error(`A view can hold at most ${MAX_WIDGETS_PER_VIEW} widgets`);
+  }
+
+  const placed = new Set();
+  const widgets = input_widgets.map((widget) => {
+    const type = String(widget?.type ?? '');
+    const def = WIDGET_TYPES.get(type);
+    // Rejected on WRITE, but never on read — see views.js. A PUT comes from
+    // this build's own editor, so an unknown type is a bug, and storing it
+    // stores something nothing will ever render.
+    if (!def) throw new Error(`Unknown widget type "${type}"`);
+    if (def.unique && placed.has(type)) throw new Error(`Widget "${type}" can only be placed once`);
+    placed.add(type);
+    if (kind === 'display' && !def.display) {
+      throw new Error(`Widget "${type}" cannot go on a display`);
+    }
+
+    const box = { x: widget.x, y: widget.y, w: widget.w, h: widget.h };
+    for (const key of ['x', 'y', 'w', 'h']) {
+      if (!Number.isInteger(box[key])) throw new Error(`Widget "${type}" needs integer grid coordinates`);
+    }
+    if (!fits(grid, box)) {
+      throw new Error(
+        kind === 'display'
+          ? `Widget "${type}" does not fit a display's ${grid.columns}×${grid.maxRows} grid`
+          : `Widget "${type}" is outside the ${grid.columns}-column grid (max ${MAX_ROWS_HARD} rows)`,
+      );
+    }
+
+    return { type, ...box, config: viewWidgetConfig(widget.config) };
+  });
+
+  const [clash] = collisions(widgets);
+  if (clash) throw new Error(`Widgets "${clash[0].type}" and "${clash[1].type}" overlap`);
+
+  return {
+    kind,
+    name,
+    slug,
+    columns: grid.columns,
+    maxRows: grid.maxRows,
+    widgets: normalize(widgets),
+  };
+}
+
+/**
+ * A placement's own config. Unknown keys are DROPPED rather than rejected,
+ * matching validateTile's "only known fields per type" — a view written by a
+ * newer build should lose the field it doesn't understand, not fail to save.
+ */
+function viewWidgetConfig(config) {
+  if (!config || typeof config !== 'object') return {};
+  const out = {};
+  for (const key of ['planId', 'timeId']) {
+    const value = config[key];
+    if (typeof value !== 'string' || !value) continue;
+    if (value.length > 120) throw new Error(`Widget ${key} is too long`);
+    out[key] = value;
+  }
+  return out;
 }

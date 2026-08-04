@@ -284,6 +284,61 @@ const MIGRATIONS = [
       addColumn(d, 'show_summaries', 'stream', 'TEXT');
     },
   },
+
+  {
+    // Views: a room's dashboards (interactive, 6 columns, rows grow) and
+    // displays (read-only, a hard 3×3 that must fit a screen — it is a tile on
+    // a video multiview, where a scrollbar is a fault). One layout engine,
+    // parameterised by (columns, max_rows); those are STORED rather than
+    // derived from `kind` at read time, so a future 4×2 display is data rather
+    // than a migration.
+    //
+    // room_id has NO FOREIGN KEY, deliberately, and the same goes for
+    // show_config, room_connectivity, checklist_state and stations.room_id.
+    // Admin → Campuses saves the whole topology by DELETE-ing and reinserting
+    // site_rooms (appConfig.js), including for a pure rename — so ON DELETE
+    // CASCADE would wipe every dashboard in the church the day someone renames
+    // a campus. It does not today only because PRAGMA foreign_keys is never
+    // set (db.js opens with WAL and nothing else), which means the FK on
+    // view_id below is documentation too: deleteView() removes placements
+    // explicitly, inside the transaction.
+    //
+    // A view whose room is gone is orphaned, not reaped — re-adding the room
+    // with the same id gets its views back, and listViews() filters against
+    // the live rooms map so orphans are invisible meanwhile.
+    name: 'views',
+    up(d) {
+      d.exec(`
+        CREATE TABLE IF NOT EXISTS views (
+          id         TEXT PRIMARY KEY,       -- crypto.randomUUID()
+          room_id    TEXT    NOT NULL,       -- site_rooms.id, unenforced (see above)
+          kind       TEXT    NOT NULL CHECK (kind IN ('dashboard','display')),
+          name       TEXT    NOT NULL,
+          slug       TEXT    NOT NULL,       -- the URL key; stable id for a kiosk
+          columns    INTEGER NOT NULL CHECK (columns BETWEEN 1 AND 12),
+          max_rows   INTEGER CHECK (max_rows IS NULL OR max_rows BETWEEN 1 AND 24),
+          position   INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS views_room_slug ON views (room_id, slug);
+        CREATE INDEX IF NOT EXISTS views_by_room ON views (room_id, kind, position);
+
+        CREATE TABLE IF NOT EXISTS view_widgets (
+          id       TEXT PRIMARY KEY,
+          view_id  TEXT    NOT NULL REFERENCES views(id) ON DELETE CASCADE,
+          type     TEXT    NOT NULL,
+          x        INTEGER NOT NULL CHECK (x >= 0),
+          y        INTEGER NOT NULL CHECK (y >= 0),
+          w        INTEGER NOT NULL CHECK (w >= 1),
+          h        INTEGER NOT NULL CHECK (h >= 1),
+          config   TEXT    NOT NULL DEFAULT '{}',
+          position INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS view_widgets_by_view ON view_widgets (view_id, position);
+      `);
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
