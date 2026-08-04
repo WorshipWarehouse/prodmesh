@@ -602,9 +602,3 @@
   background: var(--danger-soft);
   opacity: 0.35;
 }
-
-.confirm__hint {
-  margin: 6px 0 0;
-  font-size: 0.82rem;
-  color: var(--text-faint);
-}
