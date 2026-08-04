@@ -10,7 +10,7 @@ test('a fresh database migrates to the current version with the full schema', ()
   const d = new Database(':memory:');
   migrate(d);
   assert.equal(d.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  for (const t of ['spl_samples', 'sites', 'room_connectivity', 'users', 'audit_log']) {
+  for (const t of ['spl_samples', 'sites', 'room_connectivity', 'users', 'audit_log', 'views', 'view_widgets']) {
     assert.ok(tables(d).includes(t), `expected table ${t}`);
   }
   // The ca column (a later migration) is present on a fresh install too.
