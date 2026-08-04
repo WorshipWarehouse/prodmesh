@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Lock, Radio, Wifi, WifiOff } from 'lucide-react';
+import { LayoutGrid, Lock, Radio, Wifi, WifiOff } from 'lucide-react';
 import {
   getRoom,
   getRoomPlan,
@@ -164,6 +164,11 @@ export function RoomStatus() {
         <div>
           <h1 className="pagehead__title">{room.name}</h1>
           <p className="pagehead__sub">Room Console</p>
+        </div>
+        <div className="pagehead__right">
+          <Link className="btn btn--sm" to={`/room/${roomId}/views`}>
+            <LayoutGrid size={14} /> Dashboards
+          </Link>
         </div>
       </div>
 
