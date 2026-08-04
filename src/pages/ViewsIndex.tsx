@@ -131,18 +131,29 @@ export function ViewsIndex() {
         <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="new-view">
           <div className="confirm__card">
             <p className="eyebrow">New {creating}</p>
-            <p className="confirm__text" id="new-view">Name it</p>
-            <input
-              className="field"
-              autoFocus
-              value={name}
-              maxLength={60}
-              placeholder={creating === 'display' ? 'Multiview' : 'Front of House'}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && slugify(name) && create()}
-            />
-            {/* Shown, not hidden: it is the address a kiosk gets pointed at. */}
-            {slugify(name) && <p className="confirm__hint mono">/{slugify(name)}</p>}
+            <p className="confirm__text" id="new-view">Name this {creating}</p>
+            <div className="confirm__field">
+              <label className="sr-only" htmlFor="new-view-name">Name</label>
+              <input
+                id="new-view-name"
+                className="field"
+                autoFocus
+                value={name}
+                maxLength={60}
+                placeholder={creating === 'display' ? 'Multiview' : 'Front of House'}
+                aria-describedby={slugify(name) ? 'new-view-slug' : undefined}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && slugify(name) && create()}
+              />
+              {/* Shown, not hidden: it is the address a screen gets pointed at,
+                  and someone will have to type it into a kiosk one day.
+                  DESCRIBES the field rather than naming it — inside the label
+                  it became part of the field's accessible name, so the name
+                  changed with every keystroke. */}
+              {slugify(name) && (
+                <p className="confirm__hint mono" id="new-view-slug">/{slugify(name)}</p>
+              )}
+            </div>
             {error && <p className="identity__error">{error}</p>}
             <div className="confirm__buttons">
               <button className="confirm__cancel" onClick={() => setCreating(null)}>Cancel</button>

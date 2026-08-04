@@ -422,6 +422,26 @@ input[type='time']::-webkit-calendar-picker-indicator {
   cursor: default;
 }
 
+/* A named field inside the confirm dialog — naming a new dashboard, say.
+   The input must be told to fill the card: a bare <input> sizes to its `size`
+   attribute, which lands it at about half width with the buttons crowding it. */
+.confirm__field {
+  display: block;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.confirm__field .field {
+  width: 100%;
+}
+
+.confirm__hint {
+  display: block;
+  margin: 7px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-faint);
+}
+
 /* Lock / override PIN inside the confirm dialog */
 .confirm__lock {
   margin-bottom: 16px;
