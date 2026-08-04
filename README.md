@@ -53,7 +53,8 @@ real gear later.
 ## Requirements
 
 A machine that stays on and reachable from the production network — a NAS, a
-homelab box, a spare Mac mini. Docker, or Node 22+ for a checkout. Planning
+homelab box, a spare Mac mini. The desktop app, Docker, or Node 20+ for a
+checkout (see `.nvmrc`). Planning
 Center, Companion, ProPresenter and Smaart are each optional.
 
 ## How it's put together

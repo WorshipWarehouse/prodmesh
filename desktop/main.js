@@ -24,7 +24,7 @@
 import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, shell, nativeImage, clipboard } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdirSync, readFileSync, writeSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -37,6 +37,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 app.setName('ProdMesh');
 
 const PORT = Number(process.env.PORT) || 8080;
+const RELEASES_URL = 'https://github.com/jbeale/prodmesh/releases/latest';
 
 let tray = null;
 let win = null;
@@ -47,6 +48,9 @@ let state = { status: 'starting', port: PORT, error: null };
 // Outside the app bundle, so an update replaces the program and never the
 // database. This is the whole reason the launcher is safe to auto-update.
 const dataDir = join(app.getPath('userData'), 'data');
+// Whether this is the very first launch, checked BEFORE the directory is
+// created — it decides whether the status window opens by itself below.
+const firstRun = !existsSync(dataDir);
 mkdirSync(dataDir, { recursive: true });
 process.env.PRODMESH_DATA_DIR = dataDir;
 process.env.PRODMESH_DEPLOYMENT = 'desktop';
@@ -181,6 +185,10 @@ function updateTray() {
     { label: 'Copy LAN address', enabled: running, click: () => clipboard.writeText(lanUrls(state.port)[0] ?? dashboardUrl()) },
     { label: 'Status…', click: showWindow },
     { type: 'separator' },
+    // server/deployment.js tells desktop installs to update from here, so this
+    // item has to exist — Admin → System points at it by name.
+    { label: 'Check for updates…', click: () => shell.openExternal(RELEASES_URL) },
+    { type: 'separator' },
     { label: 'Show data folder', click: () => shell.openPath(dataDir) },
     { label: 'Show logs', click: () => shell.openPath(app.getPath('logs')) },
     { type: 'separator' },
@@ -250,9 +258,11 @@ if (!app.requestSingleInstanceLock()) {
     updateTray();
     tray.on('click', showWindow); // Windows: left-click opens status
     await startServer();
-    // First run has nothing configured, so the window is the only way anyone
-    // knows what to do next. Afterwards it stays out of the way in the tray.
-    if (state.status !== 'running') showWindow();
+    // On a first launch the window IS the onboarding: nothing is configured,
+    // and a lone menu-bar icon tells a volunteer nothing. It also opens on a
+    // failure, which is the other time somebody needs to be told something.
+    // Every later launch stays quietly in the tray.
+    if (firstRun || state.status !== 'running') showWindow();
   });
 
   // The server is the product; the window is a viewer. Closing every window

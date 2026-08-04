@@ -1,7 +1,7 @@
 # Deploy
 
 Two ways to run prodmesh today. A desktop launcher (tray icon, double-click
-install) is planned and will be the right answer for a church whose dashboard
+install) now exists and is the right answer for a church whose dashboard
 lives on the booth Mac.
 
 | | Best for | Updates by |
