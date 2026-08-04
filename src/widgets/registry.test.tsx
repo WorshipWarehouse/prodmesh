@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { widgetRegistry, widgetTypes, isWidgetType } from './registry';
-import { spanColumns, type WidgetSpan } from './types';
+import { spanColumns, widgetAllowedOn, widgetIsUnique, type WidgetSpan } from './types';
+import { GRID, fits } from '../lib/gridLayout';
 import { emitTopic } from '../test/fakeEventSource';
 
 const api = vi.hoisted(() => ({
@@ -53,13 +54,40 @@ describe('the registry contract', () => {
     }
   });
 
-  it('describes every widget for a future layout picker', () => {
+  it('describes every widget for the layout picker', () => {
     for (const type of widgetTypes) {
       const def = widgetRegistry[type];
       expect(def.title, `${type} needs a title`).toBeTruthy();
       expect(def.description, `${type} needs a description`).toBeTruthy();
       expect(spanColumns(def.defaultSpan), `${type} needs a usable span`).toBeGreaterThan(0);
     }
+  });
+
+  it('every widget declares a size that fits the grids it claims', () => {
+    for (const type of widgetTypes) {
+      const def = widgetRegistry[type];
+      const { w, h } = def.size;
+      expect(Number.isInteger(w) && w >= 1, `${type} needs an integer width`).toBe(true);
+      expect(Number.isInteger(h) && h >= 1, `${type} needs an integer height`).toBe(true);
+      expect(fits(GRID.dashboard, { x: 0, y: 0, w, h }), `${type} must fit a dashboard`).toBe(true);
+
+      // The assertion that turns "display-safe" from a comment into something
+      // the suite enforces: a display is a hard 3×3 with no scrolling, so a
+      // widget that claims it must actually fit inside one.
+      if (widgetAllowedOn(def, 'display')) {
+        expect(fits(GRID.display, { x: 0, y: 0, w, h }), `${type} claims display but is ${w}×${h}`).toBe(true);
+      }
+    }
+  });
+
+  it('is one-per-view unless a widget opts out', () => {
+    // The flag exists for widgets that will eventually be multi-instance (two
+    // Smaart engines in one room). Nothing opts out yet, and the default is
+    // what the server enforces.
+    for (const type of widgetTypes) {
+      expect(widgetIsUnique(widgetRegistry[type]), `${type}`).toBe(true);
+    }
+    expect(widgetIsUnique({ ...widgetRegistry.loudness, unique: false })).toBe(false);
   });
 
   it('recognises its own type names and rejects others', () => {
