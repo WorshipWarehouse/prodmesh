@@ -21,6 +21,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { getAuthStatus, getConfig, logoSrc, logoutAdmin, type AuthStatus, type Station } from '../api';
+import { HelpDrawer } from '../components/HelpDrawer';
 import { AssistanceBar } from '../components/AssistanceBar';
 import { AssistanceDialog } from '../components/AssistanceDialog';
 import { ALL_CAMPUSES, CampusContext } from './campus';
@@ -67,6 +68,7 @@ export function AppShell() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false); // the documentation drawer
   const [assistOpen, setAssistOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const helpRef = useRef<HTMLDivElement>(null);
@@ -264,8 +266,11 @@ export function AppShell() {
               </button>
               {helpOpen && (
                 <div className="accountmenu helpmenu">
-                  <button disabled title="Documentation is being written">
-                    <BookOpen size={14} /> Documentation <small>coming soon</small>
+                  <button
+                    onClick={() => { setHelpOpen(false); setGuideOpen(true); }}
+                    title="The full guide, readable with no internet connection"
+                  >
+                    <BookOpen size={14} /> Documentation
                   </button>
                   <button
                     disabled={!identity?.station}
@@ -353,6 +358,7 @@ export function AppShell() {
             </div>
           </div>
         )}
+        <HelpDrawer open={guideOpen} onClose={() => setGuideOpen(false)} />
       </div>
     </CampusContext.Provider>
     </ChurchContext.Provider>
