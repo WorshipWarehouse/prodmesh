@@ -1,0 +1,73 @@
+# electron-builder config for the prodmesh desktop launcher.
+#
+# The app it packages is desktop/.build, produced by build.mjs — never the repo
+# root, which carries a frontend toolchain nobody's Applications folder needs.
+
+appId: org.prodmesh.dashboard
+productName: ProdMesh
+copyright: prodmesh
+
+directories:
+  app: .build
+  output: release
+  buildResources: build-resources
+
+# better-sqlite3 is a native module: it must be rebuilt against Electron's ABI
+# (not Node's) and cannot be loaded from inside an asar archive.
+npmRebuild: true
+asar: true
+asarUnpack:
+  - "**/node_modules/better-sqlite3/**"
+
+# build-resources/icon.png (1024px, from art/prodmesh-icon.png) is picked up by
+# convention — electron-builder derives .icns and .ico from it. Named by
+# convention rather than pointed at with a relative path, which resolves
+# differently depending on which directory the build is invoked from.
+
+files:
+  - "**/*"
+  - "!**/*.map"
+  - "!**/*.md"
+
+mac:
+  category: public.app-category.utilities
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # The booth Mac needs to reach ProPresenter, Companion and an analyzer on the
+  # LAN, and to be reachable from every room screen. Sandboxing would sever all
+  # of that, so the app is deliberately unsandboxed — it is an appliance, not a
+  # Mac App Store utility.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build-resources/entitlements.mac.plist
+  entitlementsInherit: build-resources/entitlements.mac.plist
+  # macOS 13+ asks the user to allow local network access on first launch. Say
+  # why, or the prompt is unexplained and a volunteer will refuse it — which
+  # would break the entire product silently.
+  extendInfo:
+    NSLocalNetworkUsageDescription: >-
+      prodmesh serves the dashboard to other screens in your building and talks
+      to ProPresenter, Companion and your audio analyser over the local network.
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  # The booth PC is switched on and left alone; the dashboard should be there
+  # after a reboot without anyone remembering to start it.
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+publish:
+  provider: github
+  releaseType: release

@@ -98,16 +98,40 @@ if (existsSync(distDir)) {
   });
 }
 
-// Only start listening when run directly (not when imported by tests).
-if (process.argv[1] === __filename) {
+/**
+ * Boot the background work and start listening.
+ *
+ * Separate from module load because there are now two callers: this file when
+ * run directly (launchd/systemd/Docker), and the desktop launcher, which runs
+ * the same server inside Electron's main process. Only one copy of the server
+ * exists either way — the tray app is a wrapper, not a fork.
+ *
+ * Resolves with the http.Server once it is actually listening, so a caller
+ * that needs the port (the launcher, when asked for :0) can read it.
+ */
+export function start(port = PORT) {
   show.restoreShows().catch(() => {}); // resume any show that was active before restart
   show.initAutomation(); // per-room autostart watchers (PP-driven, browserless)
   summaries.syncFromTimelines(); // legacy timelines → summary rows (one-time per boot)
   splStore.startRetention(); // prune old SPL samples now + daily
   streamStore.startRetention(); // and old viewer samples
   initHealthDeclarations(); // every configured integration appears on /api/system/health
-  app.listen(PORT, () => {
-    console.log(`Production dashboard server on http://localhost:${PORT}`);
+  return new Promise((resolve, reject) => {
+    const server = app.listen(port);
+    server.once('listening', () => {
+      console.log(`Production dashboard server on http://localhost:${server.address().port}`);
+      resolve(server);
+    });
+    server.once('error', reject);
+  });
+}
+
+// Only start listening when run directly (not when imported by tests, and not
+// when the desktop launcher imports the app to start it itself).
+if (process.argv[1] === __filename) {
+  start().catch((err) => {
+    console.error(`Failed to start: ${err.message}`);
+    process.exit(1);
   });
 }
 

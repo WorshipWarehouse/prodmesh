@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>ProdMesh</title>
+    <style>
+      /* System fonts only. The app's bundled webfonts live in dist/ and are
+         served to browsers; pulling them in here would mean shipping them
+         twice for one small window. */
+      :root {
+        --bg: #0b1017;
+        --raised: #131b24;
+        --border: #22303d;
+        --text: #edf2f7;
+        --dim: #8fa3b5;
+        --accent: #52a8ff;
+        --ok: #34c759;
+        --bad: #ff4d4f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 22px 24px;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      h1 { margin: 0 0 2px; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+      .ver { color: var(--dim); font-size: 11px; margin-bottom: 18px; }
+      .state { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-weight: 600; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+      .state--running .dot { background: var(--ok); }
+      .state--error .dot { background: var(--bad); }
+      .card {
+        background: var(--raised);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+      }
+      .label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--dim);
+        margin-bottom: 6px;
+      }
+      /* Addresses are the one thing someone will read off this screen and type
+         into another machine, so they are selectable and monospaced. */
+      .addr {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px;
+        -webkit-user-select: text;
+        user-select: text;
+        word-break: break-all;
+      }
+      .addr + .addr { margin-top: 3px; }
+      a { color: var(--accent); cursor: pointer; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        color: #04121f;
+        background: var(--accent);
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 14px;
+        cursor: pointer;
+        width: 100%;
+      }
+      button:disabled { opacity: 0.45; cursor: default; }
+      .err {
+        color: var(--bad);
+        background: rgba(255, 77, 79, 0.09);
+        border: 1px solid rgba(255, 77, 79, 0.3);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+      }
+      .hint { color: var(--dim); font-size: 11.5px; margin: 12px 0 0; }
+      .path {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
+        color: var(--dim);
+        -webkit-user-select: text;
+        user-select: text;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ProdMesh</h1>
+    <div class="ver" id="ver"></div>
+
+    <div class="state" id="state"><span class="dot"></span><span id="stateText">Starting…</span></div>
+
+    <div id="err"></div>
+
+    <div class="card" id="addrCard" hidden>
+      <div class="label">Point other screens here</div>
+      <div id="addrs"></div>
+    </div>
+
+    <button id="open" disabled>Open dashboard</button>
+
+    <p class="hint">
+      ProdMesh keeps running when this window is closed — use the menu bar icon.
+      Data folder:
+    </p>
+    <div class="path" id="dataDir"></div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let current = null;
+
+      window.prodmesh.onState((s) => {
+        current = s;
+        $('ver').textContent = `Version ${s.version}`;
+        $('dataDir').textContent = s.dataDir;
+
+        const running = s.status === 'running';
+        $('state').className = `state state--${s.status}`;
+        $('stateText').textContent = running
+          ? `Running on port ${s.port}`
+          : s.status === 'error'
+            ? 'Not running'
+            : 'Starting…';
+
+        $('err').innerHTML = '';
+        if (s.error) {
+          const d = document.createElement('div');
+          d.className = 'err';
+          d.textContent = s.error;
+          $('err').appendChild(d);
+        }
+
+        // localhost is the least useful address here: the whole point is that
+        // OTHER machines in the building point at this one.
+        const urls = (s.urls && s.urls.length ? s.urls : [s.url]);
+        $('addrCard').hidden = !running;
+        $('addrs').innerHTML = '';
+        for (const u of urls) {
+          const a = document.createElement('div');
+          a.className = 'addr';
+          a.textContent = u;
+          $('addrs').appendChild(a);
+        }
+
+        $('open').disabled = !running;
+      });
+
+      $('open').addEventListener('click', () => window.prodmesh.open());
+    </script>
+  </body>
+</html>

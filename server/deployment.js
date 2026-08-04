@@ -33,6 +33,12 @@ const pkg = createRequire(import.meta.url)('../package.json');
 export function kind() {
   if (process.env.PRODMESH_DEPLOYMENT) return process.env.PRODMESH_DEPLOYMENT;
   if (process.env.PRODMESH_CONTAINER === '1' || existsSync('/.dockerenv')) return 'container';
+  // The desktop launcher sets PRODMESH_DEPLOYMENT=desktop before importing the
+  // server, so it is caught above. This is the belt-and-braces: inside a
+  // packaged Electron app the code lives in app.asar, and a .git check would
+  // never fire anyway — but an unpacked dev run of the launcher would look
+  // like a git checkout and offer an Update button that cannot work.
+  if (process.versions.electron) return 'desktop';
   if (existsSync(join(ROOT, '.git'))) return 'git';
   return 'package';
 }
@@ -86,6 +92,16 @@ export function updateCapability() {
       supported: false,
       strategy: 'container',
       reason: 'Update by pulling a newer image and recreating the container.',
+    };
+  }
+  if (deployment === 'desktop') {
+    // The app updates itself through Electron's updater, driven by the tray —
+    // not by this endpoint, which would be pulling a git checkout that a
+    // packaged app does not have.
+    return {
+      supported: false,
+      strategy: 'desktop',
+      reason: 'Use “Check for updates” in the prodmesh menu bar icon.',
     };
   }
   if (deployment === 'git') {

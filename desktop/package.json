@@ -1,0 +1,20 @@
+{
+  "name": "prodmesh-desktop-build",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Build harness for the prodmesh desktop launcher. Not the app manifest — build.mjs generates that.",
+  "type": "module",
+  "scripts": {
+    "stage": "node build.mjs",
+    "pack": "node build.mjs && electron-builder --config electron-builder.yml --dir",
+    "dist": "node build.mjs && electron-builder --config electron-builder.yml",
+    "test": "electron test/ui-test.cjs",
+    "start": "node build.mjs && electron .build",
+    "app": "node build.mjs && electron-builder --config electron-builder.yml --dir && open -n release/mac-arm64/ProdMesh.app"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}
