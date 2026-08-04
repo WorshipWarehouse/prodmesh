@@ -10,6 +10,8 @@ import { EventDetail } from './pages/EventDetail';
 import { RoomShowRedirect } from './pages/RoomShowRedirect';
 import { RunOfShow } from './pages/RunOfShow';
 import { ServiceReport } from './pages/ServiceReport';
+import { ViewsIndex } from './pages/ViewsIndex';
+import { DashboardView } from './pages/DashboardView';
 import { Settings } from './pages/Settings';
 import { Setup } from './pages/Setup';
 import './styles/index.css';
@@ -41,6 +43,8 @@ export default function App() {
         <Route path="/room/:roomId/show" element={<RoomShowRedirect />} />
         <Route path="/room/:roomId/run/:planId" element={<RunOfShow />} />
         <Route path="/room/:roomId/run/:planId/report" element={<ServiceReport />} />
+        <Route path="/room/:roomId/views" element={<ViewsIndex />} />
+        <Route path="/room/:roomId/view/:slug" element={<DashboardView />} />
         {/* Old bookmark */}
         <Route path="/settings" element={<Navigate to="/admin/general" replace />} />
       </Route>

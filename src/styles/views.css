@@ -1,0 +1,341 @@
+/* Views — dashboards and displays.
+
+   A DIFFERENT grid from widgets.css. That one is a flow grid whose cards
+   reflow to one column below 880px. This is a fixed 2D canvas: a widget
+   occupies (x, y, w, h) and nothing reflows, because "2 wide by 3 high" is
+   meaningless if it becomes full width on a phone, and a display's 3x3 must
+   never move at all.
+
+   Note the page is NOT given a wider .shell__main. Six columns inside the
+   existing 1600px clamp is ~260px each, which is exactly the minmax(260px)
+   the widgets were designed against in .ros__widgets. "Full width" here means
+   "not clamped to Run of Show's 1100px", and a dashboard page already isn't.
+   Widening the shell for every page to make one dashboard bigger is the wrong
+   trade. */
+
+.viewpage,
+.viewsindex {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── The canvas ──────────────────────────────────────────────────────────── */
+
+.viewgrid {
+  display: grid;
+  grid-template-columns: repeat(var(--view-columns), minmax(0, 1fr));
+  grid-auto-rows: minmax(var(--view-row-height, 150px), auto);
+  gap: 14px;
+}
+
+/* A display must FIT. It is a tile on a video multiview, where a scrollbar is
+   a fault, so its rows divide the height it was given rather than setting it. */
+.viewgrid--fixed {
+  grid-template-rows: repeat(var(--view-rows), minmax(0, 1fr));
+  grid-auto-rows: 0; /* nothing may spill past the declared rows */
+  height: 100%;
+  overflow: hidden;
+}
+
+/* A display previewed inside the shell. Letterboxed to the shape it will be on
+   the wall, so what you arrange is what gets shown. */
+.viewframe {
+  aspect-ratio: 16 / 9;
+  max-height: 70vh;
+  margin: 0 auto;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+}
+
+.viewcell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.viewcell__body {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* A widget with nothing to show renders null, so its body is genuinely empty.
+   Name it rather than leaving a blank rectangle, which reads as a fault. */
+.viewcell__body:empty::after {
+  content: attr(data-title);
+  margin: auto;
+  color: var(--text-faint);
+  font-size: 0.9rem;
+}
+
+/* A widget this build doesn't have. It keeps its slot rather than letting the
+   rest of the grid shuffle up into the gap. */
+.viewcell--unknown {
+  border-style: dashed;
+  background: transparent;
+}
+
+.viewcell__unknown {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-faint);
+}
+
+.viewcell__unknown p {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewcell__unknown small {
+  font-size: 0.78rem;
+}
+
+/* Below this width a 2D canvas has no honest story: reflowing 6 columns to one
+   throws away the arrangement anyway. So it degrades to a single column in
+   READING order — which costs nothing, because the server normalises
+   placements by (y, x) before storing them, so the DOM is already in that
+   order. The layout becomes a priority list, which is at least truthful. */
+@media (max-width: 700px) {
+  .viewgrid:not(.viewgrid--fixed) {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* ── The one header row ──────────────────────────────────────────────────────
+
+   A dashboard replaces the page header rather than sitting under one. The
+   title is the first control: reading which dashboard you are on and switching
+   to another are the same gesture, which buys back the whole row a heading
+   would have cost. */
+
+.viewbar {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+}
+
+.viewbar__ctl {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--bg-tile);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.viewbar__ctl:hover:not(.viewbar__ctl--off) {
+  background: var(--bg-tile-hover);
+}
+
+/* The real control is transparent on top, so focus lands on it — the ring has
+   to be drawn by the face underneath. */
+.viewbar__ctl:focus-within {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.viewbar__ctl--off {
+  opacity: 0.5;
+}
+
+.viewbar__icon {
+  display: flex;
+  color: var(--text-dim);
+}
+
+.viewbar__stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.viewbar__value {
+  font-weight: 650;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viewbar__caption {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viewbar__chev {
+  margin-left: 4px;
+  color: var(--text-faint);
+  flex: none;
+}
+
+/* A real <select>, invisible, covering its face: the platform keeps keyboard
+   handling, screen-reader semantics and the touch picker, and we still get a
+   two-line control it could never render itself. */
+.viewbar__select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.viewbar__select:disabled {
+  cursor: default;
+}
+
+/* Follow-the-room. Sits against the Event control it modifies — a toggle, not
+   an action, so it stays lit while it is on. */
+.viewbar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  margin-left: -6px;
+  padding: 0;
+  background: var(--bg-tile);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.viewbar__toggle:hover:not(:disabled) {
+  background: var(--bg-tile-hover);
+  color: var(--text-dim);
+}
+
+.viewbar__toggle--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+}
+
+.viewbar__toggle--on:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.viewbar__toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.viewbar__live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--ok-soft);
+  border: 1px solid var(--ok-border);
+  color: var(--ok);
+  font-weight: 700;
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+}
+
+.viewbar__elapsed {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.viewbar__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Index ───────────────────────────────────────────────────────────────── */
+
+.viewsindex__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.viewsindex__list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.viewsindex__row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.viewsindex__row:hover {
+  border-color: var(--accent);
+}
+
+.viewsindex__name {
+  font-weight: 600;
+}
+
+.viewsindex__meta {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
+
+.viewsindex__empty,
+.viewempty {
+  color: var(--text-faint);
+}
+
+.viewempty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.viewempty p {
+  margin: 0;
+}

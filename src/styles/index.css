@@ -4,6 +4,7 @@
 @import './base.css';
 @import './shell.css';
 @import './widgets.css';
+@import './views.css';
 @import './home.css';
 @import './services.css';
 @import './calendar.css';
