@@ -214,6 +214,43 @@
   cursor: default;
 }
 
+/* Follow-the-room. Sits against the Event control it modifies — a toggle, not
+   an action, so it stays lit while it is on. */
+.viewbar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  margin-left: -6px;
+  padding: 0;
+  background: var(--bg-tile);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.viewbar__toggle:hover:not(:disabled) {
+  background: var(--bg-tile-hover);
+  color: var(--text-dim);
+}
+
+.viewbar__toggle--on {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent-text);
+}
+
+.viewbar__toggle--on:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.viewbar__toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .viewbar__live {
   display: flex;
   align-items: center;

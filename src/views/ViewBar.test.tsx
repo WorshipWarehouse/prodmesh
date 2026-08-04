@@ -22,7 +22,15 @@ const plan: ServicePlan = {
   items: [],
 };
 
-function Harness({ config = {}, onChange = vi.fn() }: { config?: WidgetConfig; onChange?: (c: WidgetConfig) => void }) {
+function Harness({
+  config = {},
+  onChange = vi.fn(),
+  plans = [plan],
+}: {
+  config?: WidgetConfig;
+  onChange?: (c: WidgetConfig) => void;
+  plans?: ServicePlan[];
+}) {
   return (
     <MemoryRouter initialEntries={['/room/north-main/view/foh']}>
       <Routes>
@@ -36,7 +44,7 @@ function Harness({ config = {}, onChange = vi.fn() }: { config?: WidgetConfig; o
                 roomId="north-main"
                 view={summary('foh', 'Front of House')}
                 siblings={[summary('foh', 'Front of House'), summary('producer', 'Service Producer')]}
-                plans={[plan]}
+                plans={plans}
                 config={config}
                 onChange={onChange}
               />
@@ -72,15 +80,19 @@ describe('ViewBar', () => {
     expect(await screen.findByText('at /room/north-main/view/producer')).toBeInTheDocument();
   });
 
-  it('picking an event re-scopes the whole dashboard, and the time list follows it', async () => {
+  it('picking an event pins to it, and the time list follows', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     const { rerender } = render(<Harness onChange={onChange} />);
 
-    // Service time is inert until an event is chosen — there is nothing to pick.
+    // Service time is inert while following — the widgets choose their own.
     expect(screen.getByLabelText('Service time')).toBeDisabled();
 
-    await user.selectOptions(screen.getByLabelText('Event'), 'plan-1');
+    // The event list holds only events. Picking one pins, with no "leave
+    // follow mode first" step.
+    const events = screen.getByLabelText('Event') as HTMLSelectElement;
+    expect([...events.options].map((o) => o.value)).toEqual(['plan-1']);
+    await user.selectOptions(events, 'plan-1');
     expect(onChange).toHaveBeenCalledWith({ planId: 'plan-1' });
 
     rerender(<Harness config={{ planId: 'plan-1' }} onChange={onChange} />);
@@ -90,14 +102,45 @@ describe('ViewBar', () => {
     expect(onChange).toHaveBeenLastCalledWith({ planId: 'plan-1', timeId: 'svc' });
   });
 
-  it('"Follow the room" clears the config rather than pinning anything', async () => {
-    const onChange = vi.fn();
-    const user = userEvent.setup();
-    render(<Harness config={{ planId: 'plan-1', timeId: 'svc' }} onChange={onChange} />);
-    await user.selectOptions(screen.getByLabelText('Event'), '');
-    // Empty, not {planId: undefined}: every widget falls back to the room's
-    // own next service, which is what lets a lobby screen sit untouched.
-    expect(onChange).toHaveBeenCalledWith({});
+  describe('follow-the-room toggle', () => {
+    const follow = () => screen.getByRole('button', { name: /Follow the room/ });
+
+    it('is a pressed toggle while no event is pinned, and shows what it resolves to', () => {
+      render(<Harness />);
+      expect(follow()).toHaveAttribute('aria-pressed', 'true');
+      // The control still names the event it currently resolves to, so it
+      // never reads blank.
+      expect(screen.getByText('Sunday, August 9')).toBeInTheDocument();
+      expect(screen.getByText('Following the room')).toBeInTheDocument();
+    });
+
+    it('turning it off pins to whatever was already on screen', async () => {
+      const onChange = vi.fn();
+      const user = userEvent.setup();
+      render(<Harness onChange={onChange} />);
+      await user.click(follow());
+      // The same event, not a jump to something else — the dashboard's content
+      // must not change just because someone took manual control of it.
+      expect(onChange).toHaveBeenCalledWith({ planId: 'plan-1' });
+    });
+
+    it('turning it on clears the config rather than pinning anything', async () => {
+      const onChange = vi.fn();
+      const user = userEvent.setup();
+      render(<Harness config={{ planId: 'plan-1', timeId: 'svc' }} onChange={onChange} />);
+      expect(follow()).toHaveAttribute('aria-pressed', 'false');
+      await user.click(follow());
+      // Empty, not {planId: undefined}: every widget falls back to the room's
+      // own next service, which is what lets a lobby screen sit untouched.
+      expect(onChange).toHaveBeenCalledWith({});
+    });
+
+    it('is inert when the room has no events to follow or pin', () => {
+      render(<Harness plans={[]} />);
+      expect(follow()).toBeDisabled();
+      expect(screen.getByLabelText('Event')).toBeDisabled();
+      expect(screen.getByText('No events')).toBeInTheDocument();
+    });
   });
 
   it('shows the room going live, and counts up', async () => {

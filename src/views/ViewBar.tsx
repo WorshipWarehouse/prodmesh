@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode, type SelectHTMLAttributes } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, ChevronDown, Clock, LayoutGrid, Radio } from 'lucide-react';
+import { CalendarDays, ChevronDown, Clock, LayoutGrid, Link2, Link2Off, Radio } from 'lucide-react';
 import { hhmmss } from '../lib/duration';
 import { useTopic, roomTopic } from '../lib/stream';
 import type { ServicePlan, ShowState, ViewSummary } from '../api';
@@ -96,6 +96,13 @@ export function ViewBar({
   const live = show?.active ? show : null;
 
   const plan = plans.find((p) => p.id === config.planId) ?? null;
+
+  // No pinned plan IS "follow the room" — the empty config every widget
+  // already resolves to the room's own next service on its own. The bar just
+  // names that state and shows which event it currently resolves to, so the
+  // control never reads blank.
+  const following = !plan;
+  const shown = plan ?? plans[0] ?? null;
   const time = plan?.times.find((t) => t.id === config.timeId) ?? null;
 
   return (
@@ -115,13 +122,15 @@ export function ViewBar({
 
       <Control
         icon={<CalendarDays size={17} />}
-        display={plan ? (plan.dates ?? plan.title) : 'Follow the room'}
-        caption={plan ? plan.serviceTypeName : 'Event'}
+        display={shown ? (shown.dates ?? shown.title) : 'No events'}
+        caption={following ? 'Following the room' : (shown?.serviceTypeName ?? 'Event')}
         aria-label="Event"
-        value={config.planId ?? FOLLOW}
-        onChange={(e) => onChange(e.target.value === FOLLOW ? {} : { planId: e.target.value })}
+        disabled={plans.length === 0}
+        value={shown?.id ?? ''}
+        // Picking an event pins to it. Following is a default, not a mode you
+        // have to leave first.
+        onChange={(e) => onChange({ planId: e.target.value })}
       >
-        <option value={FOLLOW}>Follow the room</option>
         {plans.map((p) => (
           <option key={p.id} value={p.id}>
             {[p.title, p.dates].filter(Boolean).join(' · ')}
@@ -129,12 +138,32 @@ export function ViewBar({
         ))}
       </Control>
 
+      {/* Following is a state of the dashboard, not one entry in a list of
+          events — a list where every other row is a date. So it is a toggle,
+          and turning it off pins to whatever was already on screen rather than
+          jumping somewhere new. */}
+      <button
+        type="button"
+        className={`viewbar__toggle${following ? ' viewbar__toggle--on' : ''}`}
+        aria-pressed={following}
+        aria-label="Follow the room’s next service"
+        title={
+          following
+            ? 'Following the room’s next service — click to pin this event'
+            : 'Pinned to one event — click to follow the room again'
+        }
+        disabled={plans.length === 0}
+        onClick={() => onChange(following ? { planId: shown?.id } : {})}
+      >
+        {following ? <Link2 size={16} /> : <Link2Off size={16} />}
+      </button>
+
       <Control
         icon={<Clock size={17} />}
         display={time ? (clockOf(time) ?? time.name ?? 'Service') : plan ? 'First service' : '—'}
         caption={time?.name ?? 'Service time'}
         aria-label="Service time"
-        disabled={!plan}
+        disabled={following}
         value={config.timeId ?? FOLLOW}
         onChange={(e) =>
           onChange({
