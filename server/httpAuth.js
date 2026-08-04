@@ -16,6 +16,19 @@ export function resolveIdentity(req, _res, next) {
   next();
 }
 
+// Permission id → the human label Admin → Users shows for it. Sent with a
+// refusal so the browser can say WHICH authority is missing without shipping a
+// second copy of this list that drifts from PERMISSIONS.
+const LABELS = new Map(auth.PERMISSIONS.map(([id, label]) => [id, label]));
+
+/** The refusal body, for the routes whose check is too particular for
+ *  requirePermission and which would otherwise answer in a different shape. */
+export const permissionRequired = (permission) => ({
+  error: 'permission_required',
+  permission,
+  label: LABELS.get(permission) ?? permission,
+});
+
 export function requirePermission(permission) {
   return (req, res, next) => {
     if (req.legacyAdmin || auth.hasPermission(req.auth, permission)) return next();
@@ -27,7 +40,10 @@ export function requirePermission(permission) {
       roomId: req.params.id ?? null,
       planId: req.params.planId ?? null,
     });
-    return res.status(req.auth ? 403 : 401).json({ error: 'permission_required', permission });
+    // 403 vs 401 is the browser's only way to tell "this operator lacks the
+    // permission" from "nobody is logged in" — two refusals that need very
+    // different words on screen.
+    return res.status(req.auth ? 403 : 401).json(permissionRequired(permission));
   };
 }
 

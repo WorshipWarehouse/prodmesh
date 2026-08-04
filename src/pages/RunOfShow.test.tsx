@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { RunOfShow } from './RunOfShow';
 import { emitTopic } from '../test/fakeEventSource';
-import type { ServicePlan, ShowState } from '../api';
+import { IdentityContext } from '../lib/identity';
+import { PermissionError } from '../api';
+import type { AuthStatus, ServicePlan, ShowState } from '../api';
 
 const api = vi.hoisted(() => ({
   getRoom: vi.fn(),
@@ -67,13 +69,27 @@ const liveHere: ShowState = {
   current: { itemId: 'i-welcome', itemIndex: 0, itemName: 'Welcome', slideIndex: null, slideCount: null },
 };
 
-function renderPage() {
+/** An identity carrying exactly the permissions given, or none at all. */
+const asUser = (permissions: string[], authenticated = true): AuthStatus => ({
+  authenticated,
+  admin: false,
+  setupNeeded: false,
+  user: authenticated
+    ? { id: 'u1', username: 'sam', displayName: 'Sam Rivera', planningCenterPersonId: null }
+    : null,
+  permissions,
+  station: null,
+});
+
+function renderPage(identity: AuthStatus | null = null) {
   return render(
-    <MemoryRouter initialEntries={['/room/north-main/run/plan-1?time=t-svc']}>
-      <Routes>
-        <Route path="/room/:roomId/run/:planId" element={<RunOfShow />} />
-      </Routes>
-    </MemoryRouter>,
+    <IdentityContext.Provider value={identity}>
+      <MemoryRouter initialEntries={['/room/north-main/run/plan-1?time=t-svc']}>
+        <Routes>
+          <Route path="/room/:roomId/run/:planId" element={<RunOfShow />} />
+        </Routes>
+      </MemoryRouter>
+    </IdentityContext.Provider>,
   );
 }
 
@@ -155,6 +171,73 @@ describe('start rehearsal', () => {
     expect(await screen.findByRole('button', { name: 'End Show' })).toBeInTheDocument();
     expect(screen.getByText('Rehearsal')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start Show' })).not.toBeInTheDocument();
+  });
+});
+
+// Start Show used to 403 into a `catch {}` — the button visibly did nothing,
+// which during a service is indistinguishable from a hung server.
+describe('permission to operate', () => {
+  it('a failed start says why instead of looking like a dead button', async () => {
+    api.startShow.mockRejectedValue(new PermissionError('shows.operate', 'Operate shows', true));
+    const user = userEvent.setup();
+    renderPage(); // identity unknown — the button is offered, the server refuses
+
+    await user.click(await screen.findByRole('button', { name: 'Start Show' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your account cannot operate shows.');
+    expect(screen.getByRole('button', { name: 'Start Show' })).toBeEnabled();
+  });
+
+  it('surfaces a conflict from the server verbatim', async () => {
+    api.startShow.mockRejectedValue(new Error('A show is already active in this room'));
+    const user = userEvent.setup();
+    renderPage(asUser(['shows.operate']));
+
+    await user.click(await screen.findByRole('button', { name: 'Start Show' }));
+
+    expect(await screen.findByRole('alert'))
+      .toHaveTextContent('A show is already active in this room');
+  });
+
+  it('an operator without the permission is not offered the controls at all', async () => {
+    renderPage(asUser(['reports.view']));
+
+    expect(await screen.findByText('Your account cannot operate shows.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Show' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Rehearsal' })).not.toBeInTheDocument();
+  });
+
+  it('a read-only station gets a way in, not just a wall', async () => {
+    const asked = vi.fn();
+    window.addEventListener('prodmesh:auth-required', asked);
+    const user = userEvent.setup();
+    renderPage(asUser([], false));
+
+    await user.click(await screen.findByRole('button', { name: 'Log in to operate' }));
+
+    expect(asked).toHaveBeenCalled();
+    expect(asked.mock.calls[0][0].detail)
+      .toEqual({ permission: 'shows.operate', label: 'Operate shows' });
+    window.removeEventListener('prodmesh:auth-required', asked);
+  });
+
+  it('hides the live controls too — watching a show is not operating it', async () => {
+    renderPage(asUser(['reports.view']));
+    await screen.findByText('Your account cannot operate shows.');
+
+    await emitState(liveHere);
+
+    // Still shows what is happening…
+    expect(await screen.findByText('Now')).toBeInTheDocument();
+    expect(screen.getByText('Following ProPresenter')).toBeInTheDocument();
+    // …but offers no way to change it.
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'End Show' })).not.toBeInTheDocument();
+  });
+
+  it('an administrator (permissions: *) keeps every control', async () => {
+    renderPage(asUser(['*']));
+    expect(await screen.findByRole('button', { name: 'Start Show' })).toBeInTheDocument();
   });
 });
 

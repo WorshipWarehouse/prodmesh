@@ -15,7 +15,7 @@ import * as showCfg from '../showConfig.js';
 import * as ppro from '../integrations/proPresenter.js';
 import * as youtube from '../integrations/youtube.js';
 import * as auth from '../authStore.js';
-import { requirePermission, auditSuccess } from '../httpAuth.js';
+import { requirePermission, permissionRequired, auditSuccess } from '../httpAuth.js';
 import { applyMode, modeLockError } from '../roomModes.js';
 import { bump } from '../roomStateWatcher.js';
 
@@ -215,7 +215,7 @@ router.post('/api/rooms/:id/event/:planId/checklist/:itemId', requirePermission(
     const done = Boolean(req.body?.done);
     if (done && item.action?.type === 'mode') {
       if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'rooms.mode.change')) {
-        return res.status(403).json({ error: 'permission_required', permission: 'rooms.mode.change' });
+        return res.status(403).json(permissionRequired('rooms.mode.change'));
       }
       const mode = room.modes.find((m) => m.id === item.action.mode);
       if (!mode) return res.status(400).json({ error: `Unknown mode '${item.action.mode}'` });

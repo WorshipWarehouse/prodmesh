@@ -13,6 +13,7 @@ export function IdentityDialog({
   stationRequired,
   campusId,
   status,
+  denied,
   onStation,
   onLogin,
   onClose,
@@ -20,6 +21,8 @@ export function IdentityDialog({
   stationRequired: boolean;
   campusId: string;
   status: AuthStatus | null;
+  /** The permission a refused action wanted, when the dialog opened because of one. */
+  denied?: { permission: string; label: string } | null;
   onStation: (station: Station) => void;
   onLogin: (status: AuthStatus) => void;
   onClose: () => void;
@@ -31,6 +34,8 @@ export function IdentityDialog({
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const shortOfPermission = Boolean(denied && status?.authenticated);
 
   const createStation = async () => {
     setBusy(true); setError('');
@@ -82,10 +87,23 @@ export function IdentityDialog({
         ) : (
           <>
             <div className="identity__mark"><LockKeyhole size={22} /></div>
-            <p className="eyebrow">Operator access</p>
-            <h2 id="identity-title">Log in</h2>
+            {/* Someone already logged in is not short of a session — they are
+                short of an authority, and the fix is a different account, not
+                the same one again. Saying only "Log in" sent them round the
+                loop they just failed. */}
+            <p className="eyebrow">{shortOfPermission ? 'Not permitted' : 'Operator access'}</p>
+            <h2 id="identity-title">{shortOfPermission ? 'Log in as someone else' : 'Log in'}</h2>
             <p className="identity__hint">
-              {status?.station?.name ?? 'This station'} stays available in read-only mode when nobody is logged in.
+              {shortOfPermission ? (
+                <>
+                  <strong>{status?.user?.displayName}</strong> does not have “{denied?.label}”.
+                  An administrator can grant it in Admin → Users.
+                </>
+              ) : denied ? (
+                `Logging in is needed for “${denied.label}”.`
+              ) : (
+                `${status?.station?.name ?? 'This station'} stays available in read-only mode when nobody is logged in.`
+              )}
             </p>
             <label className="identity__field">
               <span>Username</span>

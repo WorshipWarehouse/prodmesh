@@ -104,14 +104,42 @@ function requestHeaders(): Record<string, string> {
   };
 }
 
-function promptForAuth(permission?: string) {
-  window.dispatchEvent(new CustomEvent('prodmesh:auth-required', { detail: { permission } }));
+/** Ask the shell to open the identity dialog, naming the missing authority.
+ *  Also called by a page that knows up front it cannot act, so "Log in" is a
+ *  button rather than something to work out. */
+export function requestAuth(permission?: string, label?: string) {
+  window.dispatchEvent(new CustomEvent('prodmesh:auth-required', { detail: { permission, label } }));
+}
+
+/**
+ * A refusal for want of a permission, distinguishable from every other failure.
+ *
+ * It exists because callers must be able to say the true thing: `authenticated`
+ * separates "log in to do this" (401 — nobody is logged in) from "your account
+ * cannot do this" (403 — logged in, wrong permissions). Told apart only by
+ * status code; a caller matching on the message cannot tell them apart at all.
+ */
+export class PermissionError extends Error {
+  permission: string;
+  label: string;
+  authenticated: boolean;
+
+  constructor(permission: string, label: string, authenticated: boolean) {
+    super('permission_required');
+    this.name = 'PermissionError';
+    this.permission = permission;
+    this.label = label;
+    this.authenticated = authenticated;
+  }
 }
 
 async function requireOk(res: Response) {
   if (res.status === 401 || res.status === 403) {
     const body = await res.clone().json().catch(() => ({}));
-    if (body.error === 'permission_required') promptForAuth(body.permission);
+    if (body.error === 'permission_required') {
+      requestAuth(body.permission, body.label);
+      throw new PermissionError(body.permission, body.label ?? body.permission, res.status === 403);
+    }
   }
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
 }

@@ -98,4 +98,50 @@ describe('IdentityDialog', () => {
     expect(await screen.findByText('Invalid username or PIN')).toBeInTheDocument();
     expect(api.loginUser).toHaveBeenCalledWith('operator', '0000');
   });
+
+  // Opened by a 403, the old copy said only "Log in" — to someone who already
+  // had. Reads as a broken session; the actual problem is the account.
+  it('names the missing permission when the operator is already logged in', () => {
+    render(
+      <ChurchContext.Provider value={testChurch}>
+      <IdentityDialog
+        stationRequired={false}
+        campusId="north"
+        status={{
+          ...readOnlyStatus,
+          authenticated: true,
+          user: { id: 'u1', username: 'sam', displayName: 'Sam Rivera', planningCenterPersonId: null },
+          permissions: ['reports.view'],
+        }}
+        denied={{ permission: 'shows.operate', label: 'Operate shows' }}
+        onStation={vi.fn()}
+        onLogin={vi.fn()}
+        onClose={vi.fn()}
+      />
+      </ChurchContext.Provider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Log in as someone else' })).toBeInTheDocument();
+    expect(screen.getByText(/does not have “Operate shows”/)).toBeInTheDocument();
+    expect(screen.getByText('Sam Rivera')).toBeInTheDocument();
+  });
+
+  it('a read-only station is told what logging in is for', () => {
+    render(
+      <ChurchContext.Provider value={testChurch}>
+      <IdentityDialog
+        stationRequired={false}
+        campusId="north"
+        status={readOnlyStatus}
+        denied={{ permission: 'shows.operate', label: 'Operate shows' }}
+        onStation={vi.fn()}
+        onLogin={vi.fn()}
+        onClose={vi.fn()}
+      />
+      </ChurchContext.Provider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.getByText('Logging in is needed for “Operate shows”.')).toBeInTheDocument();
+  });
 });

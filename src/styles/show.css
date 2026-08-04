@@ -122,6 +122,19 @@ span.ros-track__status {
   flex: 1;
 }
 
+/* Where the show controls would be, for someone who may not use them. */
+.ros-track__denied {
+  color: var(--text-faint);
+  font-size: 0.9rem;
+}
+
+/* A refused or failed action. Sits under whichever row was pressed. */
+.ros-track__failure {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
 /* Slide progress bar */
 .ros-progress {
   margin-top: 10px;
