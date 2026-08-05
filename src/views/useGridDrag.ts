@@ -99,6 +99,28 @@ export function boxFromPointer(m: Metrics, at: Cell, grab: Cell, size: WidgetSiz
   };
 }
 
+export interface SizeBounds {
+  min: WidgetSize;
+  max: WidgetSize;
+}
+
+/**
+ * The size a resize drag has reached: the origin stays put and the far corner
+ * follows the pointer, clamped to what the widget allows.
+ *
+ * Exported and pure because the first version of this was glue inside the
+ * pointermove handler, reading its bounds from the wrong value — and glue
+ * inside a pointer handler is precisely what jsdom cannot test. It shipped
+ * clamping every drag to 1×1.
+ */
+export function resizeFromPointer(origin: Cell, under: Cell, bounds: SizeBounds): WidgetSize {
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
+  return {
+    w: clamp(under.x - origin.x + 1, bounds.min.w, bounds.max.w),
+    h: clamp(under.y - origin.y + 1, bounds.min.h, bounds.max.h),
+  };
+}
+
 export type Drag =
   | { kind: 'none' }
   | {
@@ -109,6 +131,9 @@ export type Drag =
       grab: Cell;
       at: Cell | null;
       ok: boolean;
+      /** Captured at pointerdown for a resize — the caller resolves them from
+       *  the widget TYPE, which `ref` is not once a placement exists. */
+      bounds?: SizeBounds;
     };
 
 export function useGridDrag({
@@ -118,7 +143,6 @@ export function useGridDrag({
   onAdd,
   onMove,
   onResize,
-  boundsFor,
 }: {
   canvas: RefObject<HTMLDivElement | null>;
   grid: Grid;
@@ -126,8 +150,6 @@ export function useGridDrag({
   onAdd: (type: string, at: Cell) => void;
   onMove: (id: string, at: Cell) => void;
   onResize: (id: string, size: WidgetSize) => void;
-  /** How far this widget may be stretched. */
-  boundsFor: (type: string) => { min: WidgetSize; max: WidgetSize };
 }) {
   const [drag, setDrag] = useState<Drag>({ kind: 'none' });
   const metrics = useRef<Metrics | null>(null);
@@ -157,6 +179,7 @@ export function useGridDrag({
     size: WidgetSize,
     grab: Cell,
     e: ReactPointerEvent,
+    bounds?: SizeBounds,
   ) => {
     // Left button / primary touch only: a right-click drag would leave the
     // context menu open over a half-moved widget.
@@ -174,7 +197,7 @@ export function useGridDrag({
     const m = measure();
     if (!m) return;
     metrics.current = m;
-    setDrag({ kind, ref, size, grab, at: null, ok: false });
+    setDrag({ kind, ref, size, grab, at: null, ok: false, bounds });
   };
 
   const move = (e: ReactPointerEvent) => {
@@ -184,17 +207,11 @@ export function useGridDrag({
     const under = cellFromPoint(m, e.clientX, e.clientY);
     const cells = occupancy(placements, drag.kind === 'add' ? null : drag.ref);
 
-    if (drag.kind === 'resize') {
-      // The origin stays put and the far edge follows the pointer, clamped to
-      // what the widget declares. Growing INTO a neighbour is refused rather
-      // than shoving it: a layout should not rearrange itself behind you.
+    if (drag.kind === 'resize' && drag.bounds) {
+      // Growing INTO a neighbour is refused rather than shoving it: a layout
+      // should not rearrange itself behind you.
       const origin = drag.grab;
-      const { min, max } = boundsFor(drag.ref);
-      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
-      const size = {
-        w: clamp(under.x - origin.x + 1, min.w, max.w),
-        h: clamp(under.y - origin.y + 1, min.h, max.h),
-      };
+      const size = resizeFromPointer(origin, under, drag.bounds);
       setDrag({ ...drag, size, at: origin, ok: isFree(grid, cells, { ...origin, ...size }) });
       return;
     }
@@ -248,7 +265,7 @@ export function useGridDrag({
 
   /** Spread onto a placed card's resize grip. `grab` carries the ORIGIN here,
    *  not an offset — the corner being dragged is the far one. */
-  const resizeHandlers = (placement: ViewPlacement) => ({
+  const resizeHandlers = (placement: ViewPlacement, bounds: SizeBounds) => ({
     onPointerDown: (e: ReactPointerEvent) => {
       e.stopPropagation(); // the card's move handler is the parent
       begin(
@@ -257,6 +274,7 @@ export function useGridDrag({
         { w: placement.w, h: placement.h },
         { x: placement.x, y: placement.y },
         e,
+        bounds,
       );
     },
     onPointerMove: move,

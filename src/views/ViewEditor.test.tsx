@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -212,6 +212,54 @@ describe('ViewEditor', () => {
       expect(at('run-of-show').style.gridRow).toBe('1 / span 3');
       expect(status()).toBe('Run of Show cannot grow there.');
       expect(at('loudness').style.gridRow).toBe('4 / span 1');
+    });
+
+    it('the POINTER grip resizes too, not just the keyboard', async () => {
+      // jsdom has no layout, so the hook's measure() would decline. Stub just
+      // enough geometry to make the wiring exercisable — because the wiring is
+      // exactly where this broke: bounds were looked up by placement id rather
+      // than widget type, so every drag clamped to 1×1 and then failed to save.
+      const { container } = render(<Harness initial={[runOfShow()]} />);
+      const canvas = container.querySelector('.viewgrid') as HTMLElement;
+      const CELL = 100;
+
+      vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, width: 600, height: 500,
+      } as DOMRect);
+      const realStyle = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el, pe) =>
+        el === canvas
+          ? ({
+              gridTemplateColumns: Array(6).fill(`${CELL}px`).join(' '),
+              gridTemplateRows: Array(5).fill(`${CELL}px`).join(' '),
+              columnGap: '0px',
+              rowGap: '0px',
+            } as CSSStyleDeclaration)
+          : realStyle(el, pe));
+
+      const grip = container.querySelector('.viewcell__resize') as HTMLElement;
+      const at2 = (x: number, y: number) =>
+        new PointerEvent('pointermove', {
+          bubbles: true, pointerId: 1, button: 0, buttons: 1,
+          clientX: x * CELL + CELL / 2, clientY: y * CELL + CELL / 2,
+        });
+
+      // One act() per event: the move handler reads drag state from its render
+      // closure, and in a real browser the moves arrive across frames. Firing
+      // them back to back would test a component that never re-rendered.
+      await act(async () => {
+        grip.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, pointerId: 1, button: 0, buttons: 1, clientX: 5, clientY: 5,
+        }));
+      });
+      await act(async () => { grip.dispatchEvent(at2(1, 3)); }); // corner into row 4
+      await act(async () => {
+        grip.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+      });
+
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 4');
+      expect(at('run-of-show').style.gridColumn).toBe('1 / span 2');
+      vi.restoreAllMocks();
     });
 
     it('width is not offered when only height varies', async () => {

@@ -89,7 +89,6 @@ export function ViewEditor({
     onAdd: place,
     onMove: moveTo,
     onResize: resizeTo,
-    boundsFor,
   });
 
   const addFromPalette = (type: string) => {
@@ -191,7 +190,7 @@ export function ViewEditor({
             className="viewcell__resize"
             title={`Drag to resize (${widgetMin(def!).h}–${widgetMax(def!).h} rows)`}
             aria-hidden
-            {...resizeHandlers(placement)}
+            {...resizeHandlers(placement, boundsFor(placement.type))}
           />
         )}
       </div>
