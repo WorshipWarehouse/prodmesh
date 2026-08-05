@@ -18,15 +18,11 @@ import {
   startShow,
   endShow,
   setShowCurrent,
-  requestAuth,
-  PermissionError,
   type RoomMeta,
   type ServicePlan,
-  type ShowState,
 } from '../api';
 import { OrderOfService } from '../components/OrderOfService';
-import { useTopic, roomTopic } from '../lib/stream';
-import { useCan, useIdentity } from '../lib/identity';
+import { useShowActions } from '../lib/showActions';
 import { useQuery, invalidate } from '../lib/useQuery';
 import { planKey, reportKey } from '../lib/keys';
 import { widgetRegistry } from '../widgets/registry';
@@ -37,19 +33,6 @@ import type { WidgetType } from '../widgets/types';
 // part that changes.
 const ROS_WIDGETS: WidgetType[] = ['countdown', 'loudness', 'viewers'];
 
-/** Everything on this page that changes show state is behind this one. */
-const OPERATE = 'shows.operate';
-const OPERATE_LABEL = 'Operate shows';
-
-function failureText(err: unknown): string {
-  if (err instanceof PermissionError) {
-    return err.authenticated
-      ? 'Your account cannot operate shows.'
-      : 'Log in to operate shows.';
-  }
-  return err instanceof Error ? err.message : String(err);
-}
-
 export function RunOfShow() {
   const { roomId = '', planId = '' } = useParams();
   const [params, setParams] = useSearchParams();
@@ -58,13 +41,11 @@ export function RunOfShow() {
 
   const [room, setRoom] = useState<RoomMeta | null>(null);
   const [roomError, setRoomError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  // Why the last press did nothing. Never a stale value from a previous
-  // attempt: cleared at the start of every action.
-  const [failure, setFailure] = useState<string | null>(null);
 
-  const canOperate = useCan(OPERATE);
-  const loggedIn = Boolean(useIdentity()?.authenticated);
+  // The show facet, the optimistic hold, the permission gate and the failure
+  // message — shared verbatim with the run-of-show widget, because two copies
+  // of this would drift and the drift only shows up mid-service.
+  const { state, busy, failure, act, canOperate, notPermitted } = useShowActions(roomId);
 
   useEffect(() => {
     getRoom(roomId).then(setRoom).catch(() => setRoomError('Room not found'));
@@ -78,20 +59,6 @@ export function RunOfShow() {
   });
   const plan: ServicePlan | null = planQ.data?.plan ?? null;
   const error = roomError ?? (planQ.error ? 'Plan not found' : null);
-
-  // The server is the source of truth; we just render its state. This page
-  // wants only the show facet — the timer and loudness topics belong to the
-  // widgets that display them, which is what lets those widgets be placed
-  // anywhere without this page arranging it.
-  const liveShow = useTopic<ShowState>(roomTopic.show(roomId));
-
-  // Start/End return the new state too. The push normally beats the response
-  // (the server publishes before it replies), but if the stream is mid-
-  // reconnect it won't — and Start Show appearing to do nothing is the worst
-  // possible moment for that. So an action's result is held until the next
-  // push arrives, identified by `liveShow` becoming a different object.
-  const [acted, setActed] = useState<{ from: unknown; state: ShowState } | null>(null);
-  const state = acted && acted.from === liveShow ? acted.state : (liveShow ?? { active: false });
 
   // Pin the widgets to the service this page is about, rather than letting
   // them follow the room's next one.
@@ -132,52 +99,14 @@ export function RunOfShow() {
   const idx = trackable.findIndex((i) => i.id === currentId);
   const currentItem = idx >= 0 ? trackable[idx] : null;
 
-  // "The stream reconciles" is true of a state RACE and of nothing else. A
-  // refusal — no permission, a show already live in the room, a rejected plan
-  // id — produces no push at all, so swallowing it left the button looking
-  // dead and the operator with nothing to act on mid-service.
-  const act = async (fn: () => Promise<ShowState>) => {
-    setBusy(true);
-    setFailure(null);
-    try {
-      setActed({ from: liveShow, state: await fn() });
-    } catch (err) {
-      setFailure(failureText(err));
-    } finally {
-      setBusy(false);
-    }
-  };
   const pick = (itemId: string) => act(() => setShowCurrent(roomId, { itemId }));
 
   // A rehearsal gets its own synthetic timeId from the server; adopting it
   // into the URL makes this page (and its report link) track that instance.
   const startRehearsal = async () => {
-    setBusy(true);
-    setFailure(null);
-    try {
-      const next = await startShow(roomId, planId, timeId, { rehearsal: true });
-      setActed({ from: liveShow, state: next });
-      if (next.timeId) setParams({ time: next.timeId }, { replace: true });
-    } catch (err) {
-      setFailure(failureText(err));
-    } finally {
-      setBusy(false);
-    }
+    const next = await act(() => startShow(roomId, planId, timeId, { rehearsal: true }));
+    if (next?.timeId) setParams({ time: next.timeId }, { replace: true });
   };
-  // Shown wherever the show controls would be. Someone who is not logged in
-  // gets the way forward, not just the wall: the shell's own dialog, opened by
-  // the same event a refused request fires.
-  const notPermitted = loggedIn ? (
-    <span className="ros-track__denied">Your account cannot operate shows.</span>
-  ) : (
-    <>
-      <span className="ros-track__denied">Read-only.</span>
-      <button className="btn btn--sm" onClick={() => requestAuth(OPERATE, OPERATE_LABEL)}>
-        Log in to operate
-      </button>
-    </>
-  );
-
   const step = (delta: number) => {
     const n = idx < 0 ? (delta > 0 ? 0 : -1) : idx + delta;
     if (n >= 0 && n < trackable.length) pick(trackable[n].id);

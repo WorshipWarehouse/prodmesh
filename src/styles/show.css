@@ -350,3 +350,103 @@ span.ros-track__status {
 @media (prefers-reduced-motion: reduce) {
   .ros-viewers--live .ros-viewers__dot { animation: none; }
 }
+
+/* ── Run of Show, as a widget ────────────────────────────────────────────────
+   The page's controls at widget scale. Same behaviour (see lib/showActions),
+   less room: no page header, no service name, and the order of service scrolls
+   inside its cell rather than growing it — a placement is 2×3 cells whatever
+   the service holds. */
+
+.rosw {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  flex: 1;
+}
+
+.rosw__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.rosw__status--follow { color: var(--ok); }
+.rosw__status--manual { color: var(--warn); }
+.rosw__status--off { color: var(--text-dim); }
+.rosw__status--idle { color: var(--text-faint); }
+
+.rosw__start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rosw__buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rosw__buttons .btn {
+  flex: 1;
+}
+
+/* The scroll container, not the widget. Without min-height:0 a flex child
+   refuses to shrink below its content and the list pushes the cell open. */
+.rosw__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+/* ── Now & Next ──────────────────────────────────────────────────────────────
+   Read from across a room, so it scales with its cell rather than sitting at a
+   desk-sized point size. */
+
+.nownext {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.nownext__row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.nownext__label {
+  flex: none;
+  width: 3.2em;
+  font-size: clamp(0.62rem, 1.1vw, 0.85rem);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.nownext__title {
+  min-width: 0;
+  font-size: clamp(1.1rem, 3.4vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nownext__title--next {
+  font-size: clamp(0.85rem, 2vw, 1.5rem);
+  font-weight: 600;
+  color: var(--text-dim);
+}
