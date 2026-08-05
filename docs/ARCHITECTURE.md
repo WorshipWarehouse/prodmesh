@@ -24,6 +24,7 @@ Express server (server/)
   ├─ proxy → Bitfocus Companion (per room, :8000)   read var / press button
   ├─ integrations/ → Planning Center, ProPresenter, Smaart/RTA
   ├─ streamHub.js → topics + refcounted watchers    (ADR 0010)
+  ├─ views.js     → stored dashboards & displays    (ADR 0011)
   ├─ SQLite (prodmesh.db)                           topology, config, facts
   ├─ server/data/*.json                             secrets + bootstrap only
   └─ serves the built SPA (dist/) in production
