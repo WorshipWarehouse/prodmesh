@@ -114,6 +114,11 @@ Notes:
   reads are public because a screen with no keyboard has to fetch its own
   layout before anyone could log in. Widgets: `countdown`, `loudness`,
   `viewers`, `run-of-show` (2×3, dashboard only) and `now-next` (3×1, either).
+  A widget may declare a size RANGE and be stretched within it — only
+  `run-of-show` does (2×3 to 2×5), because its list scrolls, so extra rows are
+  more of the service rather than whitespace. Everything else is one authored
+  size on purpose, and the bounds are enforced server-side, not just by the
+  editor.
   **Awaiting a Sunday** — `run-of-show` driving real ProPresenter, and the Pi
   on the actual ATEM input, are the halves CI cannot certify.
 - **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes
