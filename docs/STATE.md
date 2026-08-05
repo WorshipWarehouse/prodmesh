@@ -101,6 +101,21 @@ Notes:
   Checklists subpages. The account menu requires confirmation before returning a
   station to read-only mode. When a user has a Planning Center Services Person ID,
   their Services profile thumbnail is shown as their avatar.
+- **Views — dashboards & displays** (2026-08-04, ADR 0011): a room owns 0..many
+  Views. A `dashboard` is an interactive 6-column grid with a header row that
+  picks the Event and Service time every widget on it inherits; a `display` is
+  a read-only, chrome-less 3×3 assigned to a station — a Raspberry Pi into an
+  ATEM multiview input, or a foyer TV — with a per-view `scale` because type
+  sized for a desk vanishes on a video wall. Both render through ONE canvas, so
+  the editor's preview cannot drift from what a screen shows. Layouts are
+  arranged by drag OR by an Add button and the keyboard, which is what makes
+  the editor testable in jsdom (no layout there, so a simulated drag certifies
+  nothing) — the gesture itself is hand-verified. Editing needs `views.edit`;
+  reads are public because a screen with no keyboard has to fetch its own
+  layout before anyone could log in. Widgets: `countdown`, `loudness`,
+  `viewers`, `run-of-show` (2×3, dashboard only) and `now-next` (3×1, either).
+  **Awaiting a Sunday** — `run-of-show` driving real ProPresenter, and the Pi
+  on the actual ATEM input, are the halves CI cannot certify.
 - **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes
   the auth status AppShell already fetches, so a page can hide a control it
   would only be refused for. Run of Show uses it for every `shows.operate`
