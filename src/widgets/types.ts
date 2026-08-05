@@ -73,10 +73,21 @@ export interface WidgetDef {
   component: ComponentType<WidgetProps>;
 
   /** Size in grid units on a View canvas (6 wide on a dashboard, 3 on a
-   *  display). Every widget has ONE authored size — a 1×1 loudness meter and a
-   *  6×5 one are two designs, not one design scaled — which is why there is no
-   *  resize handle. */
+   *  display) — what it gets when first placed. */
   size: WidgetSize;
+
+  /**
+   * How far it may be stretched, if at all. Both default to `size`, i.e. one
+   * authored size and no handle.
+   *
+   * Most widgets stay fixed on purpose: a 1×1 loudness meter and a 6×5 one are
+   * two designs, not one design scaled, and a resize handle would only produce
+   * the bad version of both. A range is for a widget whose content genuinely
+   * continues past its edge — Run of Show, whose order of service SCROLLS, so
+   * more height is more list rather than more whitespace.
+   */
+  minSize?: WidgetSize;
+  maxSize?: WidgetSize;
 
   /**
    * One per view? Defaults to true.
@@ -114,6 +125,16 @@ export type WidgetType =
 /** May this widget go on a view of this kind? */
 export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>
   (def.kinds ?? ['dashboard', 'display']).includes(kind);
+
+export const widgetMin = (def: WidgetDef): WidgetSize => def.minSize ?? def.size;
+export const widgetMax = (def: WidgetDef): WidgetSize => def.maxSize ?? def.size;
+
+/** Can this widget be stretched at all, on either axis? */
+export const widgetResizable = (def: WidgetDef): boolean => {
+  const min = widgetMin(def);
+  const max = widgetMax(def);
+  return max.w > min.w || max.h > min.h;
+};
 
 /** One per view unless it says otherwise. */
 export const widgetIsUnique = (def: WidgetDef): boolean => def.unique !== false;

@@ -48,6 +48,10 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     description: 'The order of service, what is live now, and the controls to move it.',
     component: RunOfShowWidget,
     size: { w: 2, h: 3 },
+    // The only widget with a range, and the reason the range exists: its list
+    // scrolls, so the extra rows are more of the service rather than padding.
+    minSize: { w: 2, h: 3 },
+    maxSize: { w: 2, h: 5 },
     // It takes actions, and a display is DEFINED as non-interactive. The
     // server enforces this too; the palette just never offers it.
     kinds: ['dashboard'],

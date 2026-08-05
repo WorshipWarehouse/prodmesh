@@ -328,16 +328,16 @@ describe('SPL meter zones', () => {
 
     await emitState(spl(89.9));
     expect(screen.getByText(/89\.9/)).toBeInTheDocument();
-    expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--ok');
+    expect(container.querySelector('.wgt--spl')).toHaveClass('ros-spl--ok');
 
     await emitState(spl(90)); // at target — warn starts at the boundary
-    expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--warn');
+    expect(container.querySelector('.wgt--spl')).toHaveClass('ros-spl--warn');
 
     await emitState(spl(94.9));
-    expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--warn');
+    expect(container.querySelector('.wgt--spl')).toHaveClass('ros-spl--warn');
 
     await emitState(spl(95)); // at limit — over starts at the boundary
-    expect(container.querySelector('.ros-spl')).toHaveClass('ros-spl--over');
+    expect(container.querySelector('.wgt--spl')).toHaveClass('ros-spl--over');
   });
 });
 

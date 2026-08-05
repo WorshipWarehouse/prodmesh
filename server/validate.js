@@ -208,12 +208,17 @@ const VIEW_KINDS = new Set(['dashboard', 'display']);
  * `display` is whether it may go on a read-only screen. A widget that takes
  * actions may not: a display is DEFINED as non-interactive.
  */
+// `min`/`max` bound how far a placement may be stretched. Absent means one
+// fixed size — see WidgetDef in src/widgets/types.ts for why most stay fixed.
 const WIDGET_TYPES = new Map([
-  ['countdown', { unique: true, display: true }],
-  ['loudness', { unique: true, display: true }],
-  ['viewers', { unique: true, display: true }],
-  ['run-of-show', { unique: true, display: false }],
-  ['now-next', { unique: true, display: true }],
+  ['countdown', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['loudness', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['viewers', { unique: true, display: true, size: { w: 1, h: 1 } }],
+  ['run-of-show', {
+    unique: true, display: false,
+    size: { w: 2, h: 3 }, min: { w: 2, h: 3 }, max: { w: 2, h: 5 },
+  }],
+  ['now-next', { unique: true, display: true, size: { w: 3, h: 1 } }],
 ]);
 
 const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room
@@ -273,6 +278,16 @@ export function validateView(input) {
     for (const key of ['x', 'y', 'w', 'h']) {
       if (!Number.isInteger(box[key])) throw new Error(`Widget "${type}" needs integer grid coordinates`);
     }
+    // A placement may only be the size its widget allows. The editor already
+    // refuses out-of-range handles; this is the door that matters, because a
+    // stored layout is data and data arrives from anywhere.
+    const min = def.min ?? def.size;
+    const max = def.max ?? def.size;
+    if (box.w < min.w || box.h < min.h || box.w > max.w || box.h > max.h) {
+      throw new Error(
+        `Widget "${type}" must be ${sizeRange(min, max)} — got ${box.w}×${box.h}`,
+      );
+    }
     if (!fits(grid, box)) {
       throw new Error(
         kind === 'display'
@@ -303,6 +318,11 @@ export function validateView(input) {
  * matching validateTile's "only known fields per type" — a view written by a
  * newer build should lose the field it doesn't understand, not fail to save.
  */
+const sizeRange = (min, max) =>
+  min.w === max.w && min.h === max.h
+    ? `${min.w}×${min.h}`
+    : `between ${min.w}×${min.h} and ${max.w}×${max.h}`;
+
 function viewWidgetConfig(config) {
   if (!config || typeof config !== 'object') return {};
   const out = {};

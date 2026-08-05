@@ -82,6 +82,14 @@
   gap: 10px;
 }
 
+/* No box inside a box. A widget that draws its own card is right in the flow
+   grid, where it IS the card; inside a cell that already has a border and a
+   background it reads as a nested panel. The cell owns the frame here. */
+.viewcell__body > .wgt {
+  flex: 1;
+  min-height: 0;
+}
+
 /* A widget with nothing to show renders null, so its body is genuinely empty.
    Name it rather than leaving a blank rectangle, which reads as a fault. */
 .viewcell__body:empty::after {
@@ -595,12 +603,28 @@
   color: var(--danger);
 }
 
-/* Where the dragged widget would land. */
+/* Where the dragged widget would land.
+   Positioned so it paints ABOVE the cards: .viewcell is position:relative, and
+   a static grid item paints underneath every positioned one — which made a
+   SHRINK invisible, since its outline fell entirely inside the card it was
+   shrinking. */
 .viewghost {
+  position: relative;
+  z-index: 3;
   border: 2px dashed var(--accent);
   border-radius: var(--radius-lg);
   background: var(--accent-soft);
   pointer-events: none;
+}
+
+/* A resize outline lies over the widget being resized, so it fades out going
+   up: the edge you are dragging is drawn hard, and the content above stays
+   readable rather than sitting behind a flat wash. Masking rather than a
+   background gradient because it takes the BORDER with it — you cannot fade a
+   border any other way. */
+.viewghost--resize {
+  -webkit-mask-image: linear-gradient(to top, #000 30%, transparent 92%);
+  mask-image: linear-gradient(to top, #000 30%, transparent 92%);
 }
 
 .viewghost--blocked {
@@ -640,4 +664,28 @@
   gap: 8px;
   font-size: 0.85rem;
   color: var(--text-dim);
+}
+
+/* The resize grip, bottom-right of a card that declares a size range. Sits
+   over the cell's corner rather than inside its padding, so it does not eat
+   space from a widget that is already tight. */
+.viewcell__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  /* A corner mark rather than an icon: two hairlines read as "grab here" at
+     any size and cost no layout. */
+  background:
+    linear-gradient(135deg, transparent 46%, var(--border-strong) 46%, var(--border-strong) 54%, transparent 54%),
+    linear-gradient(135deg, transparent 70%, var(--border-strong) 70%, var(--border-strong) 78%, transparent 78%);
+}
+
+.viewcell__resize:hover {
+  background:
+    linear-gradient(135deg, transparent 46%, var(--accent) 46%, var(--accent) 54%, transparent 54%),
+    linear-gradient(135deg, transparent 70%, var(--accent) 70%, var(--accent) 78%, transparent 78%);
 }

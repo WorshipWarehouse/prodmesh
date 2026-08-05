@@ -91,12 +91,15 @@ export function CountdownWidget({ roomId, config }: WidgetProps) {
     const startedAt = report?.startedAt ?? null;
     const length = startedAt != null ? (completedAt - startedAt) / 1000 : null;
     return (
-      <div className="ros-count ros-count--done">
-        <span className="ros-count__label">Service length</span>
-        <span className="ros-count__time">{length != null ? hhmmss(length) : '—'}</span>
-        <span className="ros-count__at">
+      <div className="wgt wgt--count wgt--done">
+        <div className="wgt__head">
+          <span className="wgt__icon"><TimerIcon size={16} /></span>
+          <span className="wgt__title">Service length</span>
+        </div>
+        <p className="wgt__value">{length != null ? hhmmss(length) : '—'}</p>
+        <p className="wgt__detail">
           Ended {new Date(completedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-        </span>
+        </p>
       </div>
     );
   }
@@ -105,12 +108,13 @@ export function CountdownWidget({ roomId, config }: WidgetProps) {
     const target =
       timer.targetSecondsOfDay != null ? ` → ${fmtSecondsOfDay(timer.targetSecondsOfDay)}` : '';
     return (
-      <div className="ros-count ros-count--pre">
-        <span className="ros-count__label">Starts in</span>
-        <span className="ros-count__time">{hhmmss(timer.remainingSeconds)}</span>
-        <span className="ros-count__at">
-          <TimerIcon size={13} /> {timer.name}{target}
-        </span>
+      <div className="wgt wgt--count wgt--pre">
+        <div className="wgt__head">
+          <span className="wgt__icon"><TimerIcon size={16} /></span>
+          <span className="wgt__title">Starts in</span>
+        </div>
+        <p className="wgt__value">{hhmmss(timer.remainingSeconds)}</p>
+        <p className="wgt__detail">{timer.name}{target}</p>
       </div>
     );
   }
@@ -119,10 +123,13 @@ export function CountdownWidget({ roomId, config }: WidgetProps) {
   const diff = new Date(time.startsAt).getTime() - now;
   const past = diff < 0;
   return (
-    <div className={`ros-count ros-count--${past ? 'live' : 'pre'}`}>
-      <span className="ros-count__label">{past ? 'Elapsed since start' : 'Starts in'}</span>
-      <span className="ros-count__time">{hhmmss(Math.abs(diff) / 1000)}</span>
-      <span className="ros-count__at">{timeLabel(time)}</span>
+    <div className={`wgt wgt--count wgt--${past ? 'live' : 'pre'}`}>
+      <div className="wgt__head">
+        <span className="wgt__icon"><TimerIcon size={16} /></span>
+        <span className="wgt__title">{past ? 'Elapsed since start' : 'Starts in'}</span>
+      </div>
+      <p className="wgt__value">{hhmmss(Math.abs(diff) / 1000)}</p>
+      <p className="wgt__detail">{timeLabel(time)}</p>
     </div>
   );
 }

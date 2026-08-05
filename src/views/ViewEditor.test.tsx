@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -159,6 +159,126 @@ describe('ViewEditor', () => {
   it('the grip label carries the position, so it is not a mystery button', async () => {
     render(<Harness initial={[{ id: 'a', type: 'viewers', x: 4, y: 2, w: 2, h: 1, config: {} }]} />);
     expect(screen.getByRole('button', { name: 'Move Live viewers, column 5, row 3' })).toBeInTheDocument();
+  });
+
+  describe('stretching', () => {
+    const runOfShow = (h = 3): ViewPlacement =>
+      ({ id: 'a', type: 'run-of-show', x: 0, y: 0, w: 2, h, config: {} });
+
+    it('offers a grip only where the widget declares a range', () => {
+      const { container, unmount } = render(<Harness initial={[runOfShow()]} />);
+      expect(container.querySelector('.viewcell__resize')).not.toBeNull();
+      unmount();
+
+      // Everything else is one authored size, so a handle would only offer the
+      // bad version of two designs.
+      render(<Harness initial={[{ id: 'b', type: 'loudness', x: 0, y: 0, w: 2, h: 1, config: {} }]} />);
+      expect(document.querySelector('.viewcell__resize')).toBeNull();
+    });
+
+    it('shift+arrow stretches within the range and says so', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[runOfShow()]} />);
+      const grip = screen.getByRole('button', { name: /Move Run of Show/ });
+      grip.focus();
+      await user.keyboard('{Enter}');
+
+      await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 4');
+      expect(status()).toBe('Run of Show is now 2 by 4.');
+
+      await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 5');
+
+      // 5 is the ceiling — and it SAYS so rather than doing nothing, which is
+      // indistinguishable from a dead key.
+      await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 5');
+      expect(status()).toBe('Run of Show cannot be resized further.');
+    });
+
+    it('will not grow into a neighbour', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[
+        runOfShow(),
+        { id: 'b', type: 'loudness', x: 0, y: 3, w: 2, h: 1, config: {} },
+      ]} />);
+      const grip = screen.getByRole('button', { name: /Move Run of Show/ });
+      grip.focus();
+      await user.keyboard('{Enter}{Shift>}{ArrowDown}{/Shift}');
+
+      // Refused rather than shoving Loudness down — a layout should not
+      // rearrange itself behind you.
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 3');
+      expect(status()).toBe('Run of Show cannot grow there.');
+      expect(at('loudness').style.gridRow).toBe('4 / span 1');
+    });
+
+    it('the POINTER grip resizes too, not just the keyboard', async () => {
+      // jsdom has no layout, so the hook's measure() would decline. Stub just
+      // enough geometry to make the wiring exercisable — because the wiring is
+      // exactly where this broke: bounds were looked up by placement id rather
+      // than widget type, so every drag clamped to 1×1 and then failed to save.
+      const { container } = render(<Harness initial={[runOfShow()]} />);
+      const canvas = container.querySelector('.viewgrid') as HTMLElement;
+      const CELL = 100;
+
+      vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, width: 600, height: 500,
+      } as DOMRect);
+      const realStyle = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((el, pe) =>
+        el === canvas
+          ? ({
+              gridTemplateColumns: Array(6).fill(`${CELL}px`).join(' '),
+              gridTemplateRows: Array(5).fill(`${CELL}px`).join(' '),
+              columnGap: '0px',
+              rowGap: '0px',
+            } as CSSStyleDeclaration)
+          : realStyle(el, pe));
+
+      const grip = container.querySelector('.viewcell__resize') as HTMLElement;
+      const at2 = (x: number, y: number) =>
+        new PointerEvent('pointermove', {
+          bubbles: true, pointerId: 1, button: 0, buttons: 1,
+          clientX: x * CELL + CELL / 2, clientY: y * CELL + CELL / 2,
+        });
+
+      // One act() per event: the move handler reads drag state from its render
+      // closure, and in a real browser the moves arrive across frames. Firing
+      // them back to back would test a component that never re-rendered.
+      await act(async () => {
+        grip.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, pointerId: 1, button: 0, buttons: 1, clientX: 5, clientY: 5,
+        }));
+      });
+      await act(async () => { grip.dispatchEvent(at2(1, 3)); }); // corner into row 4
+
+      // The outline has to be identifiable as a RESIZE so it can be drawn over
+      // the card rather than under it — a shrink is otherwise invisible until
+      // the mouse comes up.
+      const ghost = container.querySelector('.viewghost');
+      expect(ghost).toHaveClass('viewghost--resize');
+      expect(ghost).not.toHaveClass('viewghost--blocked');
+
+      await act(async () => {
+        grip.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+      });
+
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 4');
+      expect(at('run-of-show').style.gridColumn).toBe('1 / span 2');
+      vi.restoreAllMocks();
+    });
+
+    it('width is not offered when only height varies', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[runOfShow()]} />);
+      const grip = screen.getByRole('button', { name: /Move Run of Show/ });
+      grip.focus();
+      await user.keyboard('{Enter}{Shift>}{ArrowRight}{/Shift}');
+      expect(at('run-of-show').style.gridColumn).toBe('1 / span 2');
+      expect(status()).toBe('Run of Show cannot be resized further.');
+    });
   });
 
   it('the palette shows each widget’s size, since the grid is what it competes for', () => {

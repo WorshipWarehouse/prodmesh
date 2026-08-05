@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { boxFromPointer, cellFromPoint, trackIndex, tracksOf, type Metrics } from './useGridDrag';
+import {
+  boxFromPointer,
+  cellFromPoint,
+  resizeFromPointer,
+  trackIndex,
+  tracksOf,
+  type Metrics,
+} from './useGridDrag';
 
 // The drag GESTURE is not tested here and cannot be: jsdom has no layout, so
 // every rect is zero and a simulated pointer sequence would certify nothing.
@@ -86,5 +93,38 @@ describe('boxFromPointer', () => {
     // bottom, because that limit belongs to the grid, not the pointer.
     expect(boxFromPointer(m, { x: 0, y: 9 }, { x: 0, y: 0 }, { w: 1, h: 1 })).toEqual({ x: 0, y: 9 });
     expect(boxFromPointer(m, { x: 0, y: 0 }, { x: 0, y: 4 }, { w: 1, h: 1 })).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('resizeFromPointer', () => {
+  // Run of Show's real range: height only, 3 to 5.
+  const bounds = { min: { w: 2, h: 3 }, max: { w: 2, h: 5 } };
+  const origin = { x: 0, y: 0 };
+
+  it('grows the far corner toward the pointer', () => {
+    expect(resizeFromPointer(origin, { x: 1, y: 3 }, bounds)).toEqual({ w: 2, h: 4 });
+    expect(resizeFromPointer(origin, { x: 1, y: 4 }, bounds)).toEqual({ w: 2, h: 5 });
+  });
+
+  it('clamps to the widget’s declared range, both ends', () => {
+    // Past the maximum, and back above the origin — neither is allowed to
+    // produce a size the server would refuse.
+    expect(resizeFromPointer(origin, { x: 5, y: 9 }, bounds)).toEqual({ w: 2, h: 5 });
+    expect(resizeFromPointer(origin, { x: 0, y: 0 }, bounds)).toEqual({ w: 2, h: 3 });
+    expect(resizeFromPointer(origin, { x: -3, y: -3 }, bounds)).toEqual({ w: 2, h: 3 });
+  });
+
+  it('is measured from the placement’s own origin, not the canvas', () => {
+    expect(resizeFromPointer({ x: 4, y: 2 }, { x: 5, y: 5 }, bounds)).toEqual({ w: 2, h: 4 });
+  });
+
+  it('never collapses a widget when its bounds are wrong', () => {
+    // THE BUG: the first version looked its bounds up by placement id rather
+    // than widget type, got {1,1} back, and clamped every drag to 1x1 — which
+    // then failed to save. The clamp is only ever as good as what it is given,
+    // so the caller captures the bounds at pointerdown from the TYPE.
+    const wrong = { min: { w: 1, h: 1 }, max: { w: 1, h: 1 } };
+    expect(resizeFromPointer(origin, { x: 1, y: 4 }, wrong)).toEqual({ w: 1, h: 1 });
+    expect(resizeFromPointer(origin, { x: 1, y: 4 }, bounds)).toEqual({ w: 2, h: 5 });
   });
 });

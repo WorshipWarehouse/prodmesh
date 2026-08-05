@@ -8,7 +8,13 @@ process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-views-'));
 const views = await import('./views.js');
 const { getDb } = await import('./db.js');
 
-const at = (type, x, y, w = 1, h = 1) => ({ type, x, y, w, h });
+// Sizes are enforced per widget now, so a fixture has to be one the widget is
+// allowed to be.
+const SIZES = { countdown: [2, 1], loudness: [2, 1], viewers: [1, 1], 'run-of-show': [2, 3] };
+const at = (type, x, y, w, h) => {
+  const [dw, dh] = SIZES[type] ?? [1, 1];
+  return { type, x, y, w: w ?? dw, h: h ?? dh };
+};
 
 test('create → read → replace round-trips, and returns what was STORED', () => {
   const made = views.createView({ roomId: 'r1', kind: 'dashboard', name: 'FOH', slug: 'foh' });
@@ -20,7 +26,7 @@ test('create → read → replace round-trips, and returns what was STORED', () 
   const saved = views.replaceView(made.id, {
     name: 'Front of House',
     slug: 'foh',
-    widgets: [at('viewers', 4, 1), at('loudness', 0, 0, 2, 2)],
+    widgets: [at('viewers', 4, 1), at('loudness', 0, 0)],
   });
   // Normalised on the way in: reading order, not the order sent.
   assert.deepEqual(saved.widgets.map((w) => w.type), ['loudness', 'viewers']);
@@ -32,12 +38,12 @@ test('create → read → replace round-trips, and returns what was STORED', () 
 test('a rejected save leaves the stored view untouched', () => {
   const made = views.createView({ roomId: 'r2', kind: 'dashboard', name: 'Booth', slug: 'booth' });
   const good = views.replaceView(made.id, {
-    name: 'Booth', slug: 'booth', widgets: [at('countdown', 0, 0, 2, 1)],
+    name: 'Booth', slug: 'booth', widgets: [at('countdown', 0, 0)],
   });
 
   assert.throws(() => views.replaceView(made.id, {
     name: 'Booth', slug: 'booth',
-    widgets: [at('loudness', 0, 0, 2, 2), at('viewers', 1, 1, 2, 2)], // overlap
+    widgets: [at('loudness', 0, 0), at('viewers', 1, 0)], // overlap
   }), /overlap/);
 
   assert.deepEqual(views.getView(made.id), good, 'validated before anything was written');
@@ -70,7 +76,7 @@ test('deleteView leaves no orphan placements', () => {
   // forever. This test is the reason to know that.
   const made = views.createView({ roomId: 'r6', kind: 'dashboard', name: 'Temp', slug: 'temp' });
   views.replaceView(made.id, {
-    name: 'Temp', slug: 'temp', widgets: [at('countdown', 0, 0, 2, 1), at('loudness', 2, 0, 2, 1)],
+    name: 'Temp', slug: 'temp', widgets: [at('countdown', 0, 0), at('loudness', 2, 0)],
   });
   const count = () =>
     getDb().prepare('SELECT COUNT(*) AS n FROM view_widgets WHERE view_id = ?').get(made.id).n;
@@ -98,7 +104,8 @@ test('kind is fixed at creation — a display cannot become a dashboard', () => 
   const made = views.createView({ roomId: 'r8', kind: 'display', name: 'Wall', slug: 'wall' });
   // A payload claiming dashboard is ignored, so the 3x3 bound still applies.
   assert.throws(
-    () => views.replaceView(made.id, { kind: 'dashboard', name: 'Wall', slug: 'wall', widgets: [at('viewers', 4, 0)] }),
+    // 2 wide at column 2 fits a dashboard's 6 columns and not a display's 3.
+    () => views.replaceView(made.id, { kind: 'dashboard', name: 'Wall', slug: 'wall', widgets: [at('countdown', 2, 0)] }),
     /does not fit a display/,
   );
 });

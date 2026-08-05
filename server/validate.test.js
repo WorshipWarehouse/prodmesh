@@ -56,7 +56,16 @@ test('validateSchedules accepts valid windows and rejects bad ones', () => {
 // ── Views ───────────────────────────────────────────────────────────────────
 
 const view = (over = {}) => ({ kind: 'dashboard', name: 'FOH', slug: 'foh', widgets: [], ...over });
-const at = (type, x, y, w = 1, h = 1) => ({ type, x, y, w, h });
+// Each widget has its own authored size, and the validator now enforces it —
+// so a fixture has to be a size that widget is actually allowed to be.
+const SIZES = {
+  countdown: [2, 1], loudness: [2, 1], viewers: [1, 1],
+  'run-of-show': [2, 3], 'now-next': [3, 1],
+};
+const at = (type, x, y, w, h) => {
+  const [dw, dh] = SIZES[type] ?? [1, 1];
+  return { type, x, y, w: w ?? dw, h: h ?? dh };
+};
 
 test('validateView normalizes: derives the grid, orders by (y,x), drops junk', () => {
   const out = validateView(view({
@@ -96,10 +105,10 @@ test('validateView rejects every malformed layout', () => {
     /"countdown" can only be placed once/);
   assert.throws(() => validateView(view({ widgets: [{ ...at('countdown', 0, 0), x: 1.5 }] })),
     /integer grid coordinates/);
-  assert.throws(() => validateView(view({ widgets: [at('countdown', 5, 0, 2, 1)] })),
+  assert.throws(() => validateView(view({ widgets: [at('countdown', 5, 0)] })),
     /outside the 6-column grid/);
   assert.throws(() => validateView(view({ widgets: [at('countdown', 0, 24)] })), /max 24 rows/);
-  assert.throws(() => validateView(view({ kind: 'display', widgets: [at('countdown', 0, 0, 1, 4)] })),
+  assert.throws(() => validateView(view({ kind: 'display', widgets: [at('now-next', 0, 3)] })),
     /does not fit a display's 3×3 grid/);
 });
 
@@ -115,11 +124,24 @@ test('validateView takes a scale from a short list, defaulting to actual size', 
   assert.throws(() => validateView(view({ scale: 99 })), /scale must be one of/);
 });
 
+test('validateView holds a placement to the size its widget allows', () => {
+  // Run of Show is the one widget with a range, because its list scrolls:
+  // extra rows are more of the service, not more whitespace.
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('run-of-show', 0, 0, 2, 5)] })));
+  assert.throws(() => validateView(view({ widgets: [at('run-of-show', 0, 0, 2, 6)] })),
+    /between 2×3 and 2×5 — got 2×6/);
+  assert.throws(() => validateView(view({ widgets: [at('run-of-show', 0, 0, 2, 2)] })),
+    /between 2×3 and 2×5/);
+  // Everything else is one size, and says so rather than quietly accepting.
+  assert.throws(() => validateView(view({ widgets: [at('loudness', 0, 0, 4, 2)] })),
+    /must be 2×1 — got 4×2/);
+});
+
 test('validateView names both widgets in an overlap', () => {
   assert.throws(
-    () => validateView(view({ widgets: [at('loudness', 0, 0, 2, 2), at('viewers', 1, 1, 2, 2)] })),
+    () => validateView(view({ widgets: [at('loudness', 0, 0), at('viewers', 1, 0)] })),
     /Widgets "loudness" and "viewers" overlap/,
   );
   // Edge-touching is not overlapping.
-  assert.doesNotThrow(() => validateView(view({ widgets: [at('loudness', 0, 0, 2, 2), at('viewers', 2, 0, 2, 2)] })));
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('loudness', 0, 0), at('viewers', 2, 0)] })));
 });

@@ -90,7 +90,7 @@ test('writes need views.edit: 401 anonymous, 403 logged in without it', async ()
   // …and the write is on the record, WITH its room. auditSuccess reads roomId
   // off req.params.id, which /api/views/:viewId does not have.
   const saved = await send('PUT', `/api/views/${view.id}`, {
-    name: 'FOH', slug: 'foh', widgets: [{ type: 'loudness', x: 0, y: 0, w: 2, h: 2 }],
+    name: 'FOH', slug: 'foh', widgets: [{ type: 'loudness', x: 0, y: 0, w: 2, h: 1 }],
   }, editorToken);
   assert.equal(saved.status, 200);
   const entry = auth.listAudit({ limit: 50 })
@@ -114,7 +114,7 @@ test('an unknown widget type survives a read but is refused on write', async () 
 
   // Writing one, though, comes from this build's own editor — so it is a bug.
   const rejected = await send('PUT', `/api/views/${made.id}`, {
-    name: 'Future', slug: 'future', widgets: [{ type: 'from-the-future', x: 0, y: 0, w: 2, h: 2 }],
+    name: 'Future', slug: 'future', widgets: [{ type: 'from-the-future', x: 0, y: 0, w: 2, h: 1 }],
   }, editorToken);
   assert.equal(rejected.status, 400);
   assert.match((await rejected.json()).error, /Unknown widget type/);
@@ -125,8 +125,8 @@ test('a bad layout is a 400, a missing view is a 404', async () => {
   const overlap = await send('PUT', `/api/views/${made.id}`, {
     name: 'Bad', slug: 'bad',
     widgets: [
-      { type: 'loudness', x: 0, y: 0, w: 2, h: 2 },
-      { type: 'viewers', x: 1, y: 1, w: 2, h: 2 },
+      { type: 'loudness', x: 0, y: 0, w: 2, h: 1 },
+      { type: 'viewers', x: 1, y: 0, w: 1, h: 1 },
     ],
   }, editorToken);
   assert.equal(overlap.status, 400);

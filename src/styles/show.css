@@ -163,39 +163,8 @@ span.ros-track__status {
   font-variant-numeric: tabular-nums;
 }
 
-/* Live SPL meter widget */
-.ros-spl {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border-top: 4px solid var(--ok);
-}
-
-.ros-spl--warn { border-top-color: var(--warn); }
-.ros-spl--over { border-top-color: var(--danger); }
-
-.ros-spl .ros-count__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.ros-spl__db {
-  font-size: clamp(2rem, 6vw, 3rem);
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.05;
-}
-
-.ros-spl__db small {
-  font-size: 0.45em;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-
-.ros-spl--warn .ros-spl__db { color: var(--warn); }
-.ros-spl--over .ros-spl__db { color: var(--danger); }
-
+/* Live SPL meter. The card, the header row and the big number all come from
+   .wgt now; what is left here is the meter itself. */
 .ros-spl__bar {
   position: relative;
   height: 8px;
@@ -449,4 +418,132 @@ span.ros-track__status {
   font-size: clamp(0.85rem, 2vw, 1.5rem);
   font-weight: 600;
   color: var(--text-dim);
+}
+
+/* THE CONTAINER DECIDES WHETHER A WIDGET DRAWS A FRAME.
+
+   In this flow grid a widget IS the card — nothing else puts a box around it.
+   In a view cell the cell already has one, and a widget drawing its own turned
+   into a box inside a box. So the frame lives on the container's children
+   rather than on the widget, and the same component is right in both places. */
+.ros__widgets > .wgt {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+}
+
+/* ── The shared widget shape ─────────────────────────────────────────────────
+
+   Header (icon + what it is, status on the right), then the number, then a
+   line of supporting detail. Widgets used to draw their own card — which was
+   right when they only ever sat in a flow grid and WERE the card, and became a
+   box inside a box the moment a view cell put a card around them. The cell
+   owns the box now; the widget owns its contents. */
+
+.wgt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.wgt__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wgt__icon {
+  display: flex;
+  color: var(--text-dim);
+}
+
+.wgt__brand {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.wgt__title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wgt__status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.wgt__status--live { color: var(--ok); }
+
+.wgt__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.wgt--viewers .wgt__dot { animation: wgt-pulse 2s ease-in-out infinite; }
+
+@keyframes wgt-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wgt--viewers .wgt__dot { animation: none; }
+}
+
+/* Scales with the cell rather than sitting at one point size: the same widget
+   is read at a desk on a dashboard and from across a room on a display. */
+.wgt__value {
+  margin: 0;
+  font-size: clamp(1.9rem, 4.4vw, 3.4rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.wgt__value small {
+  font-size: 0.42em;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.wgt--pre .wgt__value { color: var(--text); }
+.ros-spl--warn .wgt__value { color: var(--warn); }
+.ros-spl--over .wgt__value { color: var(--danger); }
+.wgt--live .wgt__value { color: var(--ok); }
+.wgt--done .wgt__value { color: var(--text-dim); }
+
+.wgt__detail {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Takes the room left over, so the curve grows with the widget. */
+.wgt__spark {
+  margin-top: auto;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
 }

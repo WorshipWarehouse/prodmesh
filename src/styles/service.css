@@ -163,6 +163,12 @@
   border-radius: var(--radius-sm);
   background: var(--bg-tile);
   border: 1px solid var(--border);
+  /* The left bar's space is reserved on EVERY item, coloured by whichever
+     rule below applies. Two mechanisms used to draw it — a border for songs,
+     an inset shadow for the current item — so a song that WAS current showed
+     both bars at once. Reserving it here also stops non-songs sitting 3px
+     out of line with songs. */
+  border-left: 3px solid transparent;
   margin-bottom: 6px;
 }
 
@@ -220,7 +226,6 @@
 .svc__item--current {
   border-color: var(--ok);
   background: rgba(52, 199, 89, 0.14);
-  box-shadow: inset 3px 0 0 var(--ok);
   animation: current-pulse 1.6s ease-in-out infinite;
 }
 
@@ -261,7 +266,13 @@
 
 /* Songs — colored title + left accent bar */
 .svc__item--song {
-  border-left: 3px solid var(--accent);
+  border-left-color: var(--accent);
+}
+
+/* After the song rule on purpose: being LIVE outranks being a song, and both
+   are single-class selectors, so source order is what decides. */
+.svc__item--current {
+  border-left-color: var(--ok);
 }
 
 .svc__item--song .svc__item-icon {
