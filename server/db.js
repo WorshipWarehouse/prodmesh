@@ -339,6 +339,18 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    // A station may render one view full-screen — a Raspberry Pi wired into a
+    // video multiview, a lobby TV. Nullable and unenforced: unassigned is the
+    // normal state, and deleting a view must leave the station alone rather
+    // than taking it down with it. The display route treats a dangling id the
+    // same as none.
+    name: 'stations-view',
+    up(d) {
+      addColumn(d, 'stations', 'view_id', 'TEXT');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

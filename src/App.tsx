@@ -13,6 +13,7 @@ import { ServiceReport } from './pages/ServiceReport';
 import { ViewsIndex } from './pages/ViewsIndex';
 import { DashboardView } from './pages/DashboardView';
 import { ViewEditorPage } from './pages/ViewEditorPage';
+import { DisplayView } from './pages/DisplayView';
 import { Settings } from './pages/Settings';
 import { Setup } from './pages/Setup';
 import './styles/index.css';
@@ -24,6 +25,10 @@ export default function App() {
       {/* First run — deliberately outside the shell: an unclaimed install has
           no campuses to navigate and no station to identify yet. */}
       <Route path="/setup" element={<Setup />} />
+      {/* A display is not a page someone browses — it is what a screen on a
+          wall shows. Outside the shell for the same reason /setup is: there is
+          no sidebar to offer and nobody to click it. */}
+      <Route path="/display/:roomId/:key" element={<DisplayView />} />
       <Route element={<AppShell />}>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />

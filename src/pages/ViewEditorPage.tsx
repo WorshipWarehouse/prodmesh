@@ -126,9 +126,12 @@ function Editor({ view }: { view: View }) {
   );
 }
 
-// A display's real home is the chrome-less /display route; until that exists
-// both kinds preview in the shell.
-const viewHref = (view: View) => `/room/${view.roomId}/view/${view.slug}`;
+// "Done" goes to the thing you were arranging: a dashboard in the shell, a
+// display full-screen as the wall will show it.
+const viewHref = (view: View) =>
+  view.kind === 'display'
+    ? `/display/${view.roomId}/${view.slug}`
+    : `/room/${view.roomId}/view/${view.slug}`;
 
 export function ViewEditorPage() {
   const { roomId = '', slug = '' } = useParams();

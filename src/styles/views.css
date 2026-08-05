@@ -602,3 +602,28 @@
   background: var(--danger-soft);
   opacity: 0.35;
 }
+
+/* ── A display ───────────────────────────────────────────────────────────────
+
+   Full screen, no chrome, never scrolls. This is a tile on a video multiview
+   or a TV in a foyer: whatever does not fit is simply not seen, so the grid
+   divides the height it is given rather than asking for more. */
+
+.display {
+  position: fixed;
+  inset: 0;
+  padding: 18px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Nothing to show. Deliberately blank rather than a message: nobody is
+   standing at this screen to read one, and an error left up for a week reads
+   as part of the design. A black rectangle is a fault someone notices. */
+.display--blank {
+  background: #000;
+}
+
+.display .viewgrid {
+  height: 100%;
+}

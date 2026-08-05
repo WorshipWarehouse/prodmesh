@@ -23,6 +23,8 @@ import crypto from 'node:crypto';
 
 import { getDb } from './db.js';
 import { gridFor } from './gridLayout.js';
+import { rooms } from './roomsStore.js';
+import * as hub from './streamHub.js';
 import { validateView } from './validate.js';
 
 const id = () => crypto.randomUUID();
@@ -109,6 +111,7 @@ export function createView({ roomId, kind, name, slug }, nowMs = Date.now()) {
     `INSERT INTO views (id, room_id, kind, name, slug, columns, max_rows, position, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(viewId, roomId, clean.kind, clean.name, clean.slug, clean.columns, clean.maxRows, next, nowMs, nowMs);
+  publishViews(roomId);
   return getView(viewId);
 }
 
@@ -147,6 +150,7 @@ export function replaceView(viewId, input, nowMs = Date.now()) {
       .run(clean.name, clean.slug, nowMs, viewId);
   })();
 
+  publishViews(existing.room_id);
   return getView(viewId);
 }
 
@@ -162,7 +166,28 @@ export function deleteView(viewId) {
     db.prepare('DELETE FROM view_widgets WHERE view_id = ?').run(viewId);
     db.prepare('DELETE FROM views WHERE id = ?').run(viewId);
   })();
+  publishViews(view.roomId);
   return view;
+}
+
+/**
+ * A room's views, pushed.
+ *
+ * Snapshot-only, like room:*:show — there is no producer to start, the data
+ * exists whether or not anyone is looking. It is here so a DISPLAY picks up a
+ * layout change made in the booth without someone walking to the wall to
+ * reload a screen that has no keyboard.
+ */
+export const viewsTopic = (roomId) => `room:${roomId}:views`;
+
+hub.registerTopic('room:*:views', {
+  valid: (roomId) => Boolean(rooms[roomId]),
+  snapshot: (roomId) => listViews(roomId),
+});
+
+/** Announce a change to any screen watching this room. */
+function publishViews(roomId) {
+  if (roomId) hub.publish(viewsTopic(roomId), listViews(roomId));
 }
 
 /** The grid a view is laid out on, as data both sides read. */

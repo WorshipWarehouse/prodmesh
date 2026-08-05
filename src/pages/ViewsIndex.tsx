@@ -28,6 +28,11 @@ const KINDS = [
   },
 ];
 
+/** A display's home is the chrome-less full-screen route — that IS the display.
+ *  A dashboard opens inside the shell. */
+const rowHref = (roomId: string, view: { kind: string; slug: string }) =>
+  view.kind === 'display' ? `/display/${roomId}/${view.slug}` : `/room/${roomId}/view/${view.slug}`;
+
 /** Derive the URL key from the name, the way the topology editor does. */
 const slugify = (name: string) =>
   name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
@@ -94,7 +99,7 @@ export function ViewsIndex() {
               <ul className="viewsindex__list">
                 {list.map((view) => (
                   <li key={view.id}>
-                    <Link className="viewsindex__row" to={`/room/${roomId}/view/${view.slug}`}>
+                    <Link className="viewsindex__row" to={rowHref(roomId, view)}>
                       <Icon size={16} aria-hidden />
                       <span className="viewsindex__name">{view.name}</span>
                       <span className="viewsindex__meta mono">
