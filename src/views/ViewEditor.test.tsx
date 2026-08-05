@@ -253,6 +253,14 @@ describe('ViewEditor', () => {
         }));
       });
       await act(async () => { grip.dispatchEvent(at2(1, 3)); }); // corner into row 4
+
+      // The outline has to be identifiable as a RESIZE so it can be drawn over
+      // the card rather than under it — a shrink is otherwise invisible until
+      // the mouse comes up.
+      const ghost = container.querySelector('.viewghost');
+      expect(ghost).toHaveClass('viewghost--resize');
+      expect(ghost).not.toHaveClass('viewghost--blocked');
+
       await act(async () => {
         grip.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
       });

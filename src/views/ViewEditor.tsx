@@ -201,7 +201,7 @@ export function ViewEditor({
   // than on a pixel guess about where they are.
   const ghost = drag.kind !== 'none' && drag.at && (
     <div
-      className={`viewghost${drag.ok ? '' : ' viewghost--blocked'}`}
+      className={`viewghost viewghost--${drag.kind}${drag.ok ? '' : ' viewghost--blocked'}`}
       style={{
         gridColumn: `${drag.at.x + 1} / span ${drag.size.w}`,
         gridRow: `${drag.at.y + 1} / span ${drag.size.h}`,

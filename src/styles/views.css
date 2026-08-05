@@ -603,12 +603,28 @@
   color: var(--danger);
 }
 
-/* Where the dragged widget would land. */
+/* Where the dragged widget would land.
+   Positioned so it paints ABOVE the cards: .viewcell is position:relative, and
+   a static grid item paints underneath every positioned one — which made a
+   SHRINK invisible, since its outline fell entirely inside the card it was
+   shrinking. */
 .viewghost {
+  position: relative;
+  z-index: 3;
   border: 2px dashed var(--accent);
   border-radius: var(--radius-lg);
   background: var(--accent-soft);
   pointer-events: none;
+}
+
+/* A resize outline lies over the widget being resized, so it fades out going
+   up: the edge you are dragging is drawn hard, and the content above stays
+   readable rather than sitting behind a flat wash. Masking rather than a
+   background gradient because it takes the BORDER with it — you cannot fade a
+   border any other way. */
+.viewghost--resize {
+  -webkit-mask-image: linear-gradient(to top, #000 30%, transparent 92%);
+  mask-image: linear-gradient(to top, #000 30%, transparent 92%);
 }
 
 .viewghost--blocked {
