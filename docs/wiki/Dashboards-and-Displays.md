@@ -106,17 +106,30 @@ server.
 
 | Widget | Size | Shows |
 |---|---|---|
+| Clock | 2×1 | The time of day, with seconds, and today's date |
 | Countdown | 2×1 | Time until the service starts, following the room's ProPresenter timer when one is running |
-| Loudness | 2×1 | Live SPL against the room's target and limit |
 | Live viewers | 1×1 | Concurrent YouTube viewers while the room is streaming |
-| Run of Show | 2×3 | The order of service, what is live now, and Prev/Next/End. **Dashboards only** |
+| Loudness | 2×1 | Live SPL against the room's target and limit |
+| Loudness trend | 2×1 | The shape of the last quarter hour, for a mix that creeps up |
 | Now & Next | 3×1 | The current item and the one after it, sized to read across a room |
+| Room mode | 2×1 | What mode the room is in, in its own colour. Read-only |
+| Run of Show | 2×3 | The order of service, what is live now, and Prev/Next/End. **Dashboards only** |
 
 A widget with nothing to say shows just its name in grey — the loudness meter
 before SMAART is logging, viewers when the room is not streaming. That is not a
 fault; it means there is genuinely nothing to report yet. See
 [Integration caveats](Integration-Caveats.md) for why loudness in particular
 often stays quiet.
+
+Room mode is the exception: a room always has one, so that widget says
+"Connecting…" while it waits rather than going quiet. It only ever *shows* the
+mode — changing it stays on the room's own page, where the confirmation and the
+schedule-override PIN live.
+
+Loudness trend draws what **that screen** has watched since it was opened, and
+a reload starts it over. Nothing keeps a live loudness history to ask for, so
+the curve can only be what has been seen. The service's real, permanent record
+is the Show Report.
 
 ## Who can change them
 

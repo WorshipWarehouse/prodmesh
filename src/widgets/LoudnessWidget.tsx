@@ -1,5 +1,6 @@
 import { Volume2 } from 'lucide-react';
 import { useTopic, roomTopic } from '../lib/stream';
+import { splZone } from '../lib/spl';
 import type { SplState } from '../api';
 import type { WidgetProps } from './types';
 
@@ -46,12 +47,7 @@ export function LoudnessWidget({ roomId }: WidgetProps) {
   const spl = useTopic<SplState | null>(roomTopic.spl(roomId));
   if (!spl) return null;
 
-  const zone =
-    spl.limit != null && spl.current >= spl.limit
-      ? 'over'
-      : spl.target != null && spl.current >= spl.target
-        ? 'warn'
-        : 'ok';
+  const zone = splZone(spl);
   // Meter bar spans a fixed 70–100 dB window (where worship services live).
   const pct = Math.min(100, Math.max(0, ((spl.current - 70) / 30) * 100));
   return (

@@ -113,7 +113,19 @@ Notes:
   nothing) — the gesture itself is hand-verified. Editing needs `views.edit`;
   reads are public because a screen with no keyboard has to fetch its own
   layout before anyone could log in. Widgets: `countdown`, `loudness`,
-  `viewers`, `run-of-show` (2×3, dashboard only) and `now-next` (3×1, either).
+  `loudness-trend`, `viewers`, `now-next` (3×1), `room-mode`, `clock`, and
+  `run-of-show` (2×3, the one dashboard-only widget, because it acts).
+  `room-mode` is read-only on purpose: changing mode is a confirm dialog, a
+  schedule-override PIN and a permission, which is a control surface rather
+  than a tile, and it already has one on the room page. `loudness-trend` and
+  `viewers` draw curves the BROWSER recorded — neither source keeps a live
+  history to ask for, so a reload starts them over, and the service's real
+  record stays the Show Report's.
+  The client registry and `server/validate.js`'s copy of it are hand-kept
+  duplicates (JS backend, TS frontend, no build step between), and
+  `registry.test.tsx` imports the server table and fails if they disagree —
+  otherwise a widget added on one side alone is offered by the editor and
+  refused by the save.
   A widget may declare a size RANGE and be stretched within it — only
   `run-of-show` does (2×3 to 2×5), because its list scrolls, so extra rows are
   more of the service rather than whitespace. Everything else is one authored

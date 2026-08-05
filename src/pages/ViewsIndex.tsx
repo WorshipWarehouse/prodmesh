@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LayoutGrid, Monitor, Pencil, Plus } from 'lucide-react';
 import { createView, getRoom, getViews } from '../api';
 import { useQuery, invalidate } from '../lib/useQuery';
-import { viewsKey } from '../lib/keys';
+import { roomKey, viewsKey } from '../lib/keys';
 import { useCan } from '../lib/identity';
 
 // A room's dashboards and displays.
@@ -47,7 +47,7 @@ export function ViewsIndex() {
   const [busy, setBusy] = useState(false);
 
   const viewsQ = useQuery(viewsKey(roomId), () => getViews(roomId), { staleMs: 30_000 });
-  const roomQ = useQuery(`room:${roomId}`, () => getRoom(roomId), { staleMs: 10 * 60_000 });
+  const roomQ = useQuery(roomKey(roomId), () => getRoom(roomId), { staleMs: 10 * 60_000 });
 
   const create = async () => {
     if (!creating) return;

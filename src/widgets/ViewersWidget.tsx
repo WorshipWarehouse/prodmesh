@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
 import { Sparkline } from '../components/Sparkline';
 import { useTopic, roomTopic } from '../lib/stream';
+import { useSeries } from '../lib/useSeries';
 import type { StreamState } from '../api';
 import type { WidgetProps } from './types';
 import youtubeMark from '../assets/youtube-mark.svg';
@@ -12,39 +12,13 @@ import youtubeMark from '../assets/youtube-mark.svg';
 // never publishes) or when nothing is broadcasting. A "0 watching" tile on a
 // Tuesday is noise, and worse, it looks like a fault.
 
-/** How many samples the curve holds — about an hour at the 30s poll. */
+/** How many samples the curve holds — about an hour at the 30s poll. Every
+ *  sample counts: at that rate there is nothing to thin out. */
 const HISTORY = 120;
-
-/**
- * The curve is OUR OWN recording, kept for as long as this screen has been
- * open.
- *
- * YouTube does not serve a viewer history: `concurrentViewers` is a single
- * number that exists only while the broadcast is live. The server records its
- * samples for the show report; this is the same idea in the browser, and it is
- * why the curve starts empty and fills in rather than appearing complete.
- */
-function useViewerHistory(current: number | null | undefined, live: boolean) {
-  const [points, setPoints] = useState<number[]>([]);
-  const last = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!live) {
-      setPoints([]);
-      last.current = null;
-      return;
-    }
-    if (current == null || current === last.current) return;
-    last.current = current;
-    setPoints((p) => [...p, current].slice(-HISTORY));
-  }, [current, live]);
-
-  return points;
-}
 
 export function ViewersWidget({ roomId }: WidgetProps) {
   const stream = useTopic<StreamState | null>(roomTopic.youtube(roomId));
-  const history = useViewerHistory(stream?.current, Boolean(stream?.live));
+  const history = useSeries(stream?.current, Boolean(stream?.live), { limit: HISTORY });
 
   if (!stream) return null;
 

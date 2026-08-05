@@ -1,8 +1,17 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { widgetRegistry, widgetTypes, isWidgetType } from './registry';
-import { spanColumns, widgetAllowedOn, widgetIsUnique, type WidgetSpan } from './types';
+import {
+  spanColumns, widgetAllowedOn, widgetIsUnique, widgetMax, widgetMin, type WidgetSpan,
+} from './types';
 import { GRID, fits } from '../lib/gridLayout';
+// The backend is plain JS with no declarations, and turning on allowJs to
+// import forty lines of table would pull every server module into the app's
+// TypeScript project — the trade ADR 0011 already declined for gridLayout.
+// A suppression in the one TEST that compares the two tables is the small end
+// of that: nothing in src/ imports server code, and the bundle never sees it.
+// @ts-expect-error — untyped JS, deliberately
+import { WIDGET_TYPES as SERVER_TYPES } from '../../server/validate.js';
 import { emitTopic } from '../test/fakeEventSource';
 
 const api = vi.hoisted(() => ({
@@ -93,6 +102,28 @@ describe('the registry contract', () => {
   it('recognises its own type names and rejects others', () => {
     expect(isWidgetType('loudness')).toBe(true);
     expect(isWidgetType('nope')).toBe(false);
+  });
+
+  it('agrees with the server, which is the authoritative copy', () => {
+    // server/validate.js keeps a hand-written duplicate of this table, because
+    // the backend is JS and the frontend is TS with no build step between —
+    // the same arrangement TILE_TYPES has. Duplicated-by-hand is fine; SILENTLY
+    // diverged is not. A widget added on one side alone is offered by the
+    // editor and refused by the save, or the reverse, and neither shows up
+    // until somebody arranges a dashboard and cannot store it.
+    expect([...SERVER_TYPES.keys()].sort()).toEqual([...widgetTypes].sort());
+
+    for (const type of widgetTypes) {
+      const def = widgetRegistry[type];
+      const server = SERVER_TYPES.get(type)!;
+      expect(server.size, `${type} size`).toEqual(def.size);
+      expect(server.unique, `${type} unique`).toBe(widgetIsUnique(def));
+      expect(server.display, `${type} display`).toBe(widgetAllowedOn(def, 'display'));
+      // min/max are absent server-side when a widget is one fixed size, which
+      // is what widgetMin/widgetMax fall back to.
+      expect(server.min ?? def.size, `${type} min`).toEqual(widgetMin(def));
+      expect(server.max ?? def.size, `${type} max`).toEqual(widgetMax(def));
+    }
   });
 });
 

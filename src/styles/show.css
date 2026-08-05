@@ -547,3 +547,25 @@ span.ros-track__status {
   min-height: 0;
   flex: 1;
 }
+
+/* A mode is WORDS, not a measurement. The numeric size runs "Sunday Service"
+   straight out of a two-column cell, and .viewcell clips rather than scrolls —
+   so it comes down a step and is allowed a second line. `anywhere` rather than
+   break-word because a room may be named something long with no space in it. */
+.wgt--mode .wgt__value {
+  font-size: clamp(1.3rem, 2.6vw, 2.2rem);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+/* A room that should be talking to Companion and isn't. Not the same as a mock
+   room, which is also "offline" and is not a fault — see RoomModeWidget. */
+.wgt--fault .wgt__detail { color: var(--danger); }
+
+/* Eight digits plus a separator, where the other widgets show three or four —
+   so the shared size overflows two columns and the clock comes down a step.
+   nowrap because a clock broken across two lines is not a clock. */
+.wgt--clock .wgt__value {
+  font-size: clamp(1.7rem, 3.4vw, 2.8rem);
+  white-space: nowrap;
+}
