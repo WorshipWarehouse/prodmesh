@@ -212,6 +212,8 @@ const WIDGET_TYPES = new Map([
   ['countdown', { unique: true, display: true }],
   ['loudness', { unique: true, display: true }],
   ['viewers', { unique: true, display: true }],
+  ['run-of-show', { unique: true, display: false }],
+  ['now-next', { unique: true, display: true }],
 ]);
 
 const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room

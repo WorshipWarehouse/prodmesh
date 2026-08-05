@@ -103,7 +103,9 @@ describe('ViewEditor', () => {
     const add = screen.getByRole('button', { name: 'Add Countdown' });
     expect(add).toBeDisabled();
     expect(add).toHaveAttribute('title', 'No room left');
-    expect(screen.getByText('No room left')).toBeInTheDocument();
+    // Said on the entry itself, not only in a tooltip nobody hovers.
+    const entry = screen.getByText('Countdown').closest('li')!;
+    expect(within(entry).getByText('No room left')).toBeInTheDocument();
   });
 
   it('the keyboard moves a widget, announces it, and refuses a collision', async () => {

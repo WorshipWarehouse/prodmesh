@@ -15,10 +15,13 @@ import type { ViewKind } from '../lib/gridLayout';
 //  lib/keys.ts), so a widget on a page that already wanted the same data costs
 //  nothing extra.
 //
-//  Not everything on a screen is a widget. A page's own control surface —
-//  Run of Show's Start/End/Prev/Next — stays a page component, because no
-//  dashboard would ever place it and giving it a config contract would be
-//  inventing a requirement to satisfy a pattern.
+//  Not everything on a screen is a widget — but Run of Show turned out to be.
+//  ADR 0010 kept its Start/End/Prev/Next as a page component on the grounds
+//  that "no dashboard would ever place it"; a producer's dashboard is exactly
+//  where you want Next under your thumb. What made it placeable is permission
+//  gating: a widget that acts can offer its controls to whoever may use them
+//  and say so plainly to whoever may not. `kinds` is how it stays off a
+//  display, which is defined as non-interactive.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Per-instance settings from a stored layout. Every field is optional: a
@@ -101,7 +104,12 @@ export interface WidgetDef {
   defaultSpan: WidgetSpan;
 }
 
-export type WidgetType = 'countdown' | 'loudness' | 'viewers';
+export type WidgetType =
+  | 'countdown'
+  | 'loudness'
+  | 'viewers'
+  | 'run-of-show'
+  | 'now-next';
 
 /** May this widget go on a view of this kind? */
 export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>

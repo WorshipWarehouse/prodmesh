@@ -25,11 +25,12 @@
 .viewgrid {
   display: grid;
   grid-template-columns: repeat(var(--view-columns), minmax(0, 1fr));
-  /* One row unit means the same thing everywhere — that is what makes a
-     stored h=2 meaningful. Rows may GROW past the unit for tall content; the
-     drag measures the browser's resolved track sizes rather than dividing by
-     a count, so uneven rows stay accurate. */
-  grid-template-rows: repeat(var(--view-rows), minmax(var(--view-row-height, 168px), auto));
+  /* Rows are EXACTLY the unit. `h: 3` has to mean three units or a stored
+     layout means nothing — and a row that grows to fit its tallest widget
+     silently pushes everything below it down the screen. A widget with more
+     content than its authored size scrolls inside itself (see .rosw__list);
+     one that needs more room is authored taller. */
+  grid-template-rows: repeat(var(--view-rows), var(--view-row-height, 168px));
   gap: 14px;
 }
 
@@ -41,13 +42,7 @@
   overflow: hidden;
 }
 
-/* And each cell clips its own content. Widgets are authored against a
-   dashboard's row height; magnified on a small screen a row can end up
-   shorter than the card inside it, and a widget bleeding over its neighbour
-   looks like a fault rather than a tight fit. */
-.viewgrid--fixed .viewcell {
-  overflow: hidden;
-}
+
 
 /* A display previewed inside the shell. Letterboxed to the shape it will be on
    the wall, so what you arrange is what gets shown. */
@@ -73,6 +68,9 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* A cell never bleeds over its neighbour. On a fixed canvas that is the
+     difference between a tight fit and something that looks broken. */
+  overflow: hidden;
 }
 
 .viewcell__body {

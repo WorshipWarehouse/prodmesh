@@ -9,6 +9,8 @@
 // Adding a widget = a type in ./types.ts and one entry here.
 
 import { CountdownWidget } from './CountdownWidget';
+import { NowNextWidget } from './NowNextWidget';
+import { RunOfShowWidget } from './RunOfShowWidget';
 import { LoudnessWidget } from './LoudnessWidget';
 import { ViewersWidget } from './ViewersWidget';
 import type { WidgetDef, WidgetType } from './types';
@@ -39,6 +41,25 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     // with a stats line, and both look squeezed at half this.
     size: { w: 1, h: 1 },
     defaultSpan: 'third',
+  },
+
+  'run-of-show': {
+    title: 'Run of Show',
+    description: 'The order of service, what is live now, and the controls to move it.',
+    component: RunOfShowWidget,
+    size: { w: 2, h: 3 },
+    // It takes actions, and a display is DEFINED as non-interactive. The
+    // server enforces this too; the palette just never offers it.
+    kinds: ['dashboard'],
+    defaultSpan: 'third',
+  },
+
+  'now-next': {
+    title: 'Now & Next',
+    description: 'The current item and the one after it, large enough to read across a room.',
+    component: NowNextWidget,
+    size: { w: 3, h: 1 },
+    defaultSpan: 'two-thirds',
   },
 };
 
