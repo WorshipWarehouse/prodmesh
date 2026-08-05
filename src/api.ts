@@ -1051,6 +1051,8 @@ export interface ViewSummary {
   slug: string;
   columns: number;
   maxRows: number | null;
+  /** Magnification for a display seen from across a room. 1 = actual size. */
+  scale: number;
   position: number;
   createdAt: number;
   updatedAt: number;
@@ -1077,7 +1079,7 @@ export const createView = (
 
 export async function saveView(
   viewId: string,
-  input: { name: string; slug: string; widgets: Omit<ViewPlacement, 'id'>[] },
+  input: { name: string; slug: string; scale?: number; widgets: Omit<ViewPlacement, 'id'>[] },
 ): Promise<View> {
   const res = await fetch(`/api/views/${encodeURIComponent(viewId)}`, {
     method: 'PUT',

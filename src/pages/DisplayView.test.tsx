@@ -20,7 +20,7 @@ vi.mock('../api', async (importOriginal) => ({
 
 const view = (name: string): View => ({
   id: 'v1', roomId: 'north-main', kind: 'display', name, slug: 'wall',
-  columns: 3, maxRows: 3, position: 0, createdAt: 0, updatedAt: 0,
+  columns: 3, maxRows: 3, scale: 1, position: 0, createdAt: 0, updatedAt: 0,
   widgets: [{ id: 'w1', type: 'countdown', x: 0, y: 0, w: 2, h: 1, config: {} }],
 });
 
@@ -81,6 +81,24 @@ describe('DisplayView', () => {
     await emitTopic({ 'room:north-main:views': [{ id: 'v1', slug: 'wall' }] });
 
     await waitFor(() => expect(api.getView).toHaveBeenCalledTimes(2));
+  });
+
+  it('magnifies the whole layout, so it stays exactly one screen', async () => {
+    // A 3x3 as one tile of a video wall lands in a few hundred pixels, and type
+    // sized for a desk disappears. `zoom` scales the LAYOUT, so the grid still
+    // fills the screen with fewer CSS pixels — a transform would render at the
+    // old size and overflow.
+    api.getView.mockResolvedValue({ view: { ...view('Multiview'), scale: 2 } });
+    const { container } = renderDisplay();
+
+    await waitFor(() => expect(container.querySelector('.viewgrid')).toBeInTheDocument());
+    expect((container.querySelector('.display') as HTMLElement).style.zoom).toBe('2');
+  });
+
+  it('does not set zoom at all when it is not needed', async () => {
+    const { container } = renderDisplay();
+    await waitFor(() => expect(container.querySelector('.viewgrid')).toBeInTheDocument());
+    expect((container.querySelector('.display') as HTMLElement).style.zoom).toBe('');
   });
 
   it('shows nothing rather than an error nobody is there to read', async () => {

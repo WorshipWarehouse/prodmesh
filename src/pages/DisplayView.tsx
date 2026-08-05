@@ -46,8 +46,11 @@ export function DisplayView() {
   // notices; a message is one they stop seeing.
   if (!view || !grid) return <div className="display display--blank" />;
 
+  // `zoom`, not transform: it scales the LAYOUT, so the grid still fills the
+  // screen exactly and simply has fewer CSS pixels to fill it with. A
+  // transform would render at the old size and then overflow the viewport.
   return (
-    <div className="display">
+    <div className="display" style={{ zoom: view.scale > 1 ? view.scale : undefined }}>
       <ViewCanvas view={view} grid={grid} config={{}} />
     </div>
   );

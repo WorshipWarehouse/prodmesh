@@ -21,7 +21,7 @@ const place = (id: string, type: string, x: number, y: number, w = 2, h = 1): Vi
 const view = (widgets: ViewPlacement[], kind: View['kind'] = 'dashboard'): View => ({
   id: 'v1', roomId: 'north-main', kind, name: 'FOH', slug: 'foh',
   columns: kind === 'display' ? 3 : 6, maxRows: kind === 'display' ? 3 : null,
-  position: 0, createdAt: 0, updatedAt: 0, widgets,
+  scale: 1, position: 0, createdAt: 0, updatedAt: 0, widgets,
 });
 
 describe('ViewCanvas', () => {

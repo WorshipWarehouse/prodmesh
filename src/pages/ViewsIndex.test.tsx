@@ -21,7 +21,7 @@ vi.mock('../api', async (importOriginal) => ({
 const view = (kind: ViewSummary['kind'], slug: string, name: string): ViewSummary => ({
   id: `id-${slug}`, roomId: 'north-main', kind, name, slug,
   columns: kind === 'display' ? 3 : 6, maxRows: kind === 'display' ? 3 : null,
-  position: 0, createdAt: 0, updatedAt: 0,
+  scale: 1, position: 0, createdAt: 0, updatedAt: 0,
 });
 
 const identity = (permissions: string[]): AuthStatus => ({

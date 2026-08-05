@@ -41,6 +41,14 @@
   overflow: hidden;
 }
 
+/* And each cell clips its own content. Widgets are authored against a
+   dashboard's row height; magnified on a small screen a row can end up
+   shorter than the card inside it, and a widget bleeding over its neighbour
+   looks like a fault rather than a tight fit. */
+.viewgrid--fixed .viewcell {
+  overflow: hidden;
+}
+
 /* A display previewed inside the shell. Letterboxed to the shape it will be on
    the wall, so what you arrange is what gets shown. */
 .viewframe {
@@ -626,4 +634,12 @@
 
 .display .viewgrid {
   height: 100%;
+}
+
+.editbar__scale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
 }

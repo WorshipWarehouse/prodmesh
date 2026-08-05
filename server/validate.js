@@ -216,6 +216,10 @@ const WIDGET_TYPES = new Map([
 
 const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room
 
+// A short list, not a free number: this is "how far away is the screen", and
+// a slider inviting 1.37 would only ever produce blurry half-pixel type.
+const SCALES = [1, 1.25, 1.5, 2, 2.5, 3];
+
 /**
  * Validate a view's editable content. Throws on bad shape — callers map that
  * to HTTP 400.
@@ -238,6 +242,11 @@ export function validateView(input) {
   if (!TOPO_ID.test(slug)) {
     throw new Error(`View id "${slug}" must be lowercase letters, numbers, and dashes`);
   }
+
+  // Unlike columns/maxRows this IS the client's to choose — it describes the
+  // screen the view is shown on, which the server cannot know.
+  const scale = input.scale == null ? 1 : Number(input.scale);
+  if (!SCALES.includes(scale)) throw new Error(`View scale must be one of ${SCALES.join(', ')}`);
 
   const input_widgets = Array.isArray(input.widgets) ? input.widgets : [];
   if (input_widgets.length > MAX_WIDGETS_PER_VIEW) {
@@ -282,6 +291,7 @@ export function validateView(input) {
     slug,
     columns: grid.columns,
     maxRows: grid.maxRows,
+    scale,
     widgets: normalize(widgets),
   };
 }

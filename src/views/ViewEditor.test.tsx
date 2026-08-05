@@ -21,7 +21,7 @@ vi.mock('../api', async (importOriginal) => ({
 const view = (widgets: ViewPlacement[], kind: View['kind'] = 'dashboard'): View => ({
   id: 'v1', roomId: 'north-main', kind, name: 'FOH', slug: 'foh',
   columns: kind === 'display' ? 3 : 6, maxRows: kind === 'display' ? 3 : null,
-  position: 0, createdAt: 0, updatedAt: 0, widgets,
+  scale: 1, position: 0, createdAt: 0, updatedAt: 0, widgets,
 });
 
 /** Stateful host, so a change actually comes back as new props. */
@@ -71,22 +71,39 @@ describe('ViewEditor', () => {
     expect(add()).toBeEnabled();
   });
 
-  it('a full display offers nothing more, rather than failing on save', async () => {
+  it('packs a display into the gaps its widgets leave', async () => {
     const user = userEvent.setup();
-    // 3x3 = 9 cells; three 2x1 widgets leave a 1-wide column, which nothing fits.
     render(<Harness kind="display" />);
 
+    // 2-wide on a 3-wide grid, so each leaves a single free column beside it.
     await user.click(screen.getByRole('button', { name: 'Add Countdown' }));
+    expect(at('countdown').style.gridColumn).toBe('1 / span 2');
     await user.click(screen.getByRole('button', { name: 'Add Loudness' }));
-    await user.click(screen.getByRole('button', { name: 'Add Live viewers' }));
+    expect(at('loudness').style.gridRow).toBe('2 / span 1');
 
-    // Every 2-wide widget is placed; the palette says so rather than letting
-    // someone build a layout the server would refuse.
+    // The 1-wide viewers fits that gap on row 1 rather than starting a row.
+    await user.click(screen.getByRole('button', { name: 'Add Live viewers' }));
+    expect(at('viewers').style.gridColumn).toBe('3 / span 1');
+    expect(at('viewers').style.gridRow).toBe('1 / span 1');
+
+    // All three placed and unique, so the palette offers nothing further.
     for (const name of ['Countdown', 'Loudness', 'Live viewers']) {
       expect(screen.getByRole('button', { name: `Add ${name}` })).toBeDisabled();
     }
-    expect(cells()).toHaveLength(3);
-    expect(at('viewers').style.gridRow).toBe('3 / span 1');
+  });
+
+  it('says "No room left" rather than letting someone build a refused layout', async () => {
+    // A display is a hard 3x3. Filled to a single free cell, nothing 2 wide
+    // fits — the palette has to say that, not fail on save.
+    render(<Harness kind="display" initial={[
+      { id: 'a', type: 'loudness', x: 0, y: 0, w: 2, h: 3, config: {} },
+      { id: 'b', type: 'viewers', x: 2, y: 0, w: 1, h: 2, config: {} },
+    ]} />);
+
+    const add = screen.getByRole('button', { name: 'Add Countdown' });
+    expect(add).toBeDisabled();
+    expect(add).toHaveAttribute('title', 'No room left');
+    expect(screen.getByText('No room left')).toBeInTheDocument();
   });
 
   it('the keyboard moves a widget, announces it, and refuses a collision', async () => {

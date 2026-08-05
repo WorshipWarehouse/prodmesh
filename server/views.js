@@ -37,6 +37,7 @@ const rowToView = (row, widgets) => ({
   slug: row.slug,
   columns: row.columns,
   maxRows: row.max_rows,
+  scale: row.scale ?? 1,
   position: row.position,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -146,8 +147,8 @@ export function replaceView(viewId, input, nowMs = Date.now()) {
     for (const w of clean.widgets) {
       insert.run(id(), viewId, w.type, w.x, w.y, w.w, w.h, JSON.stringify(w.config), w.position);
     }
-    db.prepare('UPDATE views SET name = ?, slug = ?, updated_at = ? WHERE id = ?')
-      .run(clean.name, clean.slug, nowMs, viewId);
+    db.prepare('UPDATE views SET name = ?, slug = ?, scale = ?, updated_at = ? WHERE id = ?')
+      .run(clean.name, clean.slug, clean.scale, nowMs, viewId);
   })();
 
   publishViews(existing.room_id);

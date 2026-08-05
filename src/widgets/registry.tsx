@@ -34,7 +34,10 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     title: 'Live viewers',
     description: 'Concurrent YouTube viewers while the room is streaming.',
     component: ViewersWidget,
-    size: { w: 2, h: 1 },
+    // One number and a label — the only one of the three narrow enough for a
+    // single cell. Countdown carries three lines of text and loudness a meter
+    // with a stats line, and both look squeezed at half this.
+    size: { w: 1, h: 1 },
     defaultSpan: 'third',
   },
 };
