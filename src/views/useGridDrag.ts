@@ -102,8 +102,8 @@ export function boxFromPointer(m: Metrics, at: Cell, grab: Cell, size: WidgetSiz
 export type Drag =
   | { kind: 'none' }
   | {
-      kind: 'add' | 'move';
-      /** Registry type for an add; the placement id for a move. */
+      kind: 'add' | 'move' | 'resize';
+      /** Registry type for an add; the placement id for a move or resize. */
       ref: string;
       size: WidgetSize;
       grab: Cell;
@@ -117,12 +117,17 @@ export function useGridDrag({
   placements,
   onAdd,
   onMove,
+  onResize,
+  boundsFor,
 }: {
   canvas: RefObject<HTMLDivElement | null>;
   grid: Grid;
   placements: ViewPlacement[];
   onAdd: (type: string, at: Cell) => void;
   onMove: (id: string, at: Cell) => void;
+  onResize: (id: string, size: WidgetSize) => void;
+  /** How far this widget may be stretched. */
+  boundsFor: (type: string) => { min: WidgetSize; max: WidgetSize };
 }) {
   const [drag, setDrag] = useState<Drag>({ kind: 'none' });
   const metrics = useRef<Metrics | null>(null);
@@ -147,7 +152,7 @@ export function useGridDrag({
   };
 
   const begin = (
-    kind: 'add' | 'move',
+    kind: 'add' | 'move' | 'resize',
     ref: string,
     size: WidgetSize,
     grab: Cell,
@@ -176,17 +181,32 @@ export function useGridDrag({
     if (drag.kind === 'none') return;
     const m = metrics.current;
     if (!m) return;
-    const at = boxFromPointer(m, cellFromPoint(m, e.clientX, e.clientY), drag.grab, drag.size);
-    const cells = occupancy(
-      placements.map((p) => ({ ...p, id: p.id })),
-      drag.kind === 'move' ? drag.ref : null,
-    );
+    const under = cellFromPoint(m, e.clientX, e.clientY);
+    const cells = occupancy(placements, drag.kind === 'add' ? null : drag.ref);
+
+    if (drag.kind === 'resize') {
+      // The origin stays put and the far edge follows the pointer, clamped to
+      // what the widget declares. Growing INTO a neighbour is refused rather
+      // than shoving it: a layout should not rearrange itself behind you.
+      const origin = drag.grab;
+      const { min, max } = boundsFor(drag.ref);
+      const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
+      const size = {
+        w: clamp(under.x - origin.x + 1, min.w, max.w),
+        h: clamp(under.y - origin.y + 1, min.h, max.h),
+      };
+      setDrag({ ...drag, size, at: origin, ok: isFree(grid, cells, { ...origin, ...size }) });
+      return;
+    }
+
+    const at = boxFromPointer(m, under, drag.grab, drag.size);
     setDrag({ ...drag, at, ok: isFree(grid, cells, { ...at, ...drag.size }) });
   };
 
   const end = () => {
     if (drag.kind !== 'none' && drag.at && drag.ok) {
       if (drag.kind === 'add') onAdd(drag.ref, drag.at);
+      else if (drag.kind === 'resize') onResize(drag.ref, drag.size);
       else onMove(drag.ref, drag.at);
     }
     metrics.current = null;
@@ -226,5 +246,23 @@ export function useGridDrag({
     onPointerCancel: cancel,
   });
 
-  return { drag, addHandlers, moveHandlers };
+  /** Spread onto a placed card's resize grip. `grab` carries the ORIGIN here,
+   *  not an offset — the corner being dragged is the far one. */
+  const resizeHandlers = (placement: ViewPlacement) => ({
+    onPointerDown: (e: ReactPointerEvent) => {
+      e.stopPropagation(); // the card's move handler is the parent
+      begin(
+        'resize',
+        placement.id,
+        { w: placement.w, h: placement.h },
+        { x: placement.x, y: placement.y },
+        e,
+      );
+    },
+    onPointerMove: move,
+    onPointerUp: end,
+    onPointerCancel: cancel,
+  });
+
+  return { drag, addHandlers, moveHandlers, resizeHandlers };
 }

@@ -161,6 +161,70 @@ describe('ViewEditor', () => {
     expect(screen.getByRole('button', { name: 'Move Live viewers, column 5, row 3' })).toBeInTheDocument();
   });
 
+  describe('stretching', () => {
+    const runOfShow = (h = 3): ViewPlacement =>
+      ({ id: 'a', type: 'run-of-show', x: 0, y: 0, w: 2, h, config: {} });
+
+    it('offers a grip only where the widget declares a range', () => {
+      const { container, unmount } = render(<Harness initial={[runOfShow()]} />);
+      expect(container.querySelector('.viewcell__resize')).not.toBeNull();
+      unmount();
+
+      // Everything else is one authored size, so a handle would only offer the
+      // bad version of two designs.
+      render(<Harness initial={[{ id: 'b', type: 'loudness', x: 0, y: 0, w: 2, h: 1, config: {} }]} />);
+      expect(document.querySelector('.viewcell__resize')).toBeNull();
+    });
+
+    it('shift+arrow stretches within the range and says so', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[runOfShow()]} />);
+      const grip = screen.getByRole('button', { name: /Move Run of Show/ });
+      grip.focus();
+      await user.keyboard('{Enter}');
+
+      await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 4');
+      expect(status()).toBe('Run of Show is now 2 by 4.');
+
+      await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 5');
+
+      // 5 is the ceiling — and it SAYS so rather than doing nothing, which is
+      // indistinguishable from a dead key.
+      await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 5');
+      expect(status()).toBe('Run of Show cannot be resized further.');
+    });
+
+    it('will not grow into a neighbour', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[
+        runOfShow(),
+        { id: 'b', type: 'loudness', x: 0, y: 3, w: 2, h: 1, config: {} },
+      ]} />);
+      const grip = screen.getByRole('button', { name: /Move Run of Show/ });
+      grip.focus();
+      await user.keyboard('{Enter}{Shift>}{ArrowDown}{/Shift}');
+
+      // Refused rather than shoving Loudness down — a layout should not
+      // rearrange itself behind you.
+      expect(at('run-of-show').style.gridRow).toBe('1 / span 3');
+      expect(status()).toBe('Run of Show cannot grow there.');
+      expect(at('loudness').style.gridRow).toBe('4 / span 1');
+    });
+
+    it('width is not offered when only height varies', async () => {
+      const user = userEvent.setup();
+      render(<Harness initial={[runOfShow()]} />);
+      const grip = screen.getByRole('button', { name: /Move Run of Show/ });
+      grip.focus();
+      await user.keyboard('{Enter}{Shift>}{ArrowRight}{/Shift}');
+      expect(at('run-of-show').style.gridColumn).toBe('1 / span 2');
+      expect(status()).toBe('Run of Show cannot be resized further.');
+    });
+  });
+
   it('the palette shows each widget’s size, since the grid is what it competes for', () => {
     render(<Harness />);
     const loudness = screen.getByText('Loudness').closest('li')!;

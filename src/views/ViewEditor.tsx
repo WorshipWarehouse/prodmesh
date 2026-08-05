@@ -5,6 +5,7 @@ import { WidgetPalette, paletteFor } from './WidgetPalette';
 import { useGridDrag, type Cell } from './useGridDrag';
 import { findFirstFit, isFree, occupancy, rowCount, type Grid } from '../lib/gridLayout';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
+import { widgetMax, widgetMin, widgetResizable, type WidgetSize } from '../widgets/types';
 import type { View, ViewPlacement } from '../api';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,12 +71,25 @@ export function ViewEditor({
     if (grabbed === id) setGrabbed(null);
   };
 
-  const { drag, addHandlers, moveHandlers } = useGridDrag({
+  const resizeTo = (id: string, size: WidgetSize) =>
+    onChange(placements.map((p) => (p.id === id ? { ...p, ...size } : p)));
+
+  /** How far a widget may be stretched — the server enforces the same bounds. */
+  const boundsFor = (type: string) => {
+    const def = isWidgetType(type) ? widgetRegistry[type] : null;
+    return def
+      ? { min: widgetMin(def), max: widgetMax(def) }
+      : { min: { w: 1, h: 1 }, max: { w: 1, h: 1 } };
+  };
+
+  const { drag, addHandlers, moveHandlers, resizeHandlers } = useGridDrag({
     canvas,
     grid,
     placements,
     onAdd: place,
     onMove: moveTo,
+    onResize: resizeTo,
+    boundsFor,
   });
 
   const addFromPalette = (type: string) => {
@@ -86,10 +100,13 @@ export function ViewEditor({
     setAnnounce(`${def.title} added at column ${at.x + 1}, row ${at.y + 1}.`);
   };
 
+  const titleOf = (type: string) =>
+    isWidgetType(type) ? widgetRegistry[type].title : type;
+
   /** Arrow-key movement for the grabbed card. Refuses rather than shoves. */
   const nudge = (placement: ViewPlacement, delta: Cell) => {
     const next = { x: placement.x + delta.x, y: placement.y + delta.y };
-    const title = isWidgetType(placement.type) ? widgetRegistry[placement.type].title : placement.type;
+    const title = titleOf(placement.type);
     const cells = occupancy(placements, placement.id);
     if (!isFree(grid, cells, { ...next, w: placement.w, h: placement.h })) {
       setAnnounce(`${title} cannot move there.`);
@@ -99,17 +116,46 @@ export function ViewEditor({
     setAnnounce(`${title} at column ${next.x + 1}, row ${next.y + 1}.`);
   };
 
+  /** Shift+arrow stretches it, within what the widget declares. */
+  const stretch = (placement: ViewPlacement, delta: Cell) => {
+    const title = titleOf(placement.type);
+    const { min, max } = boundsFor(placement.type);
+    const size = {
+      w: Math.max(min.w, Math.min(placement.w + delta.x, max.w)),
+      h: Math.max(min.h, Math.min(placement.h + delta.y, max.h)),
+    };
+    if (size.w === placement.w && size.h === placement.h) {
+      setAnnounce(`${title} cannot be resized further.`);
+      return;
+    }
+    if (!isFree(grid, occupancy(placements, placement.id), { x: placement.x, y: placement.y, ...size })) {
+      setAnnounce(`${title} cannot grow there.`);
+      return;
+    }
+    resizeTo(placement.id, size);
+    setAnnounce(`${title} is now ${size.w} by ${size.h}.`);
+  };
+
   const chromeFor = (placement: ViewPlacement) => {
-    const title = isWidgetType(placement.type) ? widgetRegistry[placement.type].title : placement.type;
+    const title = titleOf(placement.type);
     const held = grabbed === placement.id;
+    const def = isWidgetType(placement.type) ? widgetRegistry[placement.type] : null;
+    const resizable = def ? widgetResizable(def) : false;
     return (
       <div className="viewcell__chrome">
         <button
           type="button"
           className="viewcell__grip"
           aria-pressed={held}
-          aria-label={`Move ${title}, column ${placement.x + 1}, row ${placement.y + 1}`}
-          title="Drag to move, or press Enter and use the arrow keys"
+          aria-label={
+            `Move ${title}, column ${placement.x + 1}, row ${placement.y + 1}` +
+            (resizable ? `, ${placement.w} by ${placement.h}` : '')
+          }
+          title={
+            resizable
+              ? 'Drag to move. Enter then arrows to move, shift+arrows to resize'
+              : 'Drag to move, or press Enter and use the arrow keys'
+          }
           {...moveHandlers(placement)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -121,7 +167,8 @@ export function ViewEditor({
               setAnnounce(`${title} placed.`);
             } else if (held && ARROWS[e.key]) {
               e.preventDefault();
-              nudge(placement, ARROWS[e.key]);
+              if (e.shiftKey) stretch(placement, ARROWS[e.key]);
+              else nudge(placement, ARROWS[e.key]);
             }
           }}
         >
@@ -136,6 +183,17 @@ export function ViewEditor({
         >
           <X size={14} />
         </button>
+
+        {/* Only where the widget declares a range. Most stay one size, so a
+            handle on them would only offer the bad version of two designs. */}
+        {resizable && (
+          <span
+            className="viewcell__resize"
+            title={`Drag to resize (${widgetMin(def!).h}–${widgetMax(def!).h} rows)`}
+            aria-hidden
+            {...resizeHandlers(placement)}
+          />
+        )}
       </div>
     );
   };

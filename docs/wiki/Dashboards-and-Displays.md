@@ -35,6 +35,17 @@ To move a widget, drag it by its title strip at the top of the card — or click
 that strip, press <kbd>Enter</kbd>, and use the arrow keys. The **×** removes
 it.
 
+A few widgets can be **stretched**, and those show a small grip in their
+bottom-right corner. Drag it, or hold <kbd>Shift</kbd> with the arrow keys
+while the card is grabbed. Run of Show is the one that matters: it can go from
+3 rows to 5, and because its order of service scrolls, the extra rows are more
+of the service rather than more empty space.
+
+Most widgets are one fixed size on purpose. A loudness meter squeezed into a
+single cell and one stretched across half a screen are two different designs,
+not one design scaled, so offering a handle would only ever give you the worse
+version of both.
+
 Nothing is saved until you press **Save layout**. **Discard** puts back what
 was there.
 

@@ -649,3 +649,27 @@
   font-size: 0.85rem;
   color: var(--text-dim);
 }
+
+/* The resize grip, bottom-right of a card that declares a size range. Sits
+   over the cell's corner rather than inside its padding, so it does not eat
+   space from a widget that is already tight. */
+.viewcell__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  /* A corner mark rather than an icon: two hairlines read as "grab here" at
+     any size and cost no layout. */
+  background:
+    linear-gradient(135deg, transparent 46%, var(--border-strong) 46%, var(--border-strong) 54%, transparent 54%),
+    linear-gradient(135deg, transparent 70%, var(--border-strong) 70%, var(--border-strong) 78%, transparent 78%);
+}
+
+.viewcell__resize:hover {
+  background:
+    linear-gradient(135deg, transparent 46%, var(--accent) 46%, var(--accent) 54%, transparent 54%),
+    linear-gradient(135deg, transparent 70%, var(--accent) 70%, var(--accent) 78%, transparent 78%);
+}
