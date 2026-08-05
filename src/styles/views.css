@@ -82,6 +82,14 @@
   gap: 10px;
 }
 
+/* No box inside a box. A widget that draws its own card is right in the flow
+   grid, where it IS the card; inside a cell that already has a border and a
+   background it reads as a nested panel. The cell owns the frame here. */
+.viewcell__body > .wgt {
+  flex: 1;
+  min-height: 0;
+}
+
 /* A widget with nothing to show renders null, so its body is genuinely empty.
    Name it rather than leaving a blank rectangle, which reads as a fault. */
 .viewcell__body:empty::after {

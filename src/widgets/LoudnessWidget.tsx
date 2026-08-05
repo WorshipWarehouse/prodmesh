@@ -55,13 +55,14 @@ export function LoudnessWidget({ roomId }: WidgetProps) {
   // Meter bar spans a fixed 70–100 dB window (where worship services live).
   const pct = Math.min(100, Math.max(0, ((spl.current - 70) / 30) * 100));
   return (
-    <div className={`ros-spl ros-spl--${zone}`}>
-      <span className="ros-count__label">
-        <Volume2 size={13} /> Loudness
-      </span>
-      <span className="ros-spl__db">
+    <div className={`wgt wgt--spl ros-spl--${zone}`}>
+      <div className="wgt__head">
+        <span className="wgt__icon"><Volume2 size={16} /></span>
+        <span className="wgt__title">Loudness</span>
+      </div>
+      <p className="wgt__value">
         {spl.current.toFixed(1)} <small>dB</small>
-      </span>
+      </p>
       <div className="ros-spl__bar">
         <div className="ros-spl__fill" style={{ width: `${pct}%` }} />
         {spl.target != null && (
@@ -71,7 +72,7 @@ export function LoudnessWidget({ roomId }: WidgetProps) {
           <div className="ros-spl__mark ros-spl__mark--limit" style={{ left: `${((spl.limit - 70) / 30) * 100}%` }} />
         )}
       </div>
-      <span className="ros-spl__stats">
+      <span className="wgt__detail">
         {spl.avg != null ? `avg ${spl.avg.toFixed(1)}` : 'avg —'}
         {' · '}
         {spl.peak != null ? `peak ${spl.peak.toFixed(1)}` : 'peak —'}

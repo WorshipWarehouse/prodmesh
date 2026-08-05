@@ -41,7 +41,44 @@ describe('ViewersWidget', () => {
   it('keeps the recorded peak visible after the stream ends', async () => {
     show();
     await push({ current: null, peak: 812, avg: 640, live: false });
-    expect(await screen.findByText(/stream ended/)).toBeInTheDocument();
+    expect(await screen.findByText(/Stream ended/)).toBeInTheDocument();
+  });
+
+  it('attributes the number to YouTube, which is what their mark is for', async () => {
+    show();
+    await push({ current: 427, peak: 427, avg: 413, live: true });
+    const mark = await screen.findByTitle('Viewer counts from the YouTube Data API');
+    // alt="" and a title: decoration that carries attribution, not a second
+    // reading of "Current viewers" for a screen reader.
+    expect(mark).toHaveAttribute('alt', '');
+    // Vite inlines it, so assert what actually ships: an SVG in YouTube's own
+    // red, which the guidelines require be left alone.
+    const src = mark.getAttribute('src') ?? '';
+    expect(src).toMatch(/^data:image\/svg\+xml/);
+    expect(decodeURIComponent(src)).toContain('#FF0033');
+  });
+
+  it('records its own curve, because YouTube does not serve one', async () => {
+    // concurrentViewers is a single number that exists only while live —
+    // there is no history to ask for, so the curve is what this screen has
+    // watched happen since it was opened. It needs two points to be a line.
+    const { container } = show();
+    await push({ current: 400, peak: 400, avg: 400, live: true });
+    expect(container.querySelector('.spark__line')).toBeNull();
+
+    await push({ current: 427, peak: 427, avg: 413, live: true });
+    expect(container.querySelector('.spark__line')).not.toBeNull();
+    expect(screen.getByText('427')).toBeInTheDocument();
+  });
+
+  it('drops the curve when the stream ends, rather than leaving a stale one up', async () => {
+    const { container } = show();
+    await push({ current: 400, peak: 400, avg: 400, live: true });
+    await push({ current: 427, peak: 427, avg: 413, live: true });
+    expect(container.querySelector('.spark__line')).not.toBeNull();
+
+    await push({ current: null, peak: 427, avg: 413, live: false });
+    expect(container.querySelector('.spark__line')).toBeNull();
   });
 });
 
