@@ -71,28 +71,65 @@ export function registerStation({ name, campusId = null, roomId = null }) {
 
 export function resolveStation(token) {
   if (!token) return null;
+  // LEFT JOIN, not a second query: a display station's whole job is to render
+  // one view, and the browser needs its slug on the very first request to know
+  // where to send itself. The join also makes a deleted view read as no
+  // assignment rather than a dangling id.
   const row = getDb().prepare(
-    'SELECT id, name, campus_id AS campusId, room_id AS roomId, room_only AS roomOnly FROM stations WHERE token_hash = ?',
+    `SELECT s.id, s.name, s.campus_id AS campusId, s.room_id AS roomId, s.room_only AS roomOnly,
+            v.id AS viewId, v.slug AS viewSlug, v.kind AS viewKind
+       FROM stations s
+       LEFT JOIN views v ON v.id = s.view_id
+      WHERE s.token_hash = ?`,
   ).get(digest(token));
   if (row) getDb().prepare('UPDATE stations SET last_seen = ? WHERE id = ?').run(Date.now(), row.id);
-  return row ? { ...row, roomOnly: Boolean(row.roomOnly) } : null;
+  return row
+    ? {
+        ...row,
+        roomOnly: Boolean(row.roomOnly),
+        viewId: row.viewId ?? null,
+        viewSlug: row.viewSlug ?? null,
+        viewKind: row.viewKind ?? null,
+      }
+    : null;
 }
 
 export function listStations() {
   return getDb().prepare(
-    `SELECT id, name, campus_id AS campusId, room_id AS roomId, room_only AS roomOnly,
-            created_at AS createdAt, last_seen AS lastSeen
-       FROM stations ORDER BY name COLLATE NOCASE`,
-  ).all().map((row) => ({ ...row, roomOnly: Boolean(row.roomOnly) }));
+    `SELECT s.id, s.name, s.campus_id AS campusId, s.room_id AS roomId, s.room_only AS roomOnly,
+            s.created_at AS createdAt, s.last_seen AS lastSeen,
+            v.id AS viewId, v.slug AS viewSlug, v.name AS viewName
+       FROM stations s
+       LEFT JOIN views v ON v.id = s.view_id
+      ORDER BY s.name COLLATE NOCASE`,
+  ).all().map((row) => ({
+    ...row,
+    roomOnly: Boolean(row.roomOnly),
+    viewId: row.viewId ?? null,
+    viewSlug: row.viewSlug ?? null,
+    viewName: row.viewName ?? null,
+  }));
 }
 
-export function updateStation(stationId, { name, campusId = null, roomId = null, roomOnly = false }) {
+export function updateStation(
+  stationId,
+  { name, campusId = null, roomId = null, roomOnly = false, viewId = null },
+) {
   const clean = String(name ?? '').trim();
   if (clean.length < 2 || clean.length > 80) throw new Error('Station name must be 2–80 characters');
+  // A display belongs to the room the station is standing in. Assigning one
+  // from another room would put a screen in the foyer showing the youth room's
+  // service — the caller has no way to notice, so refuse it here.
+  if (viewId) {
+    const view = getDb().prepare('SELECT room_id AS roomId, kind FROM views WHERE id = ?').get(viewId);
+    if (!view) throw new Error('Unknown view');
+    if (view.kind !== 'display') throw new Error('Only a display can be assigned to a station');
+    if (!roomId || view.roomId !== roomId) throw new Error('That display belongs to another room');
+  }
   // roomOnly is meaningless without a room assignment — never persist it alone.
   const result = getDb().prepare(
-    'UPDATE stations SET name = ?, campus_id = ?, room_id = ?, room_only = ? WHERE id = ?',
-  ).run(clean, campusId || null, roomId || null, roomId && roomOnly ? 1 : 0, stationId);
+    'UPDATE stations SET name = ?, campus_id = ?, room_id = ?, room_only = ?, view_id = ? WHERE id = ?',
+  ).run(clean, campusId || null, roomId || null, roomId && roomOnly ? 1 : 0, viewId || null, stationId);
   if (!result.changes) throw new Error('Unknown station');
   return listStations().find((station) => station.id === stationId);
 }

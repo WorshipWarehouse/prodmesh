@@ -11,6 +11,8 @@ import { Field } from '../components/form/Field';
 import { FormRow } from '../components/form/FormRow';
 import { useDraft } from '../components/form/useDraft';
 import { useChurch } from '../layout/church';
+import { useQuery } from '../lib/useQuery';
+import { viewsKey } from '../lib/keys';
 import { allIds, slugId } from '../lib/topology';
 import {
   getAuthStatus,
@@ -19,6 +21,7 @@ import {
   getSettings,
   saveSchedules,
   getRooms,
+  getViews,
   getVersion,
   triggerUpdate,
   getChecklistTemplates,
@@ -415,13 +418,23 @@ function StationEditor({
   const [campusId, setCampusId] = useState(station.campusId ?? '');
   const [roomId, setRoomId] = useState(station.roomId ?? '');
   const [roomOnly, setRoomOnly] = useState(station.roomOnly ?? false);
+  const [viewId, setViewId] = useState(station.viewId ?? '');
   const [busy, setBusy] = useState(false);
+
+  // A display belongs to the room the station stands in — the server refuses
+  // any other pairing, so offer only what it would accept.
+  const displays = useQuery(
+    roomId ? viewsKey(roomId) : null,
+    () => getViews(roomId),
+    { staleMs: 30_000 },
+  ).data?.views.filter((view) => view.kind === 'display') ?? [];
 
   const campusRooms = rooms.filter((room) => !campusId || room.site === campusId);
   const dirty =
     name !== station.name ||
     campusId !== (station.campusId ?? '') ||
     roomId !== (station.roomId ?? '') ||
+    viewId !== (station.viewId ?? '') ||
     (roomId !== '' && roomOnly !== (station.roomOnly ?? false));
 
   const save = async () => {
@@ -432,6 +445,7 @@ function StationEditor({
         campusId: campusId || null,
         roomId: roomId || null,
         roomOnly: Boolean(roomId) && roomOnly,
+        viewId: (roomId && viewId) || null,
       }));
     } finally {
       setBusy(false);
@@ -465,9 +479,24 @@ function StationEditor({
             const nextRoom = rooms.find((room) => room.id === event.target.value);
             setRoomId(event.target.value);
             if (nextRoom) setCampusId(nextRoom.site ?? '');
+            // The display belonged to the old room; keeping it would be a
+            // save the server refuses.
+            setViewId('');
           }}>
             <option value="">No room</option>
             {campusRooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+          </SelectField>
+        </label>
+        <label>
+          <span>Display <HelpTip text="This browser shows that display full-screen with no navigation — a Raspberry Pi on a multiview input, or a TV in the foyer. It still works as an ordinary browser until you open it." /></span>
+          <SelectField
+            value={viewId}
+            disabled={!roomId || displays.length === 0}
+            title={roomId ? undefined : 'Assign a room first'}
+            onChange={(event) => setViewId(event.target.value)}
+          >
+            <option value="">{displays.length ? 'Not a display' : 'No displays in this room'}</option>
+            {displays.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
           </SelectField>
         </label>
         <Checkbox

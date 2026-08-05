@@ -339,6 +339,32 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    // A station may render one view full-screen — a Raspberry Pi wired into a
+    // video multiview, a lobby TV. Nullable and unenforced: unassigned is the
+    // normal state, and deleting a view must leave the station alone rather
+    // than taking it down with it. The display route treats a dangling id the
+    // same as none.
+    name: 'stations-view',
+    up(d) {
+      addColumn(d, 'stations', 'view_id', 'TEXT');
+    },
+  },
+
+  {
+    // How far to magnify a display.
+    //
+    // A 3x3 laid out on a booth monitor is legible; the same pixels as one
+    // tile of a video wall are not — the whole grid ends up a few hundred
+    // pixels across, and type sized for a desk disappears. Per VIEW rather
+    // than global because the screens differ: a foyer TV and a multiview tile
+    // are not the same problem.
+    name: 'views-scale',
+    up(d) {
+      addColumn(d, 'views', 'scale', 'REAL NOT NULL DEFAULT 1');
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

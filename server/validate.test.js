@@ -103,6 +103,18 @@ test('validateView rejects every malformed layout', () => {
     /does not fit a display's 3×3 grid/);
 });
 
+test('validateView takes a scale from a short list, defaulting to actual size', () => {
+  // A display is read across a room, or as one tile of a video wall. This is
+  // the client's to choose — the server cannot know what screen it is on.
+  assert.equal(validateView(view()).scale, 1);
+  assert.equal(validateView(view({ kind: 'display', slug: 'wall', scale: 2 })).scale, 2);
+  assert.equal(validateView(view({ scale: '1.5' })).scale, 1.5, 'a form field sends a string');
+  // A list, not a range: a slider offering 1.37 only ever makes blurry type.
+  assert.throws(() => validateView(view({ scale: 1.37 })), /scale must be one of/);
+  assert.throws(() => validateView(view({ scale: 0 })), /scale must be one of/);
+  assert.throws(() => validateView(view({ scale: 99 })), /scale must be one of/);
+});
+
 test('validateView names both widgets in an overlap', () => {
   assert.throws(
     () => validateView(view({ widgets: [at('loudness', 0, 0, 2, 2), at('viewers', 1, 1, 2, 2)] })),

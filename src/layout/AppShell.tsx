@@ -171,7 +171,17 @@ export function AppShell() {
   const lockedRoomName = lockedRoomId
     ? church.sites.flatMap((s) => s.auditoriums).find((a) => a.id === lockedRoomId)?.name ?? 'Room Status'
     : null;
-  const lockedPrefix = lockedRoomId ? `/room/${lockedRoomId}` : null;
+
+  // A station assigned a display goes to its display, not to the room console.
+  // The display route lives outside this shell, so nothing here ever runs for
+  // it — this is only for a screen that arrived somewhere else: a stale
+  // bookmark, or a Pi whose kiosk config points at "/". Point it at the root
+  // and it finds its own way home.
+  const lockedPrefix = lockedRoomId
+    ? identity?.station?.viewSlug
+      ? `/display/${lockedRoomId}/${identity.station.viewSlug}`
+      : `/room/${lockedRoomId}`
+    : null;
   const offLimits =
     lockedPrefix != null &&
     location.pathname !== lockedPrefix &&

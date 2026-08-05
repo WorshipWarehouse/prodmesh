@@ -151,12 +151,16 @@ export interface Station {
   roomId: string | null;
   /** Read-only mode (nobody logged in) browses only the assigned room. */
   roomOnly: boolean;
+  /** A display this station renders full-screen. Null for an ordinary browser. */
+  viewId?: string | null;
+  viewSlug?: string | null;
 }
 
 export interface ManagedStation extends Station {
   createdAt: number;
   lastSeen: number;
   current: boolean;
+  viewName?: string | null;
 }
 
 export interface CurrentUser {
@@ -215,7 +219,13 @@ export const getStations = () => getJson<{ stations: ManagedStation[] }>('/api/s
 
 export async function updateStation(
   stationId: string,
-  input: { name: string; campusId: string | null; roomId: string | null; roomOnly: boolean },
+  input: {
+    name: string;
+    campusId: string | null;
+    roomId: string | null;
+    roomOnly: boolean;
+    viewId?: string | null;
+  },
 ): Promise<ManagedStation> {
   const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}`, {
     method: 'PUT',
@@ -1041,6 +1051,8 @@ export interface ViewSummary {
   slug: string;
   columns: number;
   maxRows: number | null;
+  /** Magnification for a display seen from across a room. 1 = actual size. */
+  scale: number;
   position: number;
   createdAt: number;
   updatedAt: number;
@@ -1067,7 +1079,7 @@ export const createView = (
 
 export async function saveView(
   viewId: string,
-  input: { name: string; slug: string; widgets: Omit<ViewPlacement, 'id'>[] },
+  input: { name: string; slug: string; scale?: number; widgets: Omit<ViewPlacement, 'id'>[] },
 ): Promise<View> {
   const res = await fetch(`/api/views/${encodeURIComponent(viewId)}`, {
     method: 'PUT',

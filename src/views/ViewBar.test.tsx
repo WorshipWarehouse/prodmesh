@@ -9,7 +9,7 @@ import type { WidgetConfig } from '../widgets/types';
 
 const summary = (slug: string, name: string): ViewSummary => ({
   id: `id-${slug}`, roomId: 'north-main', kind: 'dashboard', name, slug,
-  columns: 6, maxRows: null, position: 0, createdAt: 0, updatedAt: 0,
+  columns: 6, maxRows: null, scale: 1, position: 0, createdAt: 0, updatedAt: 0,
 });
 
 const plan: ServicePlan = {

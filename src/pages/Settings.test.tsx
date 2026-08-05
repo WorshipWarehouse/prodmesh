@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   setUserGroups: vi.fn(),
   getStations: vi.fn(),
   getRooms: vi.fn(),
+  getViews: vi.fn(),
   updateStation: vi.fn(),
   revokeStation: vi.fn(),
   getServerLog: vi.fn(),
@@ -76,6 +77,7 @@ describe('Stations', () => {
       id: 'station-1', ...input, createdAt: Date.now() - 10000, lastSeen: Date.now(), current: true,
     }));
     api.revokeStation.mockResolvedValue({ current: false });
+    api.getViews.mockResolvedValue({ views: [] });
   });
 
   it('renames and assigns a station, then confirms before revoking it', async () => {
@@ -90,6 +92,9 @@ describe('Stations', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(api.updateStation).toHaveBeenCalledWith('station-1', {
       name: 'FOH – Producer', campusId: 'north', roomId: 'north-main', roomOnly: false,
+      // An ordinary browser, not a display. Sent explicitly rather than
+      // omitted so assigning one and clearing it are the same shape.
+      viewId: null,
     });
 
     await user.click(screen.getByRole('button', { name: 'Revoke' }));
