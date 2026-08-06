@@ -136,10 +136,15 @@ test('validateView holds a placement to the size its widget allows', () => {
   // Everything else is one size, and says so rather than quietly accepting.
   assert.throws(() => validateView(view({ widgets: [at('loudness', 0, 0, 4, 2)] })),
     /must be 2×1 — got 4×2/);
-  // The first range that is about WIDTH: more columns is more devices visible.
+  // The first range that is 2D — both axes buy the same thing, more of the
+  // room's devices on screen, so either is a legitimate way to stretch it.
   assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 3, 1)] })));
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 1, 3)] })));
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 3, 3)] })));
   assert.throws(() => validateView(view({ widgets: [at('room-health', 0, 0, 4, 1)] })),
-    /between 1×1 and 3×1 — got 4×1/);
+    /between 1×1 and 3×3 — got 4×1/);
+  assert.throws(() => validateView(view({ widgets: [at('room-health', 0, 0, 1, 4)] })),
+    /between 1×1 and 3×3 — got 1×4/);
 });
 
 test('validateView lets a display hold every read-only widget', () => {

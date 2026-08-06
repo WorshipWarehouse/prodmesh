@@ -136,11 +136,13 @@ Notes:
   `registry.test.tsx` imports the server table and fails if they disagree —
   otherwise a widget added on one side alone is offered by the editor and
   refused by the save.
-  A widget may declare a size RANGE and be stretched within it — only
-  `run-of-show` does (2×3 to 2×5), because its list scrolls, so extra rows are
-  more of the service rather than whitespace. Everything else is one authored
-  size on purpose, and the bounds are enforced server-side, not just by the
-  editor.
+  A widget may declare a size RANGE and be stretched within it. Two do:
+  `run-of-show` (2×3 to 2×5) and `room-health` (1×1 to 3×3, the only 2D one —
+  width adds columns, height adds rows, and both buy the same thing). The test
+  either passes is that the extra space holds real content that continues past
+  the edge — a scrolling order of service, a list of devices — rather than
+  whitespace with a handle on it. Everything else is one authored size on
+  purpose, and the bounds are enforced server-side, not just by the editor.
   **Awaiting a Sunday** — `run-of-show` driving real ProPresenter, and the Pi
   on the actual ATEM input, are the halves CI cannot certify.
 - **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes

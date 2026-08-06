@@ -230,7 +230,7 @@ export const WIDGET_TYPES = new Map([
   ['clock', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['room-health', {
     unique: true, display: true,
-    size: { w: 1, h: 1 }, min: { w: 1, h: 1 }, max: { w: 3, h: 1 },
+    size: { w: 1, h: 1 }, min: { w: 1, h: 1 }, max: { w: 3, h: 3 },
   }],
 ]);
 

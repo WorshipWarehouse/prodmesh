@@ -37,9 +37,10 @@ it.
 
 A few widgets can be **stretched**, and those show a small grip in their
 bottom-right corner. Drag it, or hold <kbd>Shift</kbd> with the arrow keys
-while the card is grabbed. Run of Show is the one that matters: it can go from
-3 rows to 5, and because its order of service scrolls, the extra rows are more
-of the service rather than more empty space.
+while the card is grabbed. Run of Show goes from 3 rows to 5, and because its
+order of service scrolls, the extra rows are more of the service rather than
+more empty space. Integrations goes anywhere from a single cell to 3×3, in
+either direction — more room is more of the room's devices on screen.
 
 Most widgets are one fixed size on purpose. A loudness meter squeezed into a
 single cell and one stretched across half a screen are two different designs,
@@ -108,7 +109,7 @@ server.
 |---|---|---|
 | Clock | 2×1 | The time of day, with seconds, and today's date |
 | Countdown | 2×1 | Time until the service starts, following the room's ProPresenter timer when one is running |
-| Integrations | 1×1 – 3×1 | A dot per integration this room has configured, and whether it answers |
+| Integrations | 1×1 – 3×3 | A dot per integration this room has configured, and whether it answers |
 | Live viewers | 1×1 | Concurrent YouTube viewers while the room is streaming |
 | Loudness | 2×1 | Live SPL against the room's target and limit |
 | Loudness trend | 2×1 | The shape of the last quarter hour, for a mix that creeps up |
@@ -145,8 +146,10 @@ set up is absent rather than permanently grey. The colours are:
 | **Grey** | Configured but not contacted yet |
 
 Rows are sorted worst-first, so at 1×1 — which fits about four — anything
-broken is on screen and it is the healthy tail that is cut off. Stretch it
-wider for more columns if the room has more than that.
+broken is on screen and it is the healthy tail that is cut off. Stretch it if
+the room has more than that: wider adds columns, taller adds rows, and both buy
+the same thing. Which one to use is a question about the space left on your
+dashboard.
 
 It says *whether* something answers, never *why* it didn't. The error text, the
 address and the version live on the room's configuration page and in

@@ -93,12 +93,16 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     description: 'A dot per integration this room has configured, and whether it answers.',
     component: RoomHealthWidget,
     size: { w: 1, h: 1 },
-    // The other widget with a range, and the first where the range is about
-    // WIDTH. Its list is the room's configured integrations, which is a list
-    // that grows — so extra columns are more devices visible at once rather
-    // than more whitespace, the same test Run of Show's extra rows pass.
+    // The first range that is genuinely 2D, and the reason is that BOTH axes
+    // buy the same thing: more of the room's devices on screen at once. A
+    // single cell shows about four. Wider adds columns, taller adds rows, and
+    // which one you want is a question about the space left on your dashboard
+    // rather than about this widget — so it does not get to choose for you.
+    //
+    // Same test Run of Show's extra rows pass: the list is real content that
+    // continues past the edge, not whitespace with a handle on it.
     minSize: { w: 1, h: 1 },
-    maxSize: { w: 3, h: 1 },
+    maxSize: { w: 3, h: 3 },
     defaultSpan: 'third',
   },
 
