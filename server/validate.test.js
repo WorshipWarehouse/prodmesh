@@ -59,8 +59,9 @@ const view = (over = {}) => ({ kind: 'dashboard', name: 'FOH', slug: 'foh', widg
 // Each widget has its own authored size, and the validator now enforces it —
 // so a fixture has to be a size that widget is actually allowed to be.
 const SIZES = {
-  countdown: [2, 1], loudness: [2, 1], viewers: [1, 1],
-  'run-of-show': [2, 3], 'now-next': [3, 1],
+  countdown: [2, 1], loudness: [2, 1], 'loudness-trend': [2, 1], viewers: [1, 1],
+  'run-of-show': [2, 3], 'now-next': [3, 1], 'room-mode': [2, 1], clock: [2, 1],
+  'room-health': [1, 1],
 };
 const at = (type, x, y, w, h) => {
   const [dw, dh] = SIZES[type] ?? [1, 1];
@@ -135,6 +136,26 @@ test('validateView holds a placement to the size its widget allows', () => {
   // Everything else is one size, and says so rather than quietly accepting.
   assert.throws(() => validateView(view({ widgets: [at('loudness', 0, 0, 4, 2)] })),
     /must be 2×1 — got 4×2/);
+  // The first range that is 2D — both axes buy the same thing, more of the
+  // room's devices on screen, so either is a legitimate way to stretch it.
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 3, 1)] })));
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 1, 3)] })));
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 3, 3)] })));
+  assert.throws(() => validateView(view({ widgets: [at('room-health', 0, 0, 4, 1)] })),
+    /between 1×1 and 3×3 — got 4×1/);
+  assert.throws(() => validateView(view({ widgets: [at('room-health', 0, 0, 1, 4)] })),
+    /between 1×1 and 3×3 — got 1×4/);
+});
+
+test('validateView lets a display hold every read-only widget', () => {
+  // A display is defined as non-interactive, and only run-of-show acts — so
+  // the rest have to actually be placeable on one. This is the door that
+  // matters: the palette already hides what it should, but a stored layout is
+  // data and data arrives from anywhere.
+  assert.doesNotThrow(() => validateView(view({
+    kind: 'display', slug: 'wall',
+    widgets: [at('room-mode', 0, 0), at('clock', 0, 1), at('loudness-trend', 0, 2)],
+  })));
 });
 
 test('validateView names both widgets in an overlap', () => {

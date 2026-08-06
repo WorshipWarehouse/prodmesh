@@ -113,12 +113,36 @@ Notes:
   nothing) — the gesture itself is hand-verified. Editing needs `views.edit`;
   reads are public because a screen with no keyboard has to fetch its own
   layout before anyone could log in. Widgets: `countdown`, `loudness`,
-  `viewers`, `run-of-show` (2×3, dashboard only) and `now-next` (3×1, either).
-  A widget may declare a size RANGE and be stretched within it — only
-  `run-of-show` does (2×3 to 2×5), because its list scrolls, so extra rows are
-  more of the service rather than whitespace. Everything else is one authored
-  size on purpose, and the bounds are enforced server-side, not just by the
-  editor.
+  `loudness-trend`, `viewers`, `now-next` (3×1), `room-mode`, `clock`,
+  `room-health`, and `run-of-show` (2×3, the one dashboard-only widget,
+  because it acts).
+  `room-health` is a dot per configured integration, on a new `room:*:health`
+  topic (`server/roomHealth.js`) that runs the SAME probe as the config
+  page's chips. Two things let it be unauthenticated where the route needs
+  `config.manage`: it is refcounted, so a building of displays costs one probe
+  per room per 30s; and `publicHealth()` builds its payload from a fixed field
+  list, so no host, port, version banner or error string reaches the wire —
+  `roomHealth.test.js` asserts that against realistic probe text and fails if
+  a field is passed through. YouTube is read from the health registry rather
+  than probed, because every YouTube request is metered quota.
+  `room-mode` is read-only on purpose: changing mode is a confirm dialog, a
+  schedule-override PIN and a permission, which is a control surface rather
+  than a tile, and it already has one on the room page. `loudness-trend` and
+  `viewers` draw curves the BROWSER recorded — neither source keeps a live
+  history to ask for, so a reload starts them over, and the service's real
+  record stays the Show Report's.
+  The client registry and `server/validate.js`'s copy of it are hand-kept
+  duplicates (JS backend, TS frontend, no build step between), and
+  `registry.test.tsx` imports the server table and fails if they disagree —
+  otherwise a widget added on one side alone is offered by the editor and
+  refused by the save.
+  A widget may declare a size RANGE and be stretched within it. Two do:
+  `run-of-show` (2×3 to 2×5) and `room-health` (1×1 to 3×3, the only 2D one —
+  width adds columns, height adds rows, and both buy the same thing). The test
+  either passes is that the extra space holds real content that continues past
+  the edge — a scrolling order of service, a list of devices — rather than
+  whitespace with a handle on it. Everything else is one authored size on
+  purpose, and the bounds are enforced server-side, not just by the editor.
   **Awaiting a Sunday** — `run-of-show` driving real ProPresenter, and the Pi
   on the actual ATEM input, are the halves CI cannot certify.
 - **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes

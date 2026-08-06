@@ -207,18 +207,31 @@ const VIEW_KINDS = new Set(['dashboard', 'display']);
  *
  * `display` is whether it may go on a read-only screen. A widget that takes
  * actions may not: a display is DEFINED as non-interactive.
+ *
+ * Exported for src/widgets/registry.test.tsx, which imports this file and
+ * fails if the two tables disagree. That is the only thing keeping a hand-kept
+ * duplicate honest: a widget added on one side alone is otherwise offered by
+ * the editor and refused by the save, or the reverse, and neither is visible
+ * until somebody tries it.
  */
 // `min`/`max` bound how far a placement may be stretched. Absent means one
 // fixed size — see WidgetDef in src/widgets/types.ts for why most stay fixed.
-const WIDGET_TYPES = new Map([
+export const WIDGET_TYPES = new Map([
   ['countdown', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['loudness', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['loudness-trend', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['viewers', { unique: true, display: true, size: { w: 1, h: 1 } }],
   ['run-of-show', {
     unique: true, display: false,
     size: { w: 2, h: 3 }, min: { w: 2, h: 3 }, max: { w: 2, h: 5 },
   }],
   ['now-next', { unique: true, display: true, size: { w: 3, h: 1 } }],
+  ['room-mode', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['clock', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['room-health', {
+    unique: true, display: true,
+    size: { w: 1, h: 1 }, min: { w: 1, h: 1 }, max: { w: 3, h: 3 },
+  }],
 ]);
 
 const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room

@@ -8,10 +8,14 @@
 //
 // Adding a widget = a type in ./types.ts and one entry here.
 
+import { ClockWidget } from './ClockWidget';
 import { CountdownWidget } from './CountdownWidget';
 import { NowNextWidget } from './NowNextWidget';
+import { RoomHealthWidget } from './RoomHealthWidget';
+import { RoomModeWidget } from './RoomModeWidget';
 import { RunOfShowWidget } from './RunOfShowWidget';
 import { LoudnessWidget } from './LoudnessWidget';
+import { LoudnessTrendWidget } from './LoudnessTrendWidget';
 import { ViewersWidget } from './ViewersWidget';
 import type { WidgetDef, WidgetType } from './types';
 
@@ -28,6 +32,14 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     title: 'Loudness',
     description: 'Live SPL against the room’s target and limit, with C-A when available.',
     component: LoudnessWidget,
+    size: { w: 2, h: 1 },
+    defaultSpan: 'third',
+  },
+
+  'loudness-trend': {
+    title: 'Loudness trend',
+    description: 'The shape of the last quarter hour, for a mix that creeps up.',
+    component: LoudnessTrendWidget,
     size: { w: 2, h: 1 },
     defaultSpan: 'third',
   },
@@ -64,6 +76,45 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     component: NowNextWidget,
     size: { w: 3, h: 1 },
     defaultSpan: 'two-thirds',
+  },
+
+  'room-mode': {
+    title: 'Room mode',
+    description: 'What mode the room is in, in its own colour. Read-only.',
+    component: RoomModeWidget,
+    // Two columns because this one shows WORDS. "Sunday Service" in a single
+    // cell is either three characters wide or clipped.
+    size: { w: 2, h: 1 },
+    defaultSpan: 'third',
+  },
+
+  'room-health': {
+    title: 'Integrations',
+    description: 'A dot per integration this room has configured, and whether it answers.',
+    component: RoomHealthWidget,
+    size: { w: 1, h: 1 },
+    // The first range that is genuinely 2D, and the reason is that BOTH axes
+    // buy the same thing: more of the room's devices on screen at once. A
+    // single cell shows about four. Wider adds columns, taller adds rows, and
+    // which one you want is a question about the space left on your dashboard
+    // rather than about this widget — so it does not get to choose for you.
+    //
+    // Same test Run of Show's extra rows pass: the list is real content that
+    // continues past the edge, not whitespace with a handle on it.
+    minSize: { w: 1, h: 1 },
+    maxSize: { w: 3, h: 3 },
+    defaultSpan: 'third',
+  },
+
+  clock: {
+    title: 'Clock',
+    description: 'The time of day, with seconds.',
+    component: ClockWidget,
+    // Also two: "10:42:07" at the size that makes a clock worth putting on a
+    // wall does not fit one column, and dropping the seconds to make it fit
+    // would remove the reason a booth wants a clock.
+    size: { w: 2, h: 1 },
+    defaultSpan: 'third',
   },
 };
 

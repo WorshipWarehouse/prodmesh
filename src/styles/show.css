@@ -547,3 +547,132 @@ span.ros-track__status {
   min-height: 0;
   flex: 1;
 }
+
+/* A mode is WORDS, not a measurement. The numeric size runs "Sunday Service"
+   straight out of a two-column cell, and .viewcell clips rather than scrolls —
+   so it comes down a step and is allowed a second line. `anywhere` rather than
+   break-word because a room may be named something long with no space in it. */
+.wgt--mode .wgt__value {
+  font-size: clamp(1.3rem, 2.6vw, 2.2rem);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+/* A room that should be talking to Companion and isn't. Not the same as a mock
+   room, which is also "offline" and is not a fault — see RoomModeWidget. */
+.wgt--fault .wgt__detail { color: var(--danger); }
+
+/* ── Integration dots ────────────────────────────────────────────────────────
+
+   The one widget with a size RANGE that is about width rather than height:
+   more columns is more devices visible at once, which is the direction this
+   grows as a room gains things worth watching. */
+
+.wgt--health {
+  /* Queried by its own width, not the viewport's — the same widget is one
+     narrow column on a dashboard and a third of a display, and the viewport
+     tells you nothing about which. */
+  container-type: inline-size;
+}
+
+.health {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  /* Columns of at least 200px — a name and a verdict without crowding — as
+     many as fit. 200 rather than something rounder because a 3-wide cell is
+     ~440px on a 1280px screen, and anything above 210 silently drops it to a
+     single column, which is the whole reason the widget stretches.
+
+     Two traps here. The floor does NOT yield, so below 200px this lays out a
+     track wider than the cell and .viewcell clips names mid-word — that is
+     what the container query at the end of this block is for. And wrapping
+     the floor in min(…, 100%), the usual fix for exactly that, is wrong: a
+     percentage makes the repeat count indefinite, so auto-fill collapses to
+     ONE column at every width. */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1px 18px;
+  align-content: start;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.health__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.health__dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.health__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health__state {
+  margin-left: auto;
+  flex: none;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.health__row--ok .health__dot { background: var(--ok); }
+.health__row--down .health__dot { background: var(--danger); }
+.health__row--down .health__name { color: var(--danger); }
+/* Blue, not amber: a simulated integration is working exactly as configured.
+   Amber would say "attention", and the whole point of a dev or demo room is
+   that nobody needs to attend to it. */
+.health__row--mock .health__dot { background: var(--accent); }
+
+.wgt--health--ok .wgt__status { color: var(--ok); }
+.wgt--health--down .wgt__status { color: var(--danger); }
+
+/* Narrower than one full-width column, i.e. a single-cell placement.
+   Two things go, and both stay in the ACCESSIBILITY TREE rather than being
+   display:none — a dot alone is a decoration, not a status, and colour alone
+   is not a status to everyone.
+
+     · the state in words — the dot's colour carries it
+     · the header's summary — "Integrations" and "3 down" do not both fit, and
+       a title clipped to "Int…" names nothing. At this width every row is on
+       screen anyway, so the list IS the summary.
+
+   The threshold matches the grid's column floor on purpose: the state text
+   needs a column wide enough for a name AND a verdict, and that is exactly
+   when a full-width column exists. */
+@container (max-width: 199px) {
+  /* One column, stated rather than derived — see the floor above. */
+  .health { grid-template-columns: 1fr; }
+
+  .health__state,
+  .wgt--health .wgt__status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Eight digits plus a separator, where the other widgets show three or four —
+   so the shared size overflows two columns and the clock comes down a step.
+   nowrap because a clock broken across two lines is not a clock. */
+.wgt--clock .wgt__value {
+  font-size: clamp(1.7rem, 3.4vw, 2.8rem);
+  white-space: nowrap;
+}

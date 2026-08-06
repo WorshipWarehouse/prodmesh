@@ -118,9 +118,13 @@ export interface WidgetDef {
 export type WidgetType =
   | 'countdown'
   | 'loudness'
+  | 'loudness-trend'
   | 'viewers'
   | 'run-of-show'
-  | 'now-next';
+  | 'now-next'
+  | 'room-mode'
+  | 'room-health'
+  | 'clock';
 
 /** May this widget go on a view of this kind? */
 export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>

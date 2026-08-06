@@ -37,9 +37,10 @@ it.
 
 A few widgets can be **stretched**, and those show a small grip in their
 bottom-right corner. Drag it, or hold <kbd>Shift</kbd> with the arrow keys
-while the card is grabbed. Run of Show is the one that matters: it can go from
-3 rows to 5, and because its order of service scrolls, the extra rows are more
-of the service rather than more empty space.
+while the card is grabbed. Run of Show goes from 3 rows to 5, and because its
+order of service scrolls, the extra rows are more of the service rather than
+more empty space. Integrations goes anywhere from a single cell to 3×3, in
+either direction — more room is more of the room's devices on screen.
 
 Most widgets are one fixed size on purpose. A loudness meter squeezed into a
 single cell and one stretched across half a screen are two different designs,
@@ -106,17 +107,60 @@ server.
 
 | Widget | Size | Shows |
 |---|---|---|
+| Clock | 2×1 | The time of day, with seconds, and today's date |
 | Countdown | 2×1 | Time until the service starts, following the room's ProPresenter timer when one is running |
-| Loudness | 2×1 | Live SPL against the room's target and limit |
+| Integrations | 1×1 – 3×3 | A dot per integration this room has configured, and whether it answers |
 | Live viewers | 1×1 | Concurrent YouTube viewers while the room is streaming |
-| Run of Show | 2×3 | The order of service, what is live now, and Prev/Next/End. **Dashboards only** |
+| Loudness | 2×1 | Live SPL against the room's target and limit |
+| Loudness trend | 2×1 | The shape of the last quarter hour, for a mix that creeps up |
 | Now & Next | 3×1 | The current item and the one after it, sized to read across a room |
+| Room mode | 2×1 | What mode the room is in, in its own colour. Read-only |
+| Run of Show | 2×3 | The order of service, what is live now, and Prev/Next/End. **Dashboards only** |
 
 A widget with nothing to say shows just its name in grey — the loudness meter
 before SMAART is logging, viewers when the room is not streaming. That is not a
 fault; it means there is genuinely nothing to report yet. See
 [Integration caveats](Integration-Caveats.md) for why loudness in particular
 often stays quiet.
+
+Room mode is the exception: a room always has one, so that widget says
+"Connecting…" while it waits rather than going quiet. It only ever *shows* the
+mode — changing it stays on the room's own page, where the confirmation and the
+schedule-override PIN live.
+
+Loudness trend draws what **that screen** has watched since it was opened, and
+a reload starts it over. Nothing keeps a live loudness history to ask for, so
+the curve can only be what has been seen. The service's real, permanent record
+is the Show Report.
+
+### Reading the Integrations dots
+
+One row per integration the room has configured — an integration you have not
+set up is absent rather than permanently grey. The colours are:
+
+| | |
+|---|---|
+| **Green** | Answered the last check |
+| **Red** | Did not answer |
+| **Blue** | Simulated — a mock room, working exactly as configured |
+| **Grey** | Configured but not contacted yet |
+
+Rows are sorted worst-first, so at 1×1 — which fits about four — anything
+broken is on screen and it is the healthy tail that is cut off. Stretch it if
+the room has more than that: wider adds columns, taller adds rows, and both buy
+the same thing. Which one to use is a question about the space left on your
+dashboard.
+
+It says *whether* something answers, never *why* it didn't. The error text, the
+address and the version live on the room's configuration page and in
+Admin → Logs, both of which need a login — a screen on a wall should not be
+able to tell a stranger where every machine in the building is.
+
+The room is checked once every thirty seconds however many screens are showing
+this, so putting it on every display in the building costs what one costs.
+YouTube is the exception: it is never actively checked, because every request
+to YouTube spends metered quota. Its dot reflects the last real request, which
+happens while the room is streaming — when the answer matters.
 
 ## Who can change them
 

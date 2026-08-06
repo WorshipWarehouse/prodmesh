@@ -9,6 +9,7 @@
 export const planKey = (roomId: string, planId: string) => `plan:${roomId}:${planId}`;
 export const reportKey = (roomId: string, planId: string, timeId: string | null) =>
   `report:${roomId}:${planId}:${timeId ?? ''}`;
+export const roomKey = (roomId: string) => `room:${roomId}`;
 export const roomServiceKey = (roomId: string) => `room-service:${roomId}`;
 export const roomStateKey = (roomId: string) => `room-state:${roomId}`;
 export const viewsKey = (roomId: string) => `views:${roomId}`;
