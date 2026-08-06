@@ -123,6 +123,7 @@ export type WidgetType =
   | 'run-of-show'
   | 'now-next'
   | 'room-mode'
+  | 'room-health'
   | 'clock';
 
 /** May this widget go on a view of this kind? */

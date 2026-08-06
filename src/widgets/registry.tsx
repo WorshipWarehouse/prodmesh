@@ -11,6 +11,7 @@
 import { ClockWidget } from './ClockWidget';
 import { CountdownWidget } from './CountdownWidget';
 import { NowNextWidget } from './NowNextWidget';
+import { RoomHealthWidget } from './RoomHealthWidget';
 import { RoomModeWidget } from './RoomModeWidget';
 import { RunOfShowWidget } from './RunOfShowWidget';
 import { LoudnessWidget } from './LoudnessWidget';
@@ -84,6 +85,20 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     // Two columns because this one shows WORDS. "Sunday Service" in a single
     // cell is either three characters wide or clipped.
     size: { w: 2, h: 1 },
+    defaultSpan: 'third',
+  },
+
+  'room-health': {
+    title: 'Integrations',
+    description: 'A dot per integration this room has configured, and whether it answers.',
+    component: RoomHealthWidget,
+    size: { w: 1, h: 1 },
+    // The other widget with a range, and the first where the range is about
+    // WIDTH. Its list is the room's configured integrations, which is a list
+    // that grows — so extra columns are more devices visible at once rather
+    // than more whitespace, the same test Run of Show's extra rows pass.
+    minSize: { w: 1, h: 1 },
+    maxSize: { w: 3, h: 1 },
     defaultSpan: 'third',
   },
 

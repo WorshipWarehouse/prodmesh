@@ -121,6 +121,7 @@ export const roomTopic = {
   spl: (roomId: string) => `room:${roomId}:spl`,
   mode: (roomId: string) => `room:${roomId}:mode`,
   youtube: (roomId: string) => `room:${roomId}:youtube`,
+  health: (roomId: string) => `room:${roomId}:health`,
 };
 
 /** Test hook: drop the connection and every cached value. */

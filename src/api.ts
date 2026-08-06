@@ -975,6 +975,29 @@ export interface StreamState {
   title?: string | null;
 }
 
+/**
+ * One integration's dot on the room-health topic.
+ *
+ * Deliberately thin. The server probes the same way the config chips do, but
+ * publishes only which integration and whether it works — no host, port,
+ * version banner or error text, because this topic is readable by an
+ * unauthenticated screen and those turn "ProPresenter is down" into a map of
+ * the building. The detail stays on the config page and in Admin → Logs.
+ */
+export interface IntegrationHealth {
+  id: 'planningCenter' | 'proPresenter' | 'companion' | 'analysis' | 'youtube';
+  label: string;
+  /** `mock` = simulated on purpose. `unknown` = configured, not contacted yet. */
+  state: 'ok' | 'down' | 'mock' | 'unknown';
+}
+
+/** Only the integrations this room has configured — an unconfigured one is
+ *  absent, not a permanent grey dot. */
+export interface RoomHealth {
+  at: number;
+  integrations: IntegrationHealth[];
+}
+
 export interface ShowState {
   active: boolean;
   roomId?: string;

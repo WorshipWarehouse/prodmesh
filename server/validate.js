@@ -228,6 +228,10 @@ export const WIDGET_TYPES = new Map([
   ['now-next', { unique: true, display: true, size: { w: 3, h: 1 } }],
   ['room-mode', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['clock', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['room-health', {
+    unique: true, display: true,
+    size: { w: 1, h: 1 }, min: { w: 1, h: 1 }, max: { w: 3, h: 1 },
+  }],
 ]);
 
 const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room

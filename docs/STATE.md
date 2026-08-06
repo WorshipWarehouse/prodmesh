@@ -113,8 +113,18 @@ Notes:
   nothing) — the gesture itself is hand-verified. Editing needs `views.edit`;
   reads are public because a screen with no keyboard has to fetch its own
   layout before anyone could log in. Widgets: `countdown`, `loudness`,
-  `loudness-trend`, `viewers`, `now-next` (3×1), `room-mode`, `clock`, and
-  `run-of-show` (2×3, the one dashboard-only widget, because it acts).
+  `loudness-trend`, `viewers`, `now-next` (3×1), `room-mode`, `clock`,
+  `room-health`, and `run-of-show` (2×3, the one dashboard-only widget,
+  because it acts).
+  `room-health` is a dot per configured integration, on a new `room:*:health`
+  topic (`server/roomHealth.js`) that runs the SAME probe as the config
+  page's chips. Two things let it be unauthenticated where the route needs
+  `config.manage`: it is refcounted, so a building of displays costs one probe
+  per room per 30s; and `publicHealth()` builds its payload from a fixed field
+  list, so no host, port, version banner or error string reaches the wire —
+  `roomHealth.test.js` asserts that against realistic probe text and fails if
+  a field is passed through. YouTube is read from the health registry rather
+  than probed, because every YouTube request is metered quota.
   `room-mode` is read-only on purpose: changing mode is a confirm dialog, a
   schedule-override PIN and a permission, which is a control surface rather
   than a tile, and it already has one on the room page. `loudness-trend` and

@@ -58,19 +58,31 @@ describe('RoomModeWidget', () => {
   });
 
   it('calls out a Companion that has stopped answering', async () => {
+    // EXACTLY the shape readRoomState emits on that path, which is the whole
+    // point of this test: it falls back to `source: 'mock', online: false` and
+    // to the last-known mode, so the only thing distinguishing a broken room
+    // from a dev room is `error`. An earlier version of this widget checked
+    // source+online instead, which the server never produces together — it
+    // passed against an invented fixture and did nothing in the building.
     show();
-    await push(state({ online: false }));
-    expect(await screen.findByText('Companion offline')).toBeInTheDocument();
+    await push(state({
+      online: false, source: 'mock', raw: 'standby', mode: 'standby',
+      error: 'connect ECONNREFUSED 127.0.0.1:8000',
+    }));
+    expect(await screen.findByText(/Companion offline/)).toBeInTheDocument();
+    // And it says the mode beside it is stale, because that mode is a
+    // plausible word the room is not necessarily in.
+    expect(screen.getByText(/last known mode/)).toBeInTheDocument();
   });
 
   it('does not call a mock room offline, because that is not a fault', async () => {
-    // Mock rooms report online:false as a matter of course — it means nothing
-    // is wired up, which is the expected state of a demo or a dev box, and
-    // painting a fault on every one of them teaches people to ignore it.
+    // A mock room reports online:false and source:'mock' as a matter of
+    // course — nothing is wired up, which is the expected state of a demo or
+    // a dev box. Same two fields as the failure above; no `error`.
     show();
     await push(state({ online: false, source: 'mock' }));
     expect(await screen.findByText('Sunday Service')).toBeInTheDocument();
-    expect(screen.queryByText('Companion offline')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Companion offline/)).not.toBeInTheDocument();
   });
 
   it('shows the schedule lock, with the window that caused it', async () => {

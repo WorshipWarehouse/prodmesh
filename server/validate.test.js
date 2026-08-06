@@ -61,6 +61,7 @@ const view = (over = {}) => ({ kind: 'dashboard', name: 'FOH', slug: 'foh', widg
 const SIZES = {
   countdown: [2, 1], loudness: [2, 1], 'loudness-trend': [2, 1], viewers: [1, 1],
   'run-of-show': [2, 3], 'now-next': [3, 1], 'room-mode': [2, 1], clock: [2, 1],
+  'room-health': [1, 1],
 };
 const at = (type, x, y, w, h) => {
   const [dw, dh] = SIZES[type] ?? [1, 1];
@@ -135,6 +136,10 @@ test('validateView holds a placement to the size its widget allows', () => {
   // Everything else is one size, and says so rather than quietly accepting.
   assert.throws(() => validateView(view({ widgets: [at('loudness', 0, 0, 4, 2)] })),
     /must be 2×1 — got 4×2/);
+  // The first range that is about WIDTH: more columns is more devices visible.
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 3, 1)] })));
+  assert.throws(() => validateView(view({ widgets: [at('room-health', 0, 0, 4, 1)] })),
+    /between 1×1 and 3×1 — got 4×1/);
 });
 
 test('validateView lets a display hold every read-only widget', () => {
