@@ -77,6 +77,47 @@ describe('NowNextWidget slide progress', () => {
     expect(bar()).toBeNull();
   });
 
+  it('shows a playing video instead of the slide bar, never both', async () => {
+    // ProPresenter reports a slide index during media playback, so without the
+    // either/or these are two bars describing the same thing.
+    mount();
+    await push(show({ current: { itemId: 'i2', itemIndex: 1, itemName: 'Bumper', slideIndex: 2, slideCount: 8 } }));
+    expect(await screen.findByText('3/8')).toBeInTheDocument();
+
+    await emitTopic({
+      'room:north-main:video': { name: 'bumper.mov', seconds: 52.09, duration: 116.86, audioOnly: false },
+    });
+    expect(await screen.findByText('0:52 / 1:56')).toBeInTheDocument();
+    expect(screen.queryByText('3/8')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.ros-progress__bar')).toHaveLength(1);
+    expect(bar()).toHaveStyle({ width: `${(52.09 / 116.86) * 100}%` });
+  });
+
+  it('falls back to the slide bar the moment the video stops', async () => {
+    // The server publishes null rather than a frozen position, because
+    // ProPresenter cannot tell stopped from paused — see INTEGRATION-NOTES.
+    mount();
+    await push(show({ current: { itemId: 'i2', itemIndex: 1, itemName: 'Bumper', slideIndex: 2, slideCount: 8 } }));
+    await emitTopic({ 'room:north-main:video': { name: 'b.mov', seconds: 10, duration: 100, audioOnly: false } });
+    expect(await screen.findByText('0:10 / 1:40')).toBeInTheDocument();
+
+    await emitTopic({ 'room:north-main:video': null });
+    expect(await screen.findByText('3/8')).toBeInTheDocument();
+  });
+
+  it('shows a pre-service loop with no show running at all', async () => {
+    // The most-watched video of the morning has no show behind it, which is
+    // why the video topic is not scoped to one.
+    api.getRoomService.mockResolvedValue({ configured: true, live: true, plans: [] });
+    const { container } = render(<NowNextWidget roomId="north-main" config={{}} />);
+    expect(container).toBeEmptyDOMElement();
+
+    await emitTopic({
+      'room:north-main:video': { name: 'loop.mov', seconds: 30, duration: 600, audioOnly: false },
+    });
+    expect(await screen.findByText('0:30 / 10:00')).toBeInTheDocument();
+  });
+
   it('ignores a show running for a different service', async () => {
     // The widget was placed for one service; another one being live in the
     // room says nothing about it, and its slide count says even less.

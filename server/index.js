@@ -22,6 +22,7 @@ import { resolveIdentity } from './httpAuth.js';
 
 import './roomStateWatcher.js'; // registers the room:*:mode topic
 import './roomHealth.js'; // registers the room:*:health topic
+import './videoWatcher.js'; // registers the room:*:video topic
 import roomsRouter from './routes/rooms.js';
 import showsRouter from './routes/shows.js';
 import streamRouter from './routes/stream.js';

@@ -121,7 +121,7 @@ server.
 | Live viewers | 1×1 | Concurrent YouTube viewers while the room is streaming |
 | Loudness | 2×1 | Live SPL against the room's target and limit |
 | Loudness trend | 2×1 | The shape of the last quarter hour, coloured against the room's target and limit |
-| Now & Next | 3×1 | The current item and the one after it, with ProPresenter's slide progress |
+| Now & Next | 3×1 | The current item and the one after it, with slide or video progress |
 | Room mode | 2×1 | What mode the room is in, in its own colour. Read-only |
 | Run of Show | 2×3 | The order of service, what is live now, and Prev/Next/End. **Dashboards only** |
 
@@ -135,6 +135,18 @@ Room mode is the exception: a room always has one, so that widget says
 "Connecting…" while it waits rather than going quiet. It only ever *shows* the
 mode — changing it stays on the room's own page, where the confirmation and the
 schedule-override PIN live.
+
+Now & Next shows a progress bar for whatever ProPresenter is doing: slides
+through the current item, or — while a video is playing — that video's position.
+It shows one or the other, never both. The video bar is blue and carries a play
+glyph so a glance tells you which you are looking at, and it works with no
+service running at all, which is what a lobby screen showing the pre-service
+loop wants.
+
+It disappears the instant playback stops. ProPresenter cannot tell a paused
+video from a stopped or finished one, so rather than guess, prodmesh shows a
+position only while the clip is genuinely moving. A frozen counter left on a
+wall would be worse than no counter.
 
 Loudness trend draws what **that screen** has watched since it was opened, and
 a reload starts it over. Nothing keeps a live loudness history to ask for, so

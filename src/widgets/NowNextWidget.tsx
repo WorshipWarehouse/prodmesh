@@ -1,7 +1,11 @@
+import { Play } from 'lucide-react';
 import { useTopic, roomTopic } from '../lib/stream';
 import { usePlan } from './usePlan';
-import type { ShowState } from '../api';
+import type { ShowState, VideoState } from '../api';
 import type { WidgetProps } from './types';
+
+/** m:ss — a video is minutes long, and hours would be a wasted column. */
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 // What is happening and what is next — the two facts everyone in the building
 // wants, sized to be read from across a room.
@@ -12,6 +16,9 @@ import type { WidgetProps } from './types';
 
 export function NowNextWidget({ roomId, config }: WidgetProps) {
   const show = useTopic<ShowState>(roomTopic.show(roomId));
+  // Not scoped to the show: the most-watched video of the morning is the
+  // pre-service loop, which plays with no show running at all.
+  const video = useTopic<VideoState | null>(roomTopic.video(roomId));
   const { plan, planId, timeId } = usePlan(roomId, config);
 
   // Only this service's show. A different one being live in the room says
@@ -26,10 +33,10 @@ export function NowNextWidget({ roomId, config }: WidgetProps) {
   const current = idx >= 0 ? trackable[idx] : null;
   const next = idx >= 0 ? trackable[idx + 1] : trackable[0];
 
-  // Nothing running and nothing scheduled is not a state worth a card. The
-  // grid holds the space either way — the cell is positioned by the layout,
-  // not by what is inside it.
-  if (!live && !next) return null;
+  // Nothing running, nothing scheduled and nothing playing is not a state
+  // worth a card. The grid holds the space either way — the cell is positioned
+  // by the layout, not by what is inside it.
+  if (!live && !next && !video) return null;
 
   // How far ProPresenter is through the current item. Only meaningful while a
   // show is live and PP has told us both numbers — a bar with no denominator
@@ -47,14 +54,32 @@ export function NowNextWidget({ roomId, config }: WidgetProps) {
         <span className="nownext__title">{current?.title ?? (live ? '—' : 'Not started')}</span>
       </div>
 
-      {slides && (
-        // Same bar as the Run of Show page draws, laid out for one line: this
-        // widget is 3×1 and a stacked label under it would cost the Next row.
+      {/* One progress row, never two. A playing video IS what the item is doing
+          right now, so it replaces the slide count rather than sitting beside
+          it — and ProPresenter reports a slide index during media playback, so
+          without this rule you get two bars describing the same thing.
+
+          Same bar as the Run of Show page draws, laid out for one line: this
+          widget is 3×1 and a stacked label under it would cost the Next row.
+          The empty label rather than a margin, because the rows above indent by
+          .nownext__label's own width — copying that number into a margin
+          resolves `em` against a different font size and landed 7px out. */}
+      {video ? (
         <div className="nownext__row nownext__progress">
-          {/* An empty label rather than a margin: the rows above indent by
-              .nownext__label's own width, and copying that number into a
-              margin resolves `em` against a different font size — it landed
-              7px out. Same element, same width, no arithmetic. */}
+          <span className="nownext__label" aria-hidden />
+          <span className="nownext__playing" aria-hidden><Play size={11} /></span>
+          <div className="ros-progress__bar">
+            <div
+              className="ros-progress__fill ros-progress__fill--video"
+              style={{ width: `${Math.min(100, ((video.seconds ?? 0) / video.duration) * 100)}%` }}
+            />
+          </div>
+          <span className="nownext__slides mono">
+            {clock(video.seconds ?? 0)} / {clock(video.duration)}
+          </span>
+        </div>
+      ) : slides ? (
+        <div className="nownext__row nownext__progress">
           <span className="nownext__label" aria-hidden />
           <div className="ros-progress__bar">
             <div
@@ -66,7 +91,7 @@ export function NowNextWidget({ roomId, config }: WidgetProps) {
             {slides.at}/{slides.of}
           </span>
         </div>
-      )}
+      ) : null}
       <div className="nownext__row">
         <span className="nownext__label">Next</span>
         <span className="nownext__title nownext__title--next">{next?.title ?? 'End of service'}</span>

@@ -998,6 +998,22 @@ export interface RoomHealth {
   integrations: IntegrationHealth[];
 }
 
+/**
+ * A video playing on ProPresenter's media transport, or null.
+ *
+ * Only ever present while it is actually MOVING. ProPresenter keeps a stopped
+ * video's name and duration indefinitely and freezes its position, so "there
+ * is a video loaded" is a state that never ends — see INTEGRATION-NOTES.
+ * Paused is indistinguishable from stopped, so both arrive here as null.
+ */
+export interface VideoState {
+  name: string | null;
+  /** Seconds, floats. Clamped to duration. */
+  seconds: number | null;
+  duration: number;
+  audioOnly: boolean;
+}
+
 export interface ShowState {
   active: boolean;
   roomId?: string;
