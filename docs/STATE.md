@@ -3,7 +3,36 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-04 (v1.1.0 released).
+Last updated: 2026-08-10 (v1.2.0 released).
+
+## v1.2.0 at a glance
+
+The dashboards release. A room now owns as many **Views** as it wants — a
+6-column `dashboard` you arrange and read in the booth, or a chrome-less 3×3
+`display` you point a screen at (ADR 0011). Nine widgets, a drag/keyboard
+editor, and the whole thing survived a Sunday.
+
+| | |
+|---|---|
+| **Views** | dashboards + displays, drag or keyboard editor, per-view scale, station assignment |
+| **Widgets** | clock, countdown, integrations, live viewers, loudness, loudness trend, now & next, room mode, run of show |
+| **ProPresenter** | slide progress and live **video playback position** on a new refcounted `room:*:video` topic |
+| **Licensing** | MIT — the repo had been public since 2026-08-02 with no licence, i.e. all rights reserved |
+
+Fixed after the 2026-08-09 field run, all found in a real building rather than
+by CI:
+
+- **Following the room** followed the room's next *plan* and that plan's
+  *first* service time — a fixed answer that never moved, so a two-service
+  morning sat on the 9:30 all day. It now follows the live show, then the
+  clock (`src/lib/following.ts`), and fetches that plan's items even when it
+  is not the soonest one.
+- **A show whose plan left Planning Center could not be ended at all** — not
+  from the UI, and not by hand either: `splStore` spread 164k samples into
+  `Math.max(...)`, which throws past ~100k arguments, inside the aggregation
+  the end path runs.
+- Companion faults never surfaced on the room-mode widget, because
+  `readRoomState` reports a *failed* live room as `source: 'mock'`.
 
 ## Sites & rooms
 
@@ -89,7 +118,7 @@ Notes:
   side by side. Guarded by the `system.logs` permission; `PRODMESH_LOG_FILE`
   overrides the log path for tests/unusual deployments.
 - Deploy/update scripts (launchd/systemd), tests, CI. The automated suite now
-  combines **294 server tests** with **123 frontend interaction/configuration tests**
+  combines **335 server tests** with **265 frontend interaction/configuration tests**
   (Vitest + Testing Library); CI runs build, both test layers, and lint. See
   `docs/TESTING.md` for the required pattern as configuration moves into Admin,
   and `docs/UI_TEXT.md` for UI copy principles (terse labels, HelpTip for
@@ -154,7 +183,12 @@ Notes:
   disagree with the cards under it. A PINNED plan still means its first service
   — that is what its dropdown says, and it is a choice someone made.
   **Awaiting a Sunday** — `run-of-show` driving real ProPresenter, and the Pi
-  on the actual ATEM input, are the halves CI cannot certify.
+  on the actual ATEM input, are the halves CI cannot certify. The **video
+  position** shipped in 1.2.0 is verified against PP **21.4 on a laptop only**;
+  the church runs **21.1**, where `/v1/transport` has never been probed. It
+  fails to `null`, so the worst case is a bar that never appears — but treat it
+  as unverified there until someone checks, and record what 21.1 answers in
+  INTEGRATION-NOTES like every other version difference.
   **Video playback** (2026-08-10, probed against real PP 21.4): Now & Next
   shows a playing video's position on a new refcounted `room:*:video` topic
   (`server/videoWatcher.js`), which polls ProPresenter's media transport only
