@@ -55,15 +55,51 @@ export function usePlan(roomId: string, config: WidgetConfig): ResolvedPlan {
   const now = useNow(FOLLOW_TICK_MS);
   const followed = pinned ? null : resolveFollowing(service?.plans ?? [], show, now);
 
-  const plan = (pinned ? pinnedPlan : followed?.plan) ?? null;
+  /**
+   * `/api/rooms/:id/service` carries ITEMS for its FIRST plan only — see
+   * routes/events.js, where that was all the preview needed and fetching every
+   * plan's order of service on a 30-second poll would triple the Planning
+   * Center load for nothing.
+   *
+   * Following can legitimately resolve to a different one: the live show's
+   * plan is whichever the room actually started, not whichever is soonest. So
+   * a followed plan that is not plans[0] arrives with an EMPTY order of
+   * service, and every widget reading plan.items renders as though the service
+   * had nothing in it. Fetched in full here, on the SHARED key — the same
+   * request the Run of Show page already makes, so a dashboard beside it pays
+   * nothing.
+   */
+  const listed = followed?.plan ?? null;
+  const partial = Boolean(listed && listed.id !== service?.plans[0]?.id);
+  const fullPlan = useQuery(
+    partial && listed ? planKey(roomId, listed.id) : null,
+    () => getRoomPlan(roomId, listed!.id),
+    { staleMs: 10 * 60_000 },
+  ).data?.plan;
+
+  // The listed copy stands in until the full one lands: its TIMES are complete
+  // either way, so the countdown keeps working rather than blanking.
+  const followedPlan = (partial ? fullPlan ?? listed : listed) ?? null;
+  const plan = (pinned ? pinnedPlan : followedPlan) ?? null;
+
   // An explicit timeId always wins. Otherwise: a followed dashboard takes the
   // service the room is on, and a PINNED one takes the first — which is what
   // its dropdown says it will do ("First service"), and someone who pinned a
   // plan for a rehearsal layout chose that.
-  const time = plan
-    ? (config.timeId ? plan.times.find((t) => t.id === config.timeId) : null) ??
-      (pinned ? firstServiceTime(plan.times) : followed?.time ?? null)
-    : null;
+  //
+  // Resolved by ID rather than by holding the object, because the plan under
+  // it may have just been swapped for the fully-fetched copy.
+  const wantTimeId = config.timeId ?? (pinned ? null : followed?.time?.id ?? null);
+  const resolveTime = (p: ServicePlan | null): PlanTime | null => {
+    if (!p) return null;
+    const named = wantTimeId ? p.times.find((t) => t.id === wantTimeId) : undefined;
+    if (named) return named;
+    // A pinned plan with no explicit time means its FIRST service, which is
+    // what its dropdown offers. A followed one has already been told which
+    // service the room is on, so falling back would only ever be wrong.
+    return pinned ? firstServiceTime(p.times) : null;
+  };
+  const time = resolveTime(plan);
 
   return {
     plan,

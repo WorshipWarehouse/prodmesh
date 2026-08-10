@@ -127,3 +127,49 @@ describe('NowNextWidget slide progress', () => {
     expect(bar()).toBeNull();
   });
 });
+
+describe('following a live show on a plan that is not the soonest', () => {
+  // The shape hit on a real room 2026-08-10. /api/rooms/:id/service carries
+  // items for its FIRST plan only, and the live show was on the THIRD — so
+  // following resolved to the right plan and got an empty order of service.
+  // Every widget reading plan.items rendered as though the service were empty.
+  const soonest = {
+    ...plan,
+    id: 'plan-soon',
+    dates: 'August 11',
+    times: [{ id: 'svc-soon', name: '1st', startsAt: null, endsAt: null, type: 'service' }],
+    items: [{ id: 's1', sequence: 1, title: 'Soonest Welcome', type: 'item', length: null }],
+  };
+  // As it arrives inside /service: times, but no items.
+  const liveListed = { ...plan, id: 'plan-live', dates: 'August 16', items: [] };
+  // As it arrives from /plan/:id — the real thing.
+  const liveFull = { ...plan, id: 'plan-live', dates: 'August 16' };
+
+  beforeEach(() => {
+    api.getRoomService.mockResolvedValue({
+      configured: true, live: true, plans: [soonest, liveListed],
+    });
+    api.getRoomPlan.mockResolvedValue({ live: true, plan: liveFull });
+  });
+
+  it('fetches the followed plan in full instead of showing an empty service', async () => {
+    mount();
+    await push(show({ planId: 'plan-live', timeId: 'svc-1' }));
+
+    // 'Welcome' is liveFull's first item. Before the fix this rendered
+    // 'Soonest Welcome' at best, and nothing at all once following got the
+    // right plan — because that plan came through with items: [].
+    expect(await screen.findByText('Welcome')).toBeInTheDocument();
+    expect(api.getRoomPlan).toHaveBeenCalledWith('north-main', 'plan-live');
+    expect(screen.queryByText('Soonest Welcome')).not.toBeInTheDocument();
+  });
+
+  it('does not re-fetch when following already landed on the first plan', async () => {
+    // plans[0] arrives complete, so a second request would be pure waste.
+    mount();
+    await push({ active: false });
+
+    expect(await screen.findByText('Soonest Welcome')).toBeInTheDocument();
+    expect(api.getRoomPlan).not.toHaveBeenCalled();
+  });
+});
