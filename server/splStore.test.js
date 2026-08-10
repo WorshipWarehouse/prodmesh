@@ -7,6 +7,7 @@ import { join } from 'node:path';
 process.env.PRODMESH_DATA_DIR = mkdtempSync(join(tmpdir(), 'prodmesh-spl-'));
 const spl = await import('./splStore.js');
 const smaart = await import('./integrations/smaart.js');
+const { getDb } = await import('./db.js');
 
 test('leq is an energy average, not arithmetic', () => {
   // Constant level → Leq equals it.
@@ -80,4 +81,30 @@ test('smaart isConfigured', () => {
   assert.equal(smaart.isConfigured({ mock: true }), true);
   assert.equal(smaart.isConfigured({ host: '10.0.0.5' }), true);
   assert.equal(smaart.isConfigured({}), false);
+});
+
+test('a show left running for days can still be aggregated and ended', () => {
+  // Hit on a real box 2026-08-10: a show running since the 3rd had 164,398
+  // samples across 81.5 hours, and `Math.max(...values)` passes one ARGUMENT
+  // per sample. V8 throws "Maximum call stack size exceeded" past ~100k, and
+  // it throws inside the aggregation that ENDING a show runs — so the show
+  // could not be ended at all, from the UI or from a hand-rolled request.
+  //
+  // 150k here rather than 164k: comfortably past the limit, still quick.
+  const inst = 'marathon__t';
+  const db = getDb();
+  const insert = db.prepare('INSERT INTO spl_samples (room_id, instance_id, ts, spl, ca) VALUES (?,?,?,?,?)');
+  db.transaction(() => {
+    for (let i = 0; i < 150_000; i += 1) insert.run('r1', inst, 1000 + i, 80 + (i % 17) / 10, (i % 5) + 1);
+  })();
+
+  const agg = spl.aggregate(inst);
+  assert.equal(agg.count, 150_000);
+  assert.equal(agg.peak, 81.6, 'the loudest sample, found without a spread');
+  assert.equal(agg.ca.max, 5);
+
+  const st = spl.runningStats(inst);
+  assert.equal(st.n, 150_000);
+  assert.equal(st.peak, 81.6);
+  assert.equal(st.caMax, 5);
 });

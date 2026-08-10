@@ -27,6 +27,23 @@ export function leq(values) {
 const round1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
 /**
+ * Largest value, without spreading the array into a call.
+ *
+ * `Math.max(...values)` passes one ARGUMENT per sample, and V8 throws
+ * "Maximum call stack size exceeded" somewhere past ~100k of them. At 1
+ * sample/second that is a show about 28 hours long — which sounds impossible
+ * until a show is left running over a weekend, and then every attempt to END
+ * it throws here, inside the aggregation the end path runs. The show becomes
+ * genuinely unendable rather than merely awkward. Hit for real on 2026-08-10:
+ * 164,398 samples across 81.5 hours.
+ */
+function maxOf(values) {
+  let max = null;
+  for (const v of values) if (v != null && (max === null || v > max)) max = v;
+  return max;
+}
+
+/**
  * Aggregate a service instance's samples → { count, leq, peak, from, to, ca }.
  * ca (when the analysis source captured it) = { avg, max } — a plain mean,
  * not Leq: C-A is already a level *difference*, so energy math doesn't apply.
@@ -41,11 +58,11 @@ export function aggregate(instanceId) {
   return {
     count: rows.length,
     leq: round1(leq(values)),
-    peak: round1(Math.max(...values)),
+    peak: round1(maxOf(values)),
     from: rows[0].ts,
     to: rows[rows.length - 1].ts,
     ca: cas.length
-      ? { avg: round1(cas.reduce((s, v) => s + v, 0) / cas.length), max: round1(Math.max(...cas)) }
+      ? { avg: round1(cas.reduce((s, v) => s + v, 0) / cas.length), max: round1(maxOf(cas)) }
       : null,
   };
 }
@@ -59,10 +76,10 @@ export function runningStats(instanceId) {
   return {
     n: rows.length,
     sumEnergy: rows.reduce((s, r) => s + 10 ** (r.spl / 10), 0),
-    peak: rows.length ? Math.max(...rows.map((r) => r.spl)) : null,
+    peak: maxOf(rows.map((r) => r.spl)),
     caN: cas.length,
     caSum: cas.reduce((s, v) => s + v, 0),
-    caMax: cas.length ? Math.max(...cas) : null,
+    caMax: maxOf(cas),
   };
 }
 

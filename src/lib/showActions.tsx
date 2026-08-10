@@ -57,7 +57,12 @@ export function useShowActions(roomId: string) {
     setFailure(null);
     try {
       const next = await fn();
-      setActed({ from: liveShow, state: next });
+      // Only hold a state that IS one. Everything downstream reads
+      // `state.active` unguarded, so holding a null or an empty body — a 200
+      // with nothing in it, a proxy that ate the response — turns the End
+      // Show button into a white screen mid-service. Declining to hold costs
+      // only the optimistic flicker; the stream reconciles a moment later.
+      if (next && typeof next === 'object') setActed({ from: liveShow, state: next });
       return next;
     } catch (err) {
       setFailure(failureText(err));

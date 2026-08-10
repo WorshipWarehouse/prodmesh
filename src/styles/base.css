@@ -110,6 +110,15 @@ svg.lucide {
   text-align: center;
 }
 
+/* The consequence under a dead end — why you are still being offered a button
+   on a page that just told you it could not find something. */
+.pagemsg__note {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 0.9rem;
+  color: var(--text-faint);
+}
+
 .backlink {
   color: var(--text-dim);
   text-decoration: none;
