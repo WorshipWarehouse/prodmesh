@@ -78,10 +78,40 @@ export function RunOfShow() {
     invalidate(reportK);
   }, [reportK, state.active]);
 
+  // A show whose plan has gone from Planning Center must still be endable.
+  //
+  // This page is where "Run of Show" lands you whenever one is live
+  // (RoomShowRedirect), and returning a bare "Plan not found" stranded it:
+  // the show kept running, kept the room's SPL logging open and kept every
+  // dashboard reading LIVE, with no other door to it anywhere in the app. A
+  // plan can vanish for ordinary reasons — deleted, or moved to a service type
+  // this room does not subscribe to — so this is not an exotic state.
+  const orphaned = state.active && state.planId === planId;
+
   if (error) {
     return (
       <div className="pagemsg">
         <p>{error}</p>
+        {orphaned && (
+          <>
+            <p className="pagemsg__note">
+              A show is still running for it. Ending it here closes it out
+              properly — its report is kept.
+            </p>
+            {canOperate ? (
+              <button
+                className="btn btn--primary"
+                disabled={busy}
+                onClick={() => act(() => endShow(roomId))}
+              >
+                <Square size={13} /> End show
+              </button>
+            ) : (
+              notPermitted
+            )}
+            {failure && <p className="ros-track__failure">{failure}</p>}
+          </>
+        )}
         <Link className="backlink" to={`/room/${roomId}`}>← Back to room</Link>
       </div>
     );
