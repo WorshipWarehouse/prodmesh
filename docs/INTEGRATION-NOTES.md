@@ -75,6 +75,63 @@ reconnects, or a watchdog-observed slide the stream never pushed. Only a
 This is deliberately **not** a user setting. An operator cannot know whether
 their build pushes, and a wrong choice loses tracking silently mid-service.
 
+### Media transport (video position) — probed live 2026-08-10, PP 21.4
+
+Two endpoints, and neither shape is what you would guess.
+
+| | |
+|---|---|
+| `GET /v1/transport/{layer}/current` | a JSON **object** |
+| `GET /v1/transport/{layer}/time` | a **bare JSON number** — `73.78204166666666`, not `{"time": …}` |
+
+`layer` is `presentation`, `announcement` or `audio`. Despite the name, the
+**`presentation` layer is the media transport** — a video cued from the order
+of service plays there, not on some separate media layer.
+
+Three states, observed:
+
+```jsonc
+// playing (a 1m57s .mov)
+{"is_playing":true,  "uuid":"FA0CF82E-…","name":"260712 splits_2.mov","artist":"","audio_only":false,"duration":116.86675262451172}
+// STOPPED — everything except is_playing is unchanged; time freezes near duration
+{"is_playing":false, "uuid":"FA0CF82E-…","name":"260712 splits_2.mov","artist":"","audio_only":false,"duration":116.86675262451172}
+// a layer nothing has ever played on
+{"is_playing":false, "uuid":"",          "name":"",                  "artist":"","audio_only":true, "duration":0}
+```
+
+And a fourth, on reaching the end naturally: `is_playing: false` with
+**`time` back at `0`** — not frozen near `duration` the way a manual stop
+leaves it. So the position after playback is not a reliable indicator of
+anything, including whether the clip finished.
+
+**The trap: a stopped video is indistinguishable from a loaded one.** PP keeps
+the uuid, the name and the duration after playback stops, freezes `time` at
+wherever it landed, and `/v1/status/layers` still reports `media: true`. So the
+obvious "is a video up?" test — a non-empty `uuid`, or a `duration > 0`, or the
+media layer flag — stays true forever and pins a dead counter on the wall.
+`is_playing` is the **only** field that means "moving right now", which is why
+`videoWatcher.js` publishes nothing at all unless it is true.
+
+That also means **paused and stopped and ended look identical** from this
+payload: `is_playing: false` with a frozen time. Showing "paused at 1:23" would
+require guessing which one it is, and guessing wrong leaves a stale number
+under somebody's Now/Next. If that becomes worth having, the thing to observe
+is whether advancing past the media cue clears the transport or leaves it —
+that was not tested.
+
+Other findings:
+
+- `duration` and `time` are seconds as floats. Time advanced 2.002 s over a 2 s
+  wall-clock gap, so it is a real playback clock, not a cue counter.
+- **`?chunked=true` works on `/v1/transport/{layer}/time`**, pushing about once
+  a second. Not used: a position one second stale is still a correct position,
+  and polling only while somebody is watching is cheaper than holding a socket
+  open per room.
+- `audio_only: true` in the empty sample is the **audio layer's** nature, not an
+  idle marker. Do not read it as one.
+- `/v1/status/slide` reports the **media's** uuid in `current.uuid` with empty
+  `text` while a video is up, so it cannot distinguish a video from a slide.
+
 ### Quirks that have bitten us live
 
 - **Re-triggering an item** makes `slide_index` briefly report the item's

@@ -155,10 +155,18 @@ Notes:
   — that is what its dropdown says, and it is a choice someone made.
   **Awaiting a Sunday** — `run-of-show` driving real ProPresenter, and the Pi
   on the actual ATEM input, are the halves CI cannot certify.
-  **Not built** — Now & Next shows ProPresenter's slide progress, but a VIDEO
-  playback position needs a transport read nothing polls today (`/v1/transport`
-  is untouched by `server/integrations/proPresenter.js`) and no observed
-  response shapes exist to build against. See INTEGRATION-NOTES before starting.
+  **Video playback** (2026-08-10, probed against real PP 21.4): Now & Next
+  shows a playing video's position on a new refcounted `room:*:video` topic
+  (`server/videoWatcher.js`), which polls ProPresenter's media transport only
+  while a screen is watching and works OUTSIDE a show — the pre-service loop is
+  the most-watched video of the morning and has no show behind it. A playing
+  video replaces the slide bar rather than sitting beside it, since PP reports
+  a slide index during media playback too. The load-bearing detail: PP keeps a
+  stopped video's uuid, name and duration indefinitely and `status/layers`
+  still says `media: true`, so `is_playing` is the ONLY field meaning "moving
+  now" — everything else pins a dead counter on a wall. Paused is
+  indistinguishable from stopped, so both publish null. Shapes and all four
+  observed states are in INTEGRATION-NOTES.
 - **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes
   the auth status AppShell already fetches, so a page can hide a control it
   would only be refused for. Run of Show uses it for every `shows.operate`

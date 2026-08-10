@@ -427,6 +427,17 @@ span.ros-track__status {
   align-items: center;
 }
 
+/* Media, not slides. Blue rather than the slide bar's green so a glance tells
+   you which of the two this row is without reading the numbers. */
+.nownext__playing {
+  display: flex;
+  flex: none;
+  margin-right: -4px;
+  color: var(--accent);
+}
+
+.ros-progress__fill--video { background: var(--accent); }
+
 .nownext__progress .ros-progress__bar {
   flex: 1;
   height: 6px;

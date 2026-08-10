@@ -299,6 +299,46 @@ export async function ping(pp, signal) {
 }
 
 /**
+ * Shape a `/v1/transport/{layer}/current` body. Exported for the tests, which
+ * use the exact payloads observed on 21.4 (see INTEGRATION-NOTES).
+ *
+ * Returns null unless something is ACTUALLY PLAYING, and that is the whole
+ * subtlety: ProPresenter keeps `uuid`, `name` and `duration` after playback
+ * stops, freezes `time` wherever it landed, and leaves `/v1/status/layers`
+ * reporting `media: true`. Every intuitive "is a video up?" test therefore
+ * stays true forever and pins a dead counter on a wall. `is_playing` is the
+ * only field that means "moving right now".
+ *
+ * A paused video is also reported as `is_playing: false`, identical to a
+ * stopped one, so it is treated as nothing rather than guessed at. A missing
+ * position beats a wrong one.
+ */
+export function parseTransport(body) {
+  if (!body?.is_playing) return null;
+  const duration = Number(body.duration);
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+  return { name: body.name || null, duration, audioOnly: Boolean(body.audio_only) };
+}
+
+/**
+ * What is playing on a media layer, and how far in — or null.
+ *
+ * The `presentation` layer is the media transport despite the name: a video
+ * cued from the order of service plays there.
+ */
+export async function readTransport(pp, signal, layer = 'presentation') {
+  const media = parseTransport(await ppGet(pp, `/v1/transport/${layer}/current`, signal));
+  if (!media) return null;
+  // A bare JSON number, not an object — 73.78204166666666.
+  const seconds = await ppGet(pp, `/v1/transport/${layer}/time`, signal);
+  return {
+    ...media,
+    // Clamped: the reported position can sit a hair past duration at the end.
+    seconds: Number.isFinite(seconds) ? Math.max(0, Math.min(seconds, media.duration)) : null,
+  };
+}
+
+/**
  * Current slide position within the active presentation. PP 21.4+ also
  * reports total_cues here — the arrangement-aware slide count straight from
  * the source (needed because 21.4 dropped presentation_info from the active
