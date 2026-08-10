@@ -109,3 +109,11 @@ build, both test layers and lint on every branch.
 prodmesh is designed as a **LAN appliance**, in the same spirit as Bitfocus
 Companion. It has no TLS and binds all interfaces on purpose. Do not port-forward
 it. If you need it from outside the building, put it behind a VPN.
+
+## License
+
+[MIT](LICENSE).
+
+The bundled IBM Plex typefaces are licensed separately under the
+[SIL Open Font License 1.1](https://openfontlicense.org), which the MIT grant
+above does not cover and does not need to.

@@ -143,8 +143,22 @@ Notes:
   the edge — a scrolling order of service, a list of devices — rather than
   whitespace with a handle on it. Everything else is one authored size on
   purpose, and the bounds are enforced server-side, not just by the editor.
+  **Following the room** (`src/lib/following.ts`, fixed 2026-08-10 after a
+  field run) resolves to the LIVE show's plan and service time, and failing
+  that to the service whose clock window contains now — where a window is
+  `[startsAt, endsAt)`, falling back to the next service's start when Planning
+  Center carries no end time. It used to mean "the first service time in the
+  room's next plan", which is a fixed answer: a two-service Sunday left every
+  following dashboard on the 9:30 through the 11:00 and past the end of the
+  day. `usePlan` and `ViewBar` share the function, so the header cannot
+  disagree with the cards under it. A PINNED plan still means its first service
+  — that is what its dropdown says, and it is a choice someone made.
   **Awaiting a Sunday** — `run-of-show` driving real ProPresenter, and the Pi
   on the actual ATEM input, are the halves CI cannot certify.
+  **Not built** — Now & Next shows ProPresenter's slide progress, but a VIDEO
+  playback position needs a transport read nothing polls today (`/v1/transport`
+  is untouched by `server/integrations/proPresenter.js`) and no observed
+  response shapes exist to build against. See INTEGRATION-NOTES before starting.
 - **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes
   the auth status AppShell already fetches, so a page can hide a control it
   would only be refused for. Run of Show uses it for every `shows.operate`

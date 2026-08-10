@@ -125,3 +125,21 @@
   opacity: 0.13;
   stroke: none;
 }
+
+/* Threshold bands. The gradient paints both the line and the area, so these
+   stop colours are the only place the zone colours are named. */
+.spark__stop--ok { stop-color: var(--ok); }
+.spark__stop--warn { stop-color: var(--warn); }
+.spark__stop--over { stop-color: var(--danger); }
+
+/* Where each band begins. Dashed and dim on purpose: it is a reference line,
+   not data, and it must never be mistaken for the curve. */
+.spark__mark {
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark__mark--warn { stroke: var(--warn); }
+.spark__mark--over { stroke: var(--danger); }
