@@ -1,5 +1,5 @@
 import { Activity } from 'lucide-react';
-import { Sparkline } from '../components/Sparkline';
+import { Sparkline, type SparkBand } from '../components/Sparkline';
 import { useTopic, roomTopic } from '../lib/stream';
 import { useSeries } from '../lib/useSeries';
 import { splZone } from '../lib/spl';
@@ -19,6 +19,15 @@ import type { WidgetProps } from './types';
 // you can read across a room, and a quarter hour is about a worship set.
 const EVERY_MS = 5_000;
 const HISTORY = 180; // × EVERY_MS = 15 minutes
+
+// The SAME 70–100 dB window the meter's bar spans, so the two widgets are
+// directly comparable and the target/limit lines sit at a fixed height.
+//
+// Fixed rather than fitted to the data, which is a real trade: a quiet service
+// occupies the lower third instead of filling the box. That is the point. An
+// auto-fitted curve makes a half-decibel wobble look like a climb, and a
+// widget whose job is "has this been creeping up" must not manufacture creep.
+const WINDOW = { min: 70, max: 100 };
 
 export function LoudnessTrendWidget({ roomId }: WidgetProps) {
   const spl = useTopic<SplState | null>(roomTopic.spl(roomId));
@@ -51,9 +60,16 @@ export function LoudnessTrendWidget({ roomId }: WidgetProps) {
         {history.length < 2 ? 'Recording…' : `${span} on this screen`}
       </p>
 
+      {/* Only the thresholds this room actually configured. A band drawn at a
+          number nobody agreed to is worse than no band. */}
       <Sparkline
         className="wgt__spark"
         points={history}
+        bounds={WINDOW}
+        bands={[
+          spl.target != null ? { from: spl.target, tone: 'warn' as const } : null,
+          spl.limit != null ? { from: spl.limit, tone: 'over' as const } : null,
+        ].filter(Boolean) as SparkBand[]}
         label={`Loudness over the ${span}`}
       />
     </div>

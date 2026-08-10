@@ -108,4 +108,75 @@ describe('Sparkline', () => {
     expect(d.startsWith('M0.0,')).toBe(true);
     expect(d).toContain('L240.0,');
   });
+
+  it('draws no gradient or marks when no bands are asked for', () => {
+    // The viewers curve has no thresholds — nothing to compare a subscriber
+    // count against — so it must stay exactly as plain as it was.
+    const { container } = render(<Sparkline points={[1, 2, 3]} label="x" />);
+    expect(container.querySelector('linearGradient')).toBeNull();
+    expect(container.querySelector('.spark__mark')).toBeNull();
+    expect(container.querySelector('.spark__line')).not.toHaveAttribute('style');
+  });
+
+  it('fits the data by default and honours fixed bounds when given', () => {
+    const flat = [84, 84.5, 84];
+    const auto = render(<Sparkline points={flat} label="x" />);
+    const fixed = render(<Sparkline points={flat} label="x" bounds={{ min: 70, max: 100 }} />);
+    const yOf = (c: HTMLElement) =>
+      Number(c.querySelector('.spark__line')!.getAttribute('d')!.match(/^M0\.0,([\d.]+)/)![1]);
+
+    // Auto-fit stretches a half-decibel wobble across the whole box — 84 dB
+    // lands on the floor purely because it is the smallest number present.
+    // The fixed window puts 84 dB where 84 dB belongs, just under half way up.
+    expect(yOf(auto.container)).toBeCloseTo(46, 0);
+    expect(yOf(fixed.container)).toBeCloseTo(25.5, 0);
+  });
+
+  it('clamps a value that runs off the top of a fixed window', () => {
+    // A room CAN exceed the scale. The path must not escape the viewBox.
+    const { container } = render(
+      <Sparkline points={[95, 130]} label="x" bounds={{ min: 70, max: 100 }} />,
+    );
+    const ys = [...container.querySelector('.spark__line')!.getAttribute('d')!.matchAll(/,([\d.]+)/g)]
+      .map((m) => Number(m[1]));
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(2);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(46);
+  });
+
+  it('turns bands into hard gradient stops, worst at the top', () => {
+    const { container } = render(
+      <Sparkline
+        points={[80, 98]}
+        label="x"
+        bounds={{ min: 70, max: 100 }}
+        bands={[{ from: 90, tone: 'warn' }, { from: 95, tone: 'over' }]}
+      />,
+    );
+    const tones = [...container.querySelectorAll('stop')].map(
+      (s) => s.getAttribute('class')?.replace('spark__stop spark__stop--', ''),
+    );
+    // Top of the box is the loudest, so 'over' leads and 'ok' closes.
+    expect(tones).toEqual(['over', 'over', 'warn', 'warn', 'ok', 'ok']);
+
+    // Hard, not blended: each boundary is two stops at the same offset.
+    const offsets = [...container.querySelectorAll('stop')].map((s) => Number(s.getAttribute('offset')));
+    expect(offsets[1]).toBeCloseTo(offsets[2], 5);
+    expect(offsets[3]).toBeCloseTo(offsets[4], 5);
+    expect(offsets).toEqual([...offsets].sort((a, b) => a - b));
+
+    // And a visible line at each threshold — colour alone says something
+    // changed, not what number it changed at.
+    expect(container.querySelectorAll('.spark__mark')).toHaveLength(2);
+  });
+
+  it('accepts bands in any order and still paints top-down', () => {
+    const { container } = render(
+      <Sparkline points={[80, 98]} label="x" bands={[{ from: 95, tone: 'over' }, { from: 90, tone: 'warn' }]} />,
+    );
+    const tones = [...container.querySelectorAll('stop')].map(
+      (s) => s.getAttribute('class')?.replace('spark__stop spark__stop--', ''),
+    );
+    expect(tones[0]).toBe('over');
+    expect(tones.at(-1)).toBe('ok');
+  });
 });

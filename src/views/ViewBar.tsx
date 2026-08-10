@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode, type SelectHTMLAttributes } from '
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, ChevronDown, Clock, LayoutGrid, Link2, Link2Off, Radio } from 'lucide-react';
 import { hhmmss } from '../lib/duration';
+import { resolveFollowing } from '../lib/following';
+import { useNow } from '../lib/useNow';
 import { useTopic, roomTopic } from '../lib/stream';
 import type { ServicePlan, ShowState, ViewSummary } from '../api';
 import type { WidgetConfig } from '../widgets/types';
@@ -102,8 +104,14 @@ export function ViewBar({
   // names that state and shows which event it currently resolves to, so the
   // control never reads blank.
   const following = !plan;
-  const shown = plan ?? plans[0] ?? null;
-  const time = plan?.times.find((t) => t.id === config.timeId) ?? null;
+  // Resolved through the SAME function the widgets use. Computing it a second
+  // way here is how a header ends up quietly disagreeing with the cards under
+  // it, which is worse than not showing it at all.
+  const followed = resolveFollowing(plans, show, useNow(60_000));
+  const shown = plan ?? followed.plan;
+  const time = following
+    ? followed.time
+    : (plan?.times.find((t) => t.id === config.timeId) ?? null);
 
   return (
     <div className="viewbar">
@@ -158,10 +166,15 @@ export function ViewBar({
         {following ? <Link2 size={16} /> : <Link2Off size={16} />}
       </button>
 
+      {/* While following this is READ-ONLY rather than blank. The service the
+          dashboard resolved to is the single most useful thing on the bar at
+          10:55 on a Sunday — "am I looking at the 9:30 or the 11:00" — and
+          hiding it because the control is not editable answered the question
+          for nobody. Same treatment the Event control already gets. */}
       <Control
         icon={<Clock size={17} />}
         display={time ? (clockOf(time) ?? time.name ?? 'Service') : plan ? 'First service' : '—'}
-        caption={time?.name ?? 'Service time'}
+        caption={following ? (time?.name ?? 'Following the room') : (time?.name ?? 'Service time')}
         aria-label="Service time"
         disabled={following}
         value={config.timeId ?? FOLLOW}

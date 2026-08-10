@@ -420,6 +420,26 @@ span.ros-track__status {
   color: var(--text-dim);
 }
 
+/* Slide progress, on one line, in the same column as the titles so it reads as
+   belonging to Now rather than floating between the two rows. It IS a row —
+   see the empty label in the markup — so only the alignment differs. */
+.nownext__progress {
+  align-items: center;
+}
+
+.nownext__progress .ros-progress__bar {
+  flex: 1;
+  height: 6px;
+  min-width: 0;
+}
+
+.nownext__slides {
+  flex: none;
+  font-size: clamp(0.62rem, 1.1vw, 0.85rem);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
 /* THE CONTAINER DECIDES WHETHER A WIDGET DRAWS A FRAME.
 
    In this flow grid a widget IS the card — nothing else puts a box around it.

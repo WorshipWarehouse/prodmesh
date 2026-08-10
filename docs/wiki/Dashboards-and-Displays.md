@@ -66,10 +66,18 @@ once. Change the event there and the countdown, the order of service and the
 loudness meter all follow.
 
 The chain-link button next to the event is **Follow the room**. Lit, the
-dashboard tracks whatever service the room is doing next, and keeps doing so
-week after week with nobody touching it — which is what you want for a screen
-you set up once. Turn it off to pin the dashboard to one specific event; it
-stays on whatever was already showing, so nothing jumps.
+dashboard tracks whatever service the room is doing, and keeps doing so week
+after week with nobody touching it — which is what you want for a screen you
+set up once. Turn it off to pin the dashboard to one specific event; it stays
+on whatever was already showing, so nothing jumps.
+
+"Whatever the room is doing" means, in order: **the service that is live**, and
+failing that, the one the clock is inside. So on a two-service morning a
+following dashboard moves to the 11:00 by itself — the moment that show starts,
+or once the 9:30's scheduled window has passed, whichever comes first. The
+service time it landed on is shown next to the event, greyed out because you
+are not choosing it. If a service runs long, the live show wins: it stays on
+the 9:30 until the 9:30 actually ends.
 
 **LIVE** appears on the right whenever a show is running in that room, with the
 time since it started. It is the room's show, not this dashboard's — if the
@@ -112,8 +120,8 @@ server.
 | Integrations | 1×1 – 3×3 | A dot per integration this room has configured, and whether it answers |
 | Live viewers | 1×1 | Concurrent YouTube viewers while the room is streaming |
 | Loudness | 2×1 | Live SPL against the room's target and limit |
-| Loudness trend | 2×1 | The shape of the last quarter hour, for a mix that creeps up |
-| Now & Next | 3×1 | The current item and the one after it, sized to read across a room |
+| Loudness trend | 2×1 | The shape of the last quarter hour, coloured against the room's target and limit |
+| Now & Next | 3×1 | The current item and the one after it, with ProPresenter's slide progress |
 | Room mode | 2×1 | What mode the room is in, in its own colour. Read-only |
 | Run of Show | 2×3 | The order of service, what is live now, and Prev/Next/End. **Dashboards only** |
 
@@ -132,6 +140,13 @@ Loudness trend draws what **that screen** has watched since it was opened, and
 a reload starts it over. Nothing keeps a live loudness history to ask for, so
 the curve can only be what has been seen. The service's real, permanent record
 is the Show Report.
+
+Its curve turns amber above the room's target and red above its limit, with a
+dashed line at each — the same two numbers the meter marks on its bar. The
+vertical scale is fixed at 70–100 dB rather than fitted to the data, which
+means a quiet service sits low in the box instead of filling it. That is on
+purpose: a curve scaled to its own data makes a half-decibel wobble look like a
+climb, and the one thing this widget must not do is manufacture a trend.
 
 ### Reading the Integrations dots
 

@@ -31,12 +31,42 @@ export function NowNextWidget({ roomId, config }: WidgetProps) {
   // not by what is inside it.
   if (!live && !next) return null;
 
+  // How far ProPresenter is through the current item. Only meaningful while a
+  // show is live and PP has told us both numbers — a bar with no denominator
+  // is a decoration, and one left over from the last item is a lie.
+  const cur = live?.current;
+  const slides =
+    cur?.slideIndex != null && cur.slideCount != null && cur.slideCount > 0
+      ? { at: cur.slideIndex + 1, of: cur.slideCount }
+      : null;
+
   return (
     <div className="nownext">
       <div className="nownext__row nownext__row--now">
         <span className="nownext__label">Now</span>
         <span className="nownext__title">{current?.title ?? (live ? '—' : 'Not started')}</span>
       </div>
+
+      {slides && (
+        // Same bar as the Run of Show page draws, laid out for one line: this
+        // widget is 3×1 and a stacked label under it would cost the Next row.
+        <div className="nownext__row nownext__progress">
+          {/* An empty label rather than a margin: the rows above indent by
+              .nownext__label's own width, and copying that number into a
+              margin resolves `em` against a different font size — it landed
+              7px out. Same element, same width, no arithmetic. */}
+          <span className="nownext__label" aria-hidden />
+          <div className="ros-progress__bar">
+            <div
+              className="ros-progress__fill"
+              style={{ width: `${Math.min(100, (slides.at / slides.of) * 100)}%` }}
+            />
+          </div>
+          <span className="nownext__slides mono">
+            {slides.at}/{slides.of}
+          </span>
+        </div>
+      )}
       <div className="nownext__row">
         <span className="nownext__label">Next</span>
         <span className="nownext__title nownext__title--next">{next?.title ?? 'End of service'}</span>
