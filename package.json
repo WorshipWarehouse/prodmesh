@@ -2,6 +2,7 @@
   "name": "church-production-dashboard",
   "private": true,
   "version": "1.2.0-dev",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "PRODMESH_LOCAL_TEST=1 concurrently -n web,api -c cyan,magenta \"vite\" \"node --watch server/index.js\"",
