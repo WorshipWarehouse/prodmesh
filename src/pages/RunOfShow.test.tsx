@@ -370,3 +370,65 @@ describe('countdown source priority', () => {
     expect(screen.queryByText(/Walk In/)).not.toBeInTheDocument();
   });
 });
+
+describe('a show whose plan has gone from Planning Center', () => {
+  // Hit for real on 2026-08-10: a show left running since the 3rd for a plan
+  // that no longer existed. "Run of Show" routes here whenever one is live,
+  // and the page answered "Plan not found" and nothing else — so the show
+  // could not be ended from anywhere in the app while it went on holding the
+  // room's SPL logging open and every dashboard reading LIVE.
+  beforeEach(() => {
+    api.getRoomPlan.mockRejectedValue(new Error('HTTP 404'));
+    api.endShow.mockReset().mockResolvedValue({ active: false });
+  });
+
+  it('still offers End show, and ends the room’s show', async () => {
+    renderPage(asUser(['shows.operate']));
+    await emitState({ active: true, planId: 'plan-1', timeId: 't-svc', startedAt: 1 });
+
+    expect(await screen.findByText(/Plan not found/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: /End show/i }));
+    // By ROOM, not by plan — the endpoint never needed the plan, which is why
+    // the dead end was purely a rendering problem.
+    expect(api.endShow).toHaveBeenCalledWith('north-main');
+  });
+
+  it('offers nothing extra when the missing plan has no show running', async () => {
+    renderPage(asUser(['shows.operate']));
+    await emitState({ active: false });
+
+    expect(await screen.findByText(/Plan not found/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /End show/i })).not.toBeInTheDocument();
+  });
+
+  it('offers nothing when the live show belongs to a DIFFERENT plan', async () => {
+    // Ending the room's show from a stale URL for some other service would end
+    // the wrong service.
+    renderPage(asUser(['shows.operate']));
+    await emitState({ active: true, planId: 'plan-other', timeId: 't-svc', startedAt: 1 });
+
+    expect(await screen.findByText(/Plan not found/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /End show/i })).not.toBeInTheDocument();
+  });
+
+  it('says why rather than offering a button someone cannot press', async () => {
+    renderPage(asUser([]));
+    await emitState({ active: true, planId: 'plan-1', timeId: 't-svc', startedAt: 1 });
+
+    expect(await screen.findByText(/cannot operate shows/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /End show/i })).not.toBeInTheDocument();
+  });
+
+  it('survives an End that answers with no body at all', async () => {
+    // A 200 with nothing in it, or a proxy that ate the response. Everything
+    // downstream reads state.active unguarded, so holding that as the show
+    // state white-screened the page — on the button you press when something
+    // is already wrong. Found while writing the test above.
+    api.endShow.mockResolvedValue(undefined);
+    renderPage(asUser(['shows.operate']));
+    await emitState({ active: true, planId: 'plan-1', timeId: 't-svc', startedAt: 1 });
+
+    await userEvent.click(await screen.findByRole('button', { name: /End show/i }));
+    expect(await screen.findByText(/Plan not found/)).toBeInTheDocument();
+  });
+});
