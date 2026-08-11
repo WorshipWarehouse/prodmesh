@@ -1110,6 +1110,51 @@ export const endShow = (roomId: string) =>
 export const setShowCurrent = (roomId: string, body: { itemId?: string; follow?: boolean }) =>
   postJson<ShowState>(`/api/rooms/${encodeURIComponent(roomId)}/show/current`, body);
 
+/**
+ * Download a backup. Deliberately goes through fetch + a blob rather than a
+ * plain <a href>: the request needs the auth header, and an anchor cannot
+ * carry one — a bare link would 401 and look like a broken button.
+ */
+export async function downloadBackup(history: boolean): Promise<void> {
+  const res = await fetch(`/api/system/backup${history ? '?history=1' : ''}`, {
+    headers: requestHeaders(),
+  });
+  await requireOk(res);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `prodmesh-backup-${new Date().toISOString().slice(0, 10)}.pmbak`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export interface RestoreResult {
+  files: number;
+  history: boolean;
+  from: string | null;
+  createdAt: number | null;
+  restart: string;
+}
+
+/** Restore, which the server allows only while no admin PIN exists. */
+export async function restoreBackup(file: File): Promise<RestoreResult> {
+  const res = await fetch('/api/setup/restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: file,
+  });
+  if (!res.ok) {
+    // Read the body ONCE — a second res.json() throws on a consumed stream and
+    // would replace the server's actual explanation with a parse error.
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? body?.error ?? 'That backup could not be restored.');
+  }
+  return res.json();
+}
+
 export const getServicesOverview = () => getJson<ServicesOverview>('/api/services');
 
 // ── Views (dashboards & displays) ────────────────────────────────────────────

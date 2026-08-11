@@ -202,6 +202,25 @@ Notes:
   now" — everything else pins a dead counter on a wall. Paused is
   indistinguishable from stopped, so both publish null. Shapes and all four
   observed states are in INTEGRATION-NOTES.
+- **Backup & restore** (2026-08-11): Admin → General → System downloads one
+  file carrying the whole installation — campuses, rooms, integrations, users,
+  permissions, dashboards, checklists, branding, and every credential. Show
+  history is opt-in because it is 99% of the bytes and almost none of the
+  value (measured: 164,496 of ~170,000 rows were SPL samples, 16 MB vs 14 KB).
+  Behind a new `system.backup` permission and audited.
+  **Restore lives on the welcome screen and only works while no admin PIN
+  exists** (`POST /api/setup/restore`). That endpoint has no permission check
+  and cannot have a useful one — it runs before any credential exists — so
+  what makes it safe is that it stops working the moment there is something to
+  protect. A fresh install is already trust-on-first-use; a configured one
+  would be a single-request takeover. Verified by deleting the gate and
+  watching the test fail.
+  Two traps handled: `VACUUM INTO` rather than copying `prodmesh.db` (WAL keeps
+  recent commits in `-wal`, so a plain copy silently loses them), and a
+  `PRAGMA user_version` stamp so a backup from a NEWER build is refused rather
+  than half-applied. Restore does not hot-reload — module state was built from
+  the replaced database — so it returns a restart instruction worded for the
+  deployment kind.
 - **Permission gating in the UI** (2026-08-04): `src/lib/identity.ts` publishes
   the auth status AppShell already fetches, so a page can hide a control it
   would only be refused for. Run of Show uses it for every `shows.operate`
