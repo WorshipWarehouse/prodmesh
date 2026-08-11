@@ -43,10 +43,12 @@ import {
   savePcServiceTypes,
   saveAnalysis,
   saveYouTube,
+  saveCaptions,
   saveProPresenter,
   saveCompanion,
   type PcServiceType,
   type AnalysisConfig,
+  type CaptionsConfig,
   type YouTubeConfig,
   type ProPresenterConfig,
   type CompanionConfig,
@@ -1802,6 +1804,7 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
           <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} status={chip(status?.planningCenter)} />
           <AnalysisEditor roomId={roomId} initial={conn.analysis} status={chip(status?.analysis)} />
           <YouTubeEditor roomId={roomId} initial={conn.youtube} />
+          <CaptionsEditor roomId={roomId} initial={conn.captions} />
           <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} status={chip(status?.proPresenter)} />
         </>
       )}
@@ -1888,6 +1891,112 @@ interface YouTubeDraft {
 const toYtDraft = (cfg: YouTubeConfig | null): YouTubeDraft => ({
   channelId: cfg?.channelId ?? '',
 });
+
+// Draft state as strings so the inputs stay controlled; the server normalises.
+interface CaptionsDraft {
+  source: 'none' | 'prodmesh-caption' | 'prodcom';
+  host: string;
+  port: string;
+  key: string;
+  hasKey: boolean;
+  channels: string;
+}
+
+const toCapDraft = (c: CaptionsConfig | null): CaptionsDraft => ({
+  source: c?.source ?? 'none',
+  host: c?.host ?? '',
+  port: c?.port != null ? String(c.port) : '',
+  key: '',
+  hasKey: Boolean(c?.hasKey),
+  channels: (c?.channels ?? []).join(', '),
+});
+
+const CAPTION_PORTS: Record<string, string> = { 'prodmesh-caption': '8518', prodcom: '24480' };
+
+function CaptionsEditor({ roomId, initial }: { roomId: string; initial: CaptionsConfig | null }) {
+  const f = useDraft(toCapDraft(initial), async (d) => {
+    if (d.source === 'none') return toCapDraft(await saveCaptions(roomId, null));
+    const channels = d.channels.split(',').map((c) => c.trim()).filter(Boolean);
+    const stored = await saveCaptions(roomId, {
+      source: d.source,
+      host: d.host.trim(),
+      ...(d.port.trim() ? { port: Number(d.port) } : {}),
+      // Omitted entirely when left blank, which the server reads as "keep the
+      // stored one" — this form is never sent the existing key.
+      ...(d.key ? { key: d.key } : {}),
+      ...(channels.length ? { channels } : {}),
+    });
+    return toCapDraft(stored);
+  });
+  const { draft } = f;
+
+  return (
+    <EditorSection
+      title="Comms captions"
+      help="Live transcript of the production comms channels, so the band can read what the music director and monitor engineer are saying. Shown by the Comms widget on a dashboard or display; nothing else surfaces it. prodmesh reads only — it never renames a channel or clears a transcript."
+      saveLabel="Save captions"
+      form={f}
+    >
+      <FormRow>
+        {/* "Caption app" rather than "Source": the analysis editor on this same
+            page already has a Source, and two of them is ambiguous to a reader
+            long before it is ambiguous to a test. */}
+        <Field label="Caption app">
+          <SelectField
+            value={draft.source}
+            onChange={(e) => {
+              const source = e.target.value as CaptionsDraft['source'];
+              // Swap the default port with the source, unless the port has been
+              // typed over — a wrong default is worse than an empty box.
+              const known = Object.values(CAPTION_PORTS);
+              const port = !draft.port || known.includes(draft.port) ? (CAPTION_PORTS[source] ?? '') : draft.port;
+              f.patch({ source, port });
+            }}
+          >
+            <option value="none">None</option>
+            <option value="prodmesh-caption">ProdMesh Caption</option>
+            <option value="prodcom">ProdCom</option>
+          </SelectField>
+        </Field>
+        {draft.source !== 'none' && (
+          <>
+            <Field label="Host" width="grow">
+              <input className="field" placeholder="e.g. 192.168.1.150"
+                value={draft.host} onChange={(e) => f.patch({ host: e.target.value })} />
+            </Field>
+            <Field label="Port">
+              <input className="field" inputMode="numeric" placeholder={CAPTION_PORTS[draft.source] ?? ''}
+                value={draft.port} onChange={(e) => f.patch({ port: e.target.value })} />
+            </Field>
+          </>
+        )}
+      </FormRow>
+
+      {draft.source !== 'none' && (
+        <FormRow>
+          <Field label="Channels" width="grow">
+            <input className="field" placeholder="blank for all — e.g. 0, 6"
+              value={draft.channels} onChange={(e) => f.patch({ channels: e.target.value })} />
+          </Field>
+          {draft.source === 'prodcom' && (
+            <Field label={draft.hasKey ? 'API key (set)' : 'API key'}>
+              <input className="field" type="password" autoComplete="new-password"
+                placeholder={draft.hasKey ? 'unchanged' : 'only if PSK is enabled'}
+                value={draft.key} onChange={(e) => f.patch({ key: e.target.value })} />
+            </Field>
+          )}
+        </FormRow>
+      )}
+
+      {draft.source !== 'none' && (
+        <p className="settings__muted">
+          Channels are the speakers to show — a channel number for ProdMesh
+          Caption, a channel name or ID for ProdCom. Leave blank for all of them.
+        </p>
+      )}
+    </EditorSection>
+  );
+}
 
 function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeConfig | null }) {
   const f = useDraft(toYtDraft(initial), async (d) => {

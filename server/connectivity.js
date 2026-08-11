@@ -183,10 +183,16 @@ export function validateCaptions(input) {
   // ProdCom's optional pre-shared key. Stored beside the host exactly as
   // Smaart's password is — and, like it, never published: the captions topic
   // and the health dot both carry state only, never this.
-  const key = String(input.key ?? '');
-  if (key) {
-    if (key.length > 200) throw new Error('key must be at most 200 characters');
-    out.key = key;
+  //
+  // Only kept while the source is the one that uses it, so switching away
+  // drops the credential rather than leaving it in the database for an
+  // integration this room no longer talks to. Same rule as the Smaart password.
+  if (source === 'prodcom') {
+    const key = String(input.key ?? '');
+    if (key) {
+      if (key.length > 200) throw new Error('key must be at most 200 characters');
+      out.key = key;
+    }
   }
 
   if (input.channels != null) {

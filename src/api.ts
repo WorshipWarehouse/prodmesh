@@ -598,10 +598,21 @@ export interface YouTubeConfig {
   channelId: string | null;
 }
 
+/** A room's caption source. `key` is write-only — reads carry `hasKey`. */
+export interface CaptionsConfig {
+  source: 'prodmesh-caption' | 'prodcom';
+  host: string;
+  port?: number;
+  key?: string;
+  hasKey?: boolean;
+  channels?: string[];
+}
+
 export interface RoomConnectivity {
   hasServerRoom: boolean;
   planningCenter: { serviceTypes: PcServiceType[] } | null;
   analysis: AnalysisConfig | null;
+  captions: CaptionsConfig | null;
   proPresenter: ProPresenterConfig | null;
   companion: CompanionConfig | null;
   youtube: YouTubeConfig | null;
@@ -654,6 +665,21 @@ export async function saveAnalysis(
   });
   await requireOk(res);
   return (await res.json()).analysis;
+}
+
+/** Save a room's caption source. Omitting `key` keeps the stored one — the
+ *  editor never receives it, so it cannot send it back. */
+export async function saveCaptions(
+  roomId: string,
+  captions: CaptionsConfig | null,
+): Promise<CaptionsConfig | null> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/captions`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ captions }),
+  });
+  await requireOk(res);
+  return (await res.json()).captions;
 }
 
 export async function saveYouTube(
