@@ -15,6 +15,7 @@ import { NowNextWidget } from './NowNextWidget';
 import { RoomHealthWidget } from './RoomHealthWidget';
 import { RoomModeWidget } from './RoomModeWidget';
 import { RunOfShowWidget } from './RunOfShowWidget';
+import { LyricsWidget } from './LyricsWidget';
 import { LoudnessWidget } from './LoudnessWidget';
 import { LoudnessTrendWidget } from './LoudnessTrendWidget';
 import { ViewersWidget } from './ViewersWidget';
@@ -118,6 +119,19 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     minSize: { w: 2, h: 1 },
     maxSize: { w: 3, h: 3 },
     defaultSpan: 'two-thirds',
+  },
+
+  lyrics: {
+    title: 'Lyrics',
+    description: 'The song ProPresenter has open, scrolled to the line that is up.',
+    component: LyricsWidget,
+    // Two rows is the floor because the whole idea is seeing PAST the current
+    // line: at one row this is Now & Next with extra steps. Width buys line
+    // length, which is what stops a lyric wrapping mid-phrase.
+    size: { w: 2, h: 2 },
+    minSize: { w: 2, h: 2 },
+    maxSize: { w: 3, h: 3 },
+    defaultSpan: 'third',
   },
 
   clock: {

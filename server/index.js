@@ -24,6 +24,7 @@ import './roomStateWatcher.js'; // registers the room:*:mode topic
 import './roomHealth.js'; // registers the room:*:health topic
 import './videoWatcher.js'; // registers the room:*:video topic
 import './captionWatcher.js'; // registers the room:*:captions topic
+import './lyricsWatcher.js'; // registers the room:*:lyrics topic
 import roomsRouter from './routes/rooms.js';
 import showsRouter from './routes/shows.js';
 import streamRouter from './routes/stream.js';

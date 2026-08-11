@@ -1057,6 +1057,35 @@ export interface CaptionLine {
   at: number;
 }
 
+/**
+ * One cue of the song ProPresenter has open, in the order it is PLAYED —
+ * a section repeated four times is four entries here, because the whole point
+ * is knowing which of the four you are in.
+ */
+export interface LyricSlide {
+  /** May be empty: a "Blank" or "Clear Background" cue is an instrumental
+   *  beat, and dropping it would make the scroll look stuck. */
+  text: string;
+  /** The ProPresenter group name — "Verse 1", "Chorus 1", "Tag 1". */
+  section: string;
+  /** That group's colour, assigned by the operator in ProPresenter. Ours would
+   *  disagree with the presentation everyone else in the room is looking at. */
+  color: string | null;
+  /** The operator's slide note, when there is one — "push in", "piano". */
+  note: string | null;
+  /** Position within a run of back-to-back plays of the same section, e.g.
+   *  {at: 2, of: 4}. Null when the section is played once here. */
+  rep: { at: number; of: number } | null;
+}
+
+export interface RoomLyrics {
+  /** Presentation name. Null when ProPresenter has nothing open. */
+  name: string | null;
+  slides: LyricSlide[];
+  /** Index into `slides`, or null when the position is unknown. */
+  index: number | null;
+}
+
 export interface RoomCaptions {
   /** The caption app is connected. False also covers "not configured". */
   up: boolean;
