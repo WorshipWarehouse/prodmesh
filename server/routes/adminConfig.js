@@ -230,6 +230,14 @@ function redactAnalysis(cfg) {
   return { ...rest, hasPassword: Boolean(password) };
 }
 
+// Same bargain for ProdCom's pre-shared key: it is the credential to a private
+// comms transcript, so it goes in and never comes back out.
+function redactCaptions(cfg) {
+  if (!cfg) return null;
+  const { key, ...rest } = cfg;
+  return { ...rest, hasKey: Boolean(key) };
+}
+
 // Behind config.manage: this is the room-configuration editor's own read, and
 // it returns the production network map — ProPresenter/Companion/analysis
 // host:port plus the Companion button coordinates that roomModel.js
@@ -246,6 +254,7 @@ router.get('/api/config/rooms/:roomId/connectivity', requirePermission('config.m
     hasServerRoom: true,
     planningCenter: connectivity.getPlanningCenter(req.params.roomId) ?? { serviceTypes: [] },
     analysis: redactAnalysis(connectivity.getAnalysis(req.params.roomId)),
+    captions: redactCaptions(connectivity.getCaptions(req.params.roomId)),
     proPresenter: connectivity.getProPresenter(req.params.roomId),
     youtube: connectivity.getYouTube(req.params.roomId),
     // A room with no stored row yet (created in Admin → Campuses) shows its
@@ -292,6 +301,28 @@ router.put('/api/config/rooms/:roomId/connectivity/youtube', requirePermission('
     res.json({ youtube: clean });
   } catch (err) {
     res.status(rooms[req.params.roomId] ? 400 : 404).json({ error: String(err.message ?? err) });
+  }
+});
+
+router.put('/api/config/rooms/:roomId/connectivity/captions', requirePermission('config.manage'), (req, res) => {
+  try {
+    let input = req.body?.captions ?? null;
+    // An omitted key means "leave it alone", not "clear it" — the editor never
+    // receives the stored one, so it cannot send it back.
+    if (input && input.key === undefined) {
+      const stored = connectivity.getCaptions(req.params.roomId);
+      if (stored?.key) input = { ...input, key: stored.key };
+    }
+    const clean = connectivity.setCaptions(req.params.roomId, input);
+    auditSuccess(req, 'config.manage', {
+      resourceType: 'room-connectivity',
+      resourceId: req.params.roomId,
+      roomId: req.params.roomId,
+      details: { integration: 'captions', source: clean?.source ?? null },
+    });
+    res.json({ captions: redactCaptions(clean) });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
   }
 });
 

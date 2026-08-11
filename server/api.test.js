@@ -407,3 +407,48 @@ test("room service returns the next plan with an order of service", async () => 
   assert.ok(body.plans[0].items.length > 0); // items filled for the next plan
   assert.ok(body.plans[0].times.length > 0);
 });
+
+test('a caption source stores its pre-shared key without ever handing it back', async () => {
+  // Same bargain as the Smaart password: this key is the credential to a
+  // private comms transcript, so it goes in and never comes out.
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+
+  const saved = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/captions`, {
+    method: 'PUT',
+    body: { captions: { source: 'prodcom', host: '10.0.0.9', port: 24480, key: 'psk-abc', channels: ['a', 'a', 'b'] } },
+    token,
+  });
+  assert.equal(saved.status, 200);
+  const stored = (await saved.json()).captions;
+  assert.equal(stored.key, undefined);
+  assert.equal(stored.hasKey, true);
+  assert.deepEqual(stored.channels, ['a', 'b'], 'deduped, or one speaker appears twice');
+
+  const read = await (await apiRequest(`/api/config/rooms/${ROOM}/connectivity`, { token })).json();
+  assert.equal(read.captions.host, '10.0.0.9');
+  assert.equal(read.captions.key, undefined);
+  assert.equal(read.captions.hasKey, true);
+
+  // The editor is never sent the key, so a save that omits it must KEEP it —
+  // otherwise every unrelated edit silently disconnects the caption feed.
+  const kept = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/captions`, {
+    method: 'PUT', body: { captions: { source: 'prodcom', host: '10.0.0.10' } }, token,
+  });
+  assert.equal((await kept.json()).captions.hasKey, true);
+
+  // The other source has no key at all, and clearing removes the row.
+  const pmc = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/captions`, {
+    method: 'PUT', body: { captions: { source: 'prodmesh-caption', host: '10.0.0.11' } }, token,
+  });
+  assert.equal((await pmc.json()).captions.hasKey, false);
+
+  const cleared = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/captions`, {
+    method: 'PUT', body: { captions: null }, token,
+  });
+  assert.equal((await cleared.json()).captions, null);
+
+  const bad = await apiRequest(`/api/config/rooms/${ROOM}/connectivity/captions`, {
+    method: 'PUT', body: { captions: { source: 'nope', host: 'h' } }, token,
+  });
+  assert.equal(bad.status, 400);
+});

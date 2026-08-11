@@ -116,6 +116,7 @@ server.
 | Widget | Size | Shows |
 |---|---|---|
 | Clock | 2×1 | The time of day, with seconds, and today's date |
+| Comms | 2×1 – 3×3 | Live transcript of the production comms channels, colour-coded by speaker |
 | Countdown | 2×1 | Time until the service starts, following the room's ProPresenter timer when one is running |
 | Integrations | 1×1 – 3×3 | A dot per integration this room has configured, and whether it answers |
 | Live viewers | 1×1 | Concurrent YouTube viewers while the room is streaming |
@@ -159,6 +160,31 @@ vertical scale is fixed at 70–100 dB rather than fitted to the data, which
 means a quiet service sits low in the box instead of filling it. That is on
 purpose: a curve scaled to its own data makes a half-decibel wobble look like a
 climb, and the one thing this widget must not do is manufacture a trend.
+
+### Comms captions
+
+What the music director and monitor engineer are saying, as text. The point is
+the band: with in-ears in and a loud stage, reading it is the only way the
+message arrives — so this is the one widget most likely to end up on a display
+pointed at the drum riser.
+
+Configure the source per room under **Admin → Campuses → a room → Comms
+captions**. Two apps are supported, ProdMesh Caption and ProdCom; give it a
+host, and a port only if it is not the standard one. Leave **Channels** blank
+for every speaker, or list the ones this room cares about.
+
+At two columns wide it is a bare transcript. At three it also shows a speaker
+rail down the side, and a speaker's dot **glows in their own colour while they
+are talking**. Taller is simply more of the conversation. Newest is at the
+bottom; scroll up to reread.
+
+A speaker is named once per run rather than on every line — one person talking
+for a minute would otherwise print their name twenty times. The coloured bar
+down the left keeps their identity through the run.
+
+prodmesh only ever **reads**. It cannot rename a channel, clear a transcript or
+stop capture, and that is deliberate: a dashboard must not be able to disrupt
+the comms it is reporting on.
 
 ### Reading the Integrations dots
 

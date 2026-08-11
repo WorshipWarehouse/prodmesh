@@ -598,10 +598,21 @@ export interface YouTubeConfig {
   channelId: string | null;
 }
 
+/** A room's caption source. `key` is write-only — reads carry `hasKey`. */
+export interface CaptionsConfig {
+  source: 'prodmesh-caption' | 'prodcom';
+  host: string;
+  port?: number;
+  key?: string;
+  hasKey?: boolean;
+  channels?: string[];
+}
+
 export interface RoomConnectivity {
   hasServerRoom: boolean;
   planningCenter: { serviceTypes: PcServiceType[] } | null;
   analysis: AnalysisConfig | null;
+  captions: CaptionsConfig | null;
   proPresenter: ProPresenterConfig | null;
   companion: CompanionConfig | null;
   youtube: YouTubeConfig | null;
@@ -654,6 +665,21 @@ export async function saveAnalysis(
   });
   await requireOk(res);
   return (await res.json()).analysis;
+}
+
+/** Save a room's caption source. Omitting `key` keeps the stored one — the
+ *  editor never receives it, so it cannot send it back. */
+export async function saveCaptions(
+  roomId: string,
+  captions: CaptionsConfig | null,
+): Promise<CaptionsConfig | null> {
+  const res = await fetch(`/api/config/rooms/${roomId}/connectivity/captions`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ captions }),
+  });
+  await requireOk(res);
+  return (await res.json()).captions;
 }
 
 export async function saveYouTube(
@@ -1012,6 +1038,31 @@ export interface VideoState {
   seconds: number | null;
   duration: number;
   audioOnly: boolean;
+}
+
+/**
+ * One line of transcript, normalised across caption sources — an integer
+ * channel on one, a UUID on the other, both arriving here as strings.
+ */
+export interface CaptionLine {
+  /** Stable for one utterance, so a settled line replaces its live one. */
+  id: string;
+  ch: string;
+  /** Only some sources denormalise it onto the line; prefer the roster. */
+  name?: string | null;
+  text: string;
+  /** Still being spoken. Also what makes a speaker "talking" — the engine
+   *  finalises on silence, so this clears itself. */
+  live: boolean;
+  at: number;
+}
+
+export interface RoomCaptions {
+  /** The caption app is connected. False also covers "not configured". */
+  up: boolean;
+  channels: { ch: string; name: string; color: string | null }[];
+  /** Bounded rolling window, oldest first. */
+  lines: CaptionLine[];
 }
 
 export interface ShowState {

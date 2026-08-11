@@ -124,6 +124,7 @@ export type WidgetType =
   | 'now-next'
   | 'room-mode'
   | 'room-health'
+  | 'captions'
   | 'clock';
 
 /** May this widget go on a view of this kind? */
