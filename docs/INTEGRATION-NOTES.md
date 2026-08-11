@@ -148,6 +148,72 @@ Trigger endpoints: `GET /v1/playlist/focused/{index}/trigger`,
 
 ---
 
+## Captions (ProdMesh Caption / ProdCom)
+
+Two apps transcribe production comms so the band can READ what the music
+director says. prodmesh reads both through `integrations/captions.js` and
+never writes to either — ProdCom's API can create channels and clear
+transcripts, and the caption app's own docs give the reason not to:
+"a caption encoder must not be able to disrupt a service."
+
+### ProdMesh Caption — measured live 2026-08-11
+
+`ws://host:8518/api/stream`, and the API doc is accurate except for one thing
+that matters a great deal:
+
+**Sending an `events` filter silences `tick` — permanently, and there is no way
+to ask for it back.** Measured against a running instance:
+
+| subscribe | ticks in ~12 s |
+|---|---|
+| none at all (defaults) | 2–4, every 5 s |
+| `{channels:'all'}` | 2, every 5 s |
+| `{channels:[0]}` | 3 — a CHANNEL filter is fine |
+| `{channels:'all', events:['partial','final']}` | **0** |
+| `{channels:'all', events:['partial','final','tick']}` | **0** |
+
+The doc says heartbeat messages "reach every subscriber regardless of channel
+filter", which is true and easy to misread as covering the events filter too.
+It does not. And `tick` is, in that doc's own words, half the health check —
+without it a crashed app is indistinguishable from a quiet room, which is
+exactly the failure the check exists to catch. So `prodmeshCaption.js` sends a
+subscribe with **no `events` key**. The default set is already
+`partial`+`final`+`state`, which is what we wanted anyway.
+
+Also observed and not in the doc: a `subscribed` frame acknowledges the
+subscribe. Harmless — the parser ignores anything it does not recognise — but
+it means the documented type list is not exhaustive.
+
+Rates, from a real capture: ~75 partials and 3 finals in 14 s of continuous
+speech on one channel, folding to 4 utterances. Partials are the majority of
+traffic by an order of magnitude, so anything that republishes per partial
+wants the hub's conflation doing real work.
+
+### ProdCom — FROM THE SPEC, NOT VERIFIED
+
+`ws://host:24480/api/v1/ws`. Nothing below has been seen on a live instance.
+
+Specified: the path; `{"type":"subscribe","events":["transcript"]}`; a
+`welcome` frame on connect; **`heartbeat` frames that must be echoed back or
+the connection is dropped**; PSK auth via `Authorization: Bearer <key>` or
+`?key=`; and the `TranscriptEntry` schema (`id`, `channelId`, `channelName`,
+`text`, `source`, `inProgress`, `hasBeenSeen`, `date`, `completeDate`,
+`translatedText`).
+
+**Not specified: the envelope around a transcript event.** The prose says only
+"Each event is a JSON object representing a new, updated, or completed
+transcript entry" — it never shows one. Guessing the wrapper wrong would give a
+transcript that is silently always empty, with no error anywhere, so
+`prodcom.js` identifies an entry by SHAPE (`text` + `channelId` +
+`inProgress`) and accepts it bare or under `data` / `entry` / `transcript` /
+`payload`. Replace that with the real shape once someone has run it.
+
+Note ProdCom has no separate partial/final message — `inProgress` distinguishes
+them on one entry whose `id` persists across the transition, which is what lets
+a settled line replace its live one in place.
+
+---
+
 ## YouTube Live
 
 ### The constraint everything else follows from

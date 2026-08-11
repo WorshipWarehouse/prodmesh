@@ -76,7 +76,13 @@ export async function watch(cfg, handlers, signal) {
     }
 
     let lastTick = Date.now();
+    // `close` fires after an explicit close, so done() is reached twice on
+    // every teardown. Without this the health registry counts one dropped
+    // connection as two consecutive failures.
+    let settled = false;
     const done = (why) => {
+      if (settled) return;
+      settled = true;
       clearInterval(stale);
       signal.removeEventListener('abort', onAbort);
       handlers.onUp?.(false);
@@ -97,9 +103,14 @@ export async function watch(cfg, handlers, signal) {
       lastTick = Date.now();
       report(key, true);
       handlers.onUp?.(true);
-      // `final` alone would be stabler but arrives only after a pause, and a
-      // musician reading from behind a kit needs the words as they are said.
-      ws.send(JSON.stringify({ type: 'subscribe', channels: 'all', events: ['partial', 'final'] }));
+      // NO `events` key, deliberately — see INTEGRATION-NOTES. Sending one at
+      // all silences `tick`, and `tick` is half the health check: without it a
+      // crashed app is indistinguishable from a quiet room, which is the exact
+      // failure the caption app's own docs warn about. Measured 2026-08-11:
+      // default subscribe → a tick every 5 s; `events:['partial','final']` →
+      // none in 14 s; even `events:[…,'tick']` → none. The default set is
+      // already partial + final + state, which is what we want anyway.
+      ws.send(JSON.stringify({ type: 'subscribe', channels: 'all' }));
     });
     ws.on('message', (raw) => {
       lastTick = Date.now();

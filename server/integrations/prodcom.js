@@ -108,7 +108,13 @@ export async function watch(cfg, handlers, signal) {
       return resolve();
     }
 
+    // `close` fires after an explicit close, so done() is reached twice on
+    // every teardown. Without this the health registry counts one dropped
+    // connection as two consecutive failures.
+    let settled = false;
     const done = (why) => {
+      if (settled) return;
+      settled = true;
       signal.removeEventListener('abort', onAbort);
       handlers.onUp?.(false);
       if (why) report(key, false, why);
