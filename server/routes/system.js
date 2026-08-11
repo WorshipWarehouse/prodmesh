@@ -15,6 +15,8 @@ import * as auth from '../authStore.js';
 import * as splStore from '../splStore.js';
 import * as streamStore from '../streamStore.js';
 import * as health from '../health.js';
+import * as settings from '../settings.js';
+import * as backup from '../backup.js';
 import { requirePermission, auditSuccess } from '../httpAuth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,6 +66,75 @@ async function backfillLabels(row) {
 // Deliberately NOT gated alongside it: plan notes and song leaders on the Run
 // of Show, which camera ops, switchers and FOH read anonymously to know who
 // is next. Operational context stays open; retrospective analysis does not.
+// ── Backup & restore ─────────────────────────────────────────────────────────
+
+/**
+ * Download an installation.
+ *
+ * Its own permission rather than config.manage, because this is categorically
+ * more than editing campuses: the file carries the Planning Center token,
+ * every PIN and every credential. Audited for the same reason — "who took a
+ * copy of everything" is a question worth being able to answer.
+ */
+router.get('/api/system/backup', requirePermission('system.backup'), (req, res) => {
+  const history = req.query.history === '1' || req.query.history === 'true';
+  try {
+    const bytes = backup.createBackup({ history });
+    auditSuccess(req, 'system.backup', {
+      resourceType: 'backup',
+      details: { history, bytes: bytes.length },
+    });
+    const day = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="prodmesh-backup-${day}.pmbak"`);
+    res.send(bytes);
+  } catch (err) {
+    res.status(500).json({ error: String(err.message ?? err) });
+  }
+});
+
+/**
+ * Restore an installation — ONLY onto one that has not been set up.
+ *
+ * This endpoint has no permission check and cannot have a useful one: it runs
+ * before any credential exists. What makes that safe is the gate below. A
+ * fresh install is already trust-on-first-use — whoever reaches it first sets
+ * the admin PIN — so restoring there grants nothing that completing setup
+ * would not. On a CONFIGURED box the same request would be a one-request
+ * takeover, because the file sets the admin PIN and every credential.
+ *
+ * So: refused the moment an admin PIN exists, and there is no way to reach it
+ * from the running UI afterwards.
+ */
+router.post(
+  '/api/setup/restore',
+  express.raw({ type: () => true, limit: '64mb' }),
+  (req, res) => {
+    if (!settings.isAdminSetupNeeded()) {
+      return res.status(409).json({
+        error: 'already_set_up',
+        message: 'This prodmesh is already set up. Restoring is only possible on a fresh install.',
+      });
+    }
+    try {
+      const envelope = backup.readBackup(req.body);
+      const out = backup.restoreBackup(envelope);
+      // Deliberately no live reload: module state throughout the process was
+      // built from the database that has just been replaced, and a
+      // half-restored server that looks fine is worse than a clear
+      // instruction. deployment.kind() makes the instruction specific.
+      res.json({
+        ...out,
+        from: envelope.app?.version ?? null,
+        createdAt: envelope.createdAt ?? null,
+        restart: deployment.restartHint(),
+      });
+    } catch (err) {
+      res.status(400).json({ error: String(err.message ?? err) });
+    }
+  },
+);
+
 router.get('/api/history', requirePermission('reports.view'), async (_req, res) => {
   summaries.syncFromTimelines(); // once per boot: legacy timelines → rows
   for (const id of show.activeInstanceIds()) summaries.refresh(id);

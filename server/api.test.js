@@ -48,15 +48,17 @@ function post(path, body, token, stationToken = null) {
   });
 }
 
-function apiRequest(path, { method = 'GET', body, token, stationToken } = {}) {
+function apiRequest(path, { method = 'GET', body, raw, token, stationToken } = {}) {
   return fetch(base + path, {
     method,
     headers: {
       ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(raw ? { 'Content-Type': 'application/octet-stream' } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(stationToken ? { 'X-Prodmesh-Station': stationToken } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(raw ? { body: raw } : {}),
   });
 }
 
@@ -451,4 +453,25 @@ test('a caption source stores its pre-shared key without ever handing it back', 
     method: 'PUT', body: { captions: { source: 'nope', host: 'h' } }, token,
   });
   assert.equal(bad.status, 400);
+});
+
+test('a backup needs its own permission, and restore is refused once set up', async () => {
+  // Downloading is not "manage campuses": the file carries the Planning Center
+  // token, every PIN and every credential.
+  const anon = await apiRequest('/api/system/backup');
+  assert.equal(anon.status, 401);
+  const body = await anon.json();
+  assert.equal(body.permission, 'system.backup');
+
+  // THE load-bearing rule. This endpoint has no permission check and cannot
+  // have a useful one — it runs before any credential exists. What makes that
+  // safe is that it stops working the moment there is something to protect:
+  // on a configured box the same request would set the admin PIN and every
+  // credential from an uploaded file, i.e. a one-request takeover.
+  const restore = await apiRequest('/api/setup/restore', {
+    method: 'POST',
+    raw: Buffer.from('anything at all'),
+  });
+  assert.equal(restore.status, 409);
+  assert.equal((await restore.json()).error, 'already_set_up');
 });

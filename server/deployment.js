@@ -122,6 +122,22 @@ export function updateCapability() {
   };
 }
 
+/**
+ * How to bring the server back after a restore, in the words that fit this
+ * install. Restore replaces the database under a running process, so it always
+ * needs a restart — the only question is who does it.
+ */
+export function restartHint() {
+  switch (kind()) {
+    case 'container':
+      return 'Restart the container to finish (docker restart, or your orchestrator).';
+    case 'git':
+      return 'Restart the prodmesh service to finish — it will come back with everything restored.';
+    default:
+      return 'Quit and reopen prodmesh to finish.';
+  }
+}
+
 /** Where the server log lives, and whether anything writes one here. */
 export function logFile() {
   if (process.env.PRODMESH_LOG_FILE) return process.env.PRODMESH_LOG_FILE;
