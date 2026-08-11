@@ -1014,6 +1014,31 @@ export interface VideoState {
   audioOnly: boolean;
 }
 
+/**
+ * One line of transcript, normalised across caption sources — an integer
+ * channel on one, a UUID on the other, both arriving here as strings.
+ */
+export interface CaptionLine {
+  /** Stable for one utterance, so a settled line replaces its live one. */
+  id: string;
+  ch: string;
+  /** Only some sources denormalise it onto the line; prefer the roster. */
+  name?: string | null;
+  text: string;
+  /** Still being spoken. Also what makes a speaker "talking" — the engine
+   *  finalises on silence, so this clears itself. */
+  live: boolean;
+  at: number;
+}
+
+export interface RoomCaptions {
+  /** The caption app is connected. False also covers "not configured". */
+  up: boolean;
+  channels: { ch: string; name: string; color: string | null }[];
+  /** Bounded rolling window, oldest first. */
+  lines: CaptionLine[];
+}
+
 export interface ShowState {
   active: boolean;
   roomId?: string;

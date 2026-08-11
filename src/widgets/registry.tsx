@@ -8,6 +8,7 @@
 //
 // Adding a widget = a type in ./types.ts and one entry here.
 
+import { CaptionsWidget } from './CaptionsWidget';
 import { ClockWidget } from './ClockWidget';
 import { CountdownWidget } from './CountdownWidget';
 import { NowNextWidget } from './NowNextWidget';
@@ -104,6 +105,19 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     minSize: { w: 1, h: 1 },
     maxSize: { w: 3, h: 3 },
     defaultSpan: 'third',
+  },
+
+  captions: {
+    title: 'Comms',
+    description: 'Live transcript of the production comms channels, colour-coded by speaker.',
+    component: CaptionsWidget,
+    size: { w: 2, h: 1 },
+    // Two columns is the narrowest that fits a speaker name and a line of
+    // speech; three earns the speaker rail. Height is simply more of the
+    // conversation, which is real content continuing past the edge.
+    minSize: { w: 2, h: 1 },
+    maxSize: { w: 3, h: 3 },
+    defaultSpan: 'two-thirds',
   },
 
   clock: {
