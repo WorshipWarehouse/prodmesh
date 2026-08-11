@@ -18,6 +18,8 @@ import { SETUP_COMPLETE_EVENT } from '../layout/SetupGate';
 import { buildChurch } from '../lib/topology';
 import {
   getSetupState,
+  restoreBackup,
+  type RestoreResult,
   completeSetup,
   getAuthStatus,
   getConfig,
@@ -57,6 +59,74 @@ const STEPS = [
 
 const WELCOME = -1;
 const DONE = STEPS.length;
+
+/**
+ * Restoring instead of setting up.
+ *
+ * Offered here and nowhere else, because here is the only place it is safe: a
+ * box with no admin PIN yet is already trust-on-first-use, so restoring grants
+ * nothing that completing setup would not. The server enforces that — this is
+ * simply the one screen from which the endpoint is still reachable.
+ *
+ * Deliberately understated. Most people arriving here are setting up for the
+ * first time and should not have to think about it; the person who needs it is
+ * looking for it.
+ */
+function RestoreOffer() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<RestoreResult | null>(null);
+  const pick = useRef<HTMLInputElement>(null);
+
+  const onFile = async (file?: File) => {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setDone(await restoreBackup(file));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That backup could not be restored.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="setup__restored" role="status">
+        <p className="setup__restoredtitle">Restored.</p>
+        <p>
+          {done.files} file{done.files === 1 ? '' : 's'} and the database
+          {done.from ? <> from prodmesh {done.from}</> : null}
+          {done.createdAt ? <>, backed up {new Date(done.createdAt).toLocaleDateString()}</> : null}.
+          {!done.history && ' Show history was not included in this backup.'}
+        </p>
+        {/* The restart is not optional and not a suggestion: the database under
+            this running server has just been replaced. */}
+        <p className="setup__restart">{done.restart}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="setup__restore">
+      <input
+        ref={pick}
+        type="file"
+        accept=".pmbak"
+        className="sr-only"
+        onChange={(e) => onFile(e.target.files?.[0])}
+      />
+      <p>
+        Rebuilding a machine?{' '}
+        <button className="linkbtn" disabled={busy} onClick={() => pick.current?.click()}>
+          {busy ? 'Restoring…' : 'Restore from a backup'}
+        </button>
+      </p>
+      {error && <p className="setup__restoreerr" role="alert">{error}</p>}
+    </div>
+  );
+}
 
 export function Setup() {
   const navigate = useNavigate();
@@ -142,6 +212,8 @@ export function Setup() {
           <button className="btn btn--primary btn--lg" onClick={() => setStep(0)} autoFocus>
             Begin <ArrowRight size={16} />
           </button>
+
+          <RestoreOffer />
         </div>
       </div>
     );

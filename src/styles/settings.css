@@ -1103,3 +1103,80 @@
   text-transform: none;
   font-style: italic;
 }
+
+/* A consequence someone must read before pressing the button above it.
+   Not a HelpTip: UI_TEXT keeps optional knowledge in a tooltip and must-know
+   consequences inline, the way the admin PIN reset already does. */
+.settings__warn {
+  margin-top: 6px;
+  max-width: 62ch;
+  font-size: 0.85rem;
+  color: var(--warn);
+}
+
+.settings__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  max-width: 62ch;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.settings__check input { margin-top: 2px; flex: none; }
+
+/* ── Restore, on the welcome screen ──────────────────────────────────────────
+   Understated on purpose: almost everyone arriving here is setting up for the
+   first time and should not have to consider it. The person rebuilding a dead
+   machine is looking for it and will find it. */
+
+.setup__restore {
+  margin-top: 22px;
+  font-size: 0.88rem;
+  color: var(--text-faint);
+}
+
+.setup__restoreerr {
+  margin-top: 8px;
+  max-width: 52ch;
+  color: var(--danger);
+}
+
+.setup__restored {
+  margin-top: 22px;
+  max-width: 52ch;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.setup__restoredtitle {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--ok);
+}
+
+/* The database under this running server has just been replaced. */
+.setup__restart {
+  margin: 10px 0 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.linkbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linkbtn:disabled { color: var(--text-faint); cursor: default; }

@@ -44,6 +44,8 @@ import {
   saveAnalysis,
   saveYouTube,
   saveCaptions,
+  downloadBackup,
+  PermissionError,
   saveProPresenter,
   saveCompanion,
   type PcServiceType,
@@ -969,7 +971,70 @@ export function SystemPanel() {
         )}
       </div>
       <Msg msg={status} />
+
+      <BackupRow />
     </section>
+  );
+}
+
+/**
+ * Download an installation.
+ *
+ * The warning is not boilerplate and is not a tooltip: this file contains the
+ * Planning Center token, every PIN and every credential, and the person most
+ * likely to press this is the one least likely to guess that. UI_TEXT keeps
+ * supplementary detail in a HelpTip, but a must-know consequence stays inline
+ * — the same rule the admin PIN reset already follows.
+ */
+function BackupRow() {
+  const [history, setHistory] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Feedback>(null);
+
+  const download = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await downloadBackup(history);
+      setMsg(ok('Backup downloaded.'));
+    } catch (err) {
+      setMsg(fail(err instanceof PermissionError ? err.message : 'Could not build the backup.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="panel__row">
+      <div>
+        <div className="panel__label">Backup</div>
+        <div className="settings__muted">
+          Everything needed to rebuild this install on another machine: campuses,
+          rooms, integrations, users, dashboards and checklists.
+        </div>
+        <div className="settings__warn">
+          Keep it somewhere safe. It contains your Planning Center token, your
+          PINs and every other credential — anyone with this file has what the
+          server has.
+        </div>
+        <label className="settings__check">
+          <input type="checkbox" checked={history} onChange={(e) => setHistory(e.target.checked)} />
+          Include show history (much larger — every recorded service and its
+          loudness readings)
+        </label>
+        <div className="settings__muted">
+          To restore, install prodmesh on the new machine and use the backup on
+          its welcome screen. Restoring is only possible before an admin PIN is
+          set, so it can never overwrite a working install.
+        </div>
+        <Msg msg={msg} />
+      </div>
+      <div className="panel__controls">
+        <button className="btn" onClick={download} disabled={busy}>
+          {busy ? 'Preparing…' : 'Download backup'}
+        </button>
+      </div>
+    </div>
   );
 }
 
