@@ -236,6 +236,7 @@ export const WIDGET_TYPES = new Map([
     unique: true, display: true,
     size: { w: 1, h: 1 }, min: { w: 1, h: 1 }, max: { w: 3, h: 3 },
   }],
+  ['slides-left', { unique: true, display: true, size: { w: 1, h: 1 } }],
   ['lyrics', {
     unique: true, display: true,
     size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 3 },

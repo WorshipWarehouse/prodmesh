@@ -858,6 +858,39 @@ span.ros-track__status {
 
 .wgt__status--down { color: var(--danger); }
 
+/* ── Slides / video left ─────────────────────────────────────────────────────
+
+   A countdown read across a control room, so the number gets the whole cell
+   and the state is carried by colour AND by the border — a tinted edge is
+   what survives being seen from an angle, out of the corner of an eye, on a
+   multiview downscaled to a quarter of a screen. Nothing animates: this sits
+   in a director's peripheral vision for an hour, and movement there is a
+   distraction they cannot turn off. */
+
+.wgt--left {
+  container-type: inline-size;
+  justify-content: space-between;
+}
+
+/* Bigger than the shared .wgt__value, because this one IS the widget rather
+   than a headline above other content. Sized against the cell (cqi) and not
+   the viewport: a 1×1 on a 1600px dashboard and the same 1×1 upscaled on a
+   multiview are different widths of the same tile. */
+.wgt--left .wgt__value {
+  font-size: clamp(2.4rem, 22cqi + 0.4rem, 5rem);
+}
+
+.wgt--left--warn .wgt__value { color: var(--warn); }
+.wgt--left--over .wgt__value { color: var(--danger); }
+
+/* The card belongs to the LAYOUT, not the widget, so the tint reaches it with
+   :has() rather than by widening WidgetProps — the contract that lets a layout
+   be data is worth more than a border. The coloured number carries the state on
+   its own if this selector ever fails; the edge is what survives being seen at
+   an angle, downscaled, out of the corner of an eye. */
+.viewcell:has(.wgt--left--warn) { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.viewcell:has(.wgt--left--over) { border-color: color-mix(in srgb, var(--danger) 65%, var(--border)); }
+
 /* ── Lyrics ──────────────────────────────────────────────────────────────────
 
    The current line centred, what has gone fading out above it, what is coming

@@ -1,11 +1,9 @@
 import { Play } from 'lucide-react';
 import { useTopic, roomTopic } from '../lib/stream';
 import { usePlan } from './usePlan';
+import { clock, liveShow, slideProgress } from './showPosition';
 import type { ShowState, VideoState } from '../api';
 import type { WidgetProps } from './types';
-
-/** m:ss — a video is minutes long, and hours would be a wasted column. */
-const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 // What is happening and what is next — the two facts everyone in the building
 // wants, sized to be read from across a room.
@@ -21,12 +19,7 @@ export function NowNextWidget({ roomId, config }: WidgetProps) {
   const video = useTopic<VideoState | null>(roomTopic.video(roomId));
   const { plan, planId, timeId } = usePlan(roomId, config);
 
-  // Only this service's show. A different one being live in the room says
-  // nothing about the service this widget was placed for.
-  const live =
-    show?.active && (!planId || show.planId === planId) && (!timeId || show.timeId === timeId)
-      ? show
-      : null;
+  const live = liveShow(show, planId, timeId);
 
   const trackable = plan?.items.filter((i) => (i.type ?? 'item') !== 'header') ?? [];
   const idx = trackable.findIndex((i) => i.id === live?.current?.itemId);
@@ -38,14 +31,7 @@ export function NowNextWidget({ roomId, config }: WidgetProps) {
   // by the layout, not by what is inside it.
   if (!live && !next && !video) return null;
 
-  // How far ProPresenter is through the current item. Only meaningful while a
-  // show is live and PP has told us both numbers — a bar with no denominator
-  // is a decoration, and one left over from the last item is a lie.
-  const cur = live?.current;
-  const slides =
-    cur?.slideIndex != null && cur.slideCount != null && cur.slideCount > 0
-      ? { at: cur.slideIndex + 1, of: cur.slideCount }
-      : null;
+  const slides = slideProgress(live);
 
   return (
     <div className="nownext">
