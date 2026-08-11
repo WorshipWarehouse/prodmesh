@@ -66,6 +66,7 @@ nav:
       - Checklists: Checklists.md
       - Rooms and campuses: Rooms-and-Campuses.md
       - User management: User-Management.md
+      - Backup and restore: Backup-and-Restore.md
   - Connecting your gear:
       - Integrations: Integrations.md
       - Integration caveats: Integration-Caveats.md

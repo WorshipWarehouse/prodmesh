@@ -33,6 +33,7 @@ const ORDER = [
   'Checklists',
   'Rooms-and-Campuses',
   'User-Management',
+  'Backup-and-Restore',
   'Integrations',
   'Integration-Caveats',
 ];
@@ -46,6 +47,7 @@ const TITLES: Record<string, string> = {
   'Checklists': 'Checklists',
   'Rooms-and-Campuses': 'Rooms & campuses',
   'User-Management': 'Users & access',
+  'Backup-and-Restore': 'Backup & restore',
   'Integrations': 'Integrations',
   'Integration-Caveats': 'Integration caveats',
 };
