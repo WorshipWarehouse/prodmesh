@@ -99,3 +99,28 @@ test('YouTube is read from the health registry, never probed', () => {
   assert.ok(!JSON.stringify(publicHealth(yt, none, AT)).includes('UC_test_channel'));
   health.reset();
 });
+
+test('a caption source is a dot, and its pre-shared key never leaves the box', () => {
+  // ProdCom's PSK is stored beside the host like Smaart's password. This topic
+  // is readable by a screen with nobody logged in, so the key reaching it would
+  // hand a stranger the credential to the comms transcript itself.
+  health.reset();
+  const r = room({ captions: { source: 'prodcom', host: '192.0.2.40', port: 24480, key: 'sup3rsecret' } });
+  const none = { planningCenter: null, proPresenter: null, companion: null, analysis: null };
+
+  const out = publicHealth(r, none, AT);
+  assert.deepEqual(out.integrations, [{ id: 'captions', label: 'Captions', state: 'unknown' }]);
+
+  const json = JSON.stringify(out);
+  for (const leak of ['sup3rsecret', '192.0.2.40', '24480']) {
+    assert.ok(!json.includes(leak), `leaked ${leak}`);
+  }
+
+  // The watcher reports every connect and drop, so the dot follows it without
+  // opening a second socket of its own.
+  health.report('captions@192.0.2.40:24480', false, 'connection closed');
+  assert.equal(publicHealth(r, none, AT).integrations[0].state, 'down');
+  health.report('captions@192.0.2.40:24480', true);
+  assert.equal(publicHealth(r, none, AT).integrations[0].state, 'ok');
+  health.reset();
+});

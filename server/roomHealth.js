@@ -34,6 +34,7 @@
 import { rooms } from './roomsStore.js';
 import * as hub from './streamHub.js';
 import * as youtube from './integrations/youtube.js';
+import * as captions from './integrations/captions.js';
 import { roomStatus } from './connectivityStatus.js';
 import { snapshot } from './health.js';
 
@@ -65,6 +66,7 @@ const LABELS = {
   companion: 'Companion',
   analysis: 'Analysis',
   youtube: 'YouTube',
+  captions: 'Captions',
 };
 
 /**
@@ -113,8 +115,24 @@ export function publicHealth(room, status, at) {
       dot('companion', status.companion),
       dot('analysis', status.analysis),
       youtubeDot(room),
+      captionsDot(room),
     ].filter(Boolean),
   };
+}
+
+/**
+ * Captions are read from the health registry rather than probed, for the same
+ * reason YouTube is — but a different one underneath. A probe here would mean
+ * opening a second WebSocket beside the one captionWatcher already holds, and
+ * that watcher reports every connect and every drop. Anything a probe could
+ * learn is already recorded by the thing doing the real work.
+ */
+function captionsDot(room) {
+  const cfg = room.captions;
+  if (!captions.isConfigured(cfg)) return null;
+  const snap = snapshot()[captions.healthKey(cfg)];
+  if (!snap || snap.ok == null) return { id: 'captions', label: LABELS.captions, state: 'unknown' };
+  return { id: 'captions', label: LABELS.captions, state: snap.ok ? 'ok' : 'down' };
 }
 
 async function probe(roomId) {

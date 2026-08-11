@@ -27,13 +27,15 @@
 import { getDb } from './db.js';
 import { rooms } from './roomsStore.js';
 import { SOURCES } from './integrations/analysis.js';
+import * as captions from './integrations/captions.js';
 
 const PC = 'planningCenter';
 const ANALYSIS = 'analysis';
 const PP = 'proPresenter';
 const COMPANION = 'companion';
 const YOUTUBE = 'youtube';
-const INTEGRATIONS = [PC, ANALYSIS, PP, COMPANION, YOUTUBE];
+const CAPTIONS = 'captions';
+const INTEGRATIONS = [PC, ANALYSIS, PP, COMPANION, YOUTUBE, CAPTIONS];
 
 // Long-lived per-room work (the show manager's watchers) registers here to be
 // restarted when a room's config changes — applyConnectivity() alone can't
@@ -156,6 +158,63 @@ export function setPlanningCenter(roomId, serviceTypes) {
 }
 
 /** The stored analysis-source config for a room (null if the room has none). */
+/**
+ * Validate a room's caption source; null clears it.
+ *
+ * `channels` is an ALLOWLIST of channel identities — an integer index on one
+ * source, a UUID on the other, so it is stored as strings and compared as
+ * strings. Empty means every channel, which is the sane default: a room that
+ * has bothered to configure a caption app wants to hear it.
+ */
+export function validateCaptions(input) {
+  if (input === null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('captions must be an object');
+  const source = String(input.source ?? '');
+  if (!captions.sourceNames.includes(source)) throw new Error(`Unknown caption source "${source}"`);
+  const host = validateHost(input.host, 'Caption source needs a host');
+  const out = { source, host };
+
+  const port = input.port === '' || input.port == null ? null : Number(input.port);
+  if (port != null) {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
+    out.port = port;
+  }
+
+  // ProdCom's optional pre-shared key. Stored beside the host exactly as
+  // Smaart's password is — and, like it, never published: the captions topic
+  // and the health dot both carry state only, never this.
+  const key = String(input.key ?? '');
+  if (key) {
+    if (key.length > 200) throw new Error('key must be at most 200 characters');
+    out.key = key;
+  }
+
+  if (input.channels != null) {
+    if (!Array.isArray(input.channels)) throw new Error('channels must be an array');
+    if (input.channels.length > 64) throw new Error('at most 64 channels');
+    const list = input.channels.map((c) => String(c).trim()).filter(Boolean);
+    // Deduped so a doubled entry cannot make one speaker arrive twice.
+    if (list.length) out.channels = [...new Set(list)];
+  }
+  return out;
+}
+
+/** The stored caption config for a room (null if it has none). */
+export function getCaptions(roomId) {
+  return readRow(roomId, CAPTIONS);
+}
+
+/** Validate + store a room's caption source (null clears it), apply live. */
+export function setCaptions(roomId, config) {
+  if (!rooms[roomId]) throw new Error(`Unknown room "${roomId}"`);
+  const clean = validateCaptions(config);
+  if (clean === null) deleteRow(roomId, CAPTIONS);
+  else writeRow(roomId, CAPTIONS, clean);
+  applyConnectivity();
+  notifyChange(roomId, CAPTIONS);
+  return clean;
+}
+
 export function getAnalysis(roomId) {
   return readRow(roomId, ANALYSIS);
 }
@@ -398,6 +457,10 @@ function seedIfEmpty() {
     // runs so the marker is set and the database is authoritative from boot
     // one, rather than the integration looking "never seeded" forever.
     [YOUTUBE]: (room) => room.youtube ?? null,
+    // No rooms.config.js predecessor — captions arrived after the file stopped
+    // being anything but a fresh-install seed. Seeding still runs so the marker
+    // is set and the database owns it from boot one.
+    [CAPTIONS]: (room) => room.captions ?? null,
   };
   for (const integration of INTEGRATIONS) {
     const key = `connectivity_seeded:${integration}`;
