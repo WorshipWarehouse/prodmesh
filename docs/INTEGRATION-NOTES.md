@@ -132,6 +132,50 @@ Other findings:
 - `/v1/status/slide` reports the **media's** uuid in `current.uuid` with empty
   `text` while a video is up, so it cannot distinguish a video from a slide.
 
+### The presentation body — probed live 2026-08-11, PP 21.4
+
+`GET /v1/presentation/active` returns the WHOLE song in one response, which is
+what makes a lyric view cheap: one request per song rather than per slide.
+
+```
+presentation.groups[] → name    "Verse 1" | "Chorus 1" | "Bridge 1" | "Tag 1"
+                        color   {red, green, blue, alpha} as 0..1 FLOATS
+                        slides[] → text   the lyric, with \n where the operator broke it
+                                   notes  the operator's cue: "push in", "piano"
+presentation.arrangements[] → id.name, groups[] (group uuids, WITH REPEATS), total_cues
+```
+
+**`groups` is the song's material, not its running order.** A section appears
+there exactly once however many times it is played; the arrangement is the flat
+list of group uuids with repeats. On the probed song `groups` summed to 14 cues
+and the arrangement actually being run was 27. Anything that indexes by slide
+position must expand the arrangement first, or from the first repeat onward it
+is addressing the wrong half of the song. `arrangeSlides()` in
+`integrations/proPresenter.js` is the one place that does this; `slideTotal()`
+is its length, deliberately, so the Now & Next slide bar and the lyric scroll
+cannot disagree about how long a song is.
+
+Three traps, all of them measured rather than reasoned about:
+
+- **`presentation.total_cues` is the RAW group sum**, not the arranged one — 14
+  where the arrangement is 27. Each `arrangements[].total_cues` is that
+  arrangement's real length, and matches what `slide_index` reports.
+- **`current_arrangement` came back as an empty string** while a song was
+  live. So on 21.4 the only signal for which arrangement is playing is the cue
+  count: match `slide_index`'s `total_cues` against each arrangement's length.
+  21.1 still carries the arrangement on the playlist item
+  (`presentation_info`), which is better and is preferred when present.
+- **Utility groups arrive as pure black.** "Blank" and "Clear Background" both
+  came back `rgba(0, 0, 0, 1)` — ProPresenter's unset colour, not a choice. Pass
+  it through and you paint a black dot and a black highlight bar onto a dark
+  dashboard, which renders as nothing while looking like a bug. `hexColor()`
+  reports pure black and pure white as `null`.
+
+Empty `text` is common and meaningful: an Intro, a "Blank", a held chord. It is
+a beat in the song, not a slide to skip — dropping those cues makes a lyric
+scroll look like ProPresenter has hung at exactly the moment the band is
+playing.
+
 ### Quirks that have bitten us live
 
 - **Re-triggering an item** makes `slide_index` briefly report the item's

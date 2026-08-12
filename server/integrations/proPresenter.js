@@ -359,33 +359,125 @@ export async function readSlide(pp, signal) {
   return parseSlide(await ppGet(pp, '/v1/presentation/slide_index', signal));
 }
 
+// ── The active presentation, expanded ─────────────────────────────────────────
+//
+//  /v1/presentation/active hands back the whole song in one response — every
+//  group's name, ProPresenter's own section COLOUR, each slide's text and the
+//  operator's slide notes — plus the arrangements that say what order it is
+//  actually played in. Probed live 2026-08-11 on 21.4; the body shape and the
+//  three traps below are in INTEGRATION-NOTES.
+//
+//  The trap that matters here: `groups` is the song's raw MATERIAL, not its
+//  running order. A group appears once under `groups` however many times it is
+//  played, and the arrangement is a list of group uuids WITH REPEATS. So the
+//  presentation-level `total_cues` (14 on the probed song) is the raw sum,
+//  while the arrangement people actually run is 27. Anything that indexes by
+//  slide position must expand the arrangement first or it addresses the wrong
+//  half of the song.
+
+/** PP gives colour components as 0..1 floats. Some builds have used 0..255,
+ *  which is cheap to survive and expensive to debug.
+ *
+ *  Pure black and pure white come back as null, NOT as a colour. Those are what
+ *  ProPresenter leaves on the utility groups nobody ever styles — the "Blank"
+ *  and "Clear Background" cues both arrived as rgba(0,0,0,1) on the probed
+ *  song. Treating that as a deliberate choice paints a black dot and a black
+ *  highlight bar onto a dark dashboard, i.e. renders them invisible; treating
+ *  it as "unset" lets the widget fall back to something a person can see. */
+function hexColor(c) {
+  if (!c) return null;
+  const parts = [c.red, c.green, c.blue];
+  if (parts.some((n) => typeof n !== 'number' || Number.isNaN(n))) return null;
+  const scale = parts.some((n) => n > 1) ? 1 : 255;
+  const rgb = parts.map((n) => Math.max(0, Math.min(255, Math.round(n * scale))));
+  if (rgb.every((n) => n === 0) || rgb.every((n) => n === 255)) return null;
+  return `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+}
+
 /**
- * Total slide count of the active presentation for the given arrangement
- * (songs repeat groups, so different arrangements have different totals).
- * `arrangement` = { uuid, name } from the active playlist item. Falls back to
- * the presentation's own current_arrangement, then the raw group sum.
+ * Flatten a presentation into the cue list it is actually played as.
+ *
+ * Returns one entry per cue, in running order:
+ *   { text, section, color, note, rep }
+ * where `rep` is {at, of} for a section played several times BACK TO BACK
+ * (the probed song runs Bridge 1 four times in a row) and null otherwise.
+ * Consecutive only, deliberately: a chorus that comes round again later reads
+ * as the chorus, but four identical bridges in a row look like a frozen screen
+ * unless the position within the run is on display.
+ *
+ * `arrangement` = { uuid, name } from the active playlist item — PP 21.1's
+ * route. `totalCues` = the count from slide_index, which is 21.4's route,
+ * because 21.4 dropped presentation_info from the active playlist item and
+ * leaves `current_arrangement` as an empty string. Falls back to the raw group
+ * order, which is right for a presentation with no arrangements at all.
  */
-export function slideTotal(pres, arrangement = null) {
-  if (!pres) return null;
-  const gcount = {};
-  for (const g of pres.groups ?? []) gcount[g.uuid] = (g.slides ?? []).length;
+export function arrangeSlides(pres, arrangement = null, totalCues = null) {
+  if (!pres) return [];
+  const byUuid = new Map();
+  for (const g of pres.groups ?? []) byUuid.set(g.uuid, g);
   const arrs = pres.arrangements ?? [];
+  const uuidsOf = (a) => (Array.isArray(a?.groups) ? a.groups : []).map((u) => (typeof u === 'string' ? u : u?.uuid));
+  const lengthOf = (uuids) => uuids.reduce((s, u) => s + (byUuid.get(u)?.slides ?? []).length, 0);
 
   let target = null;
   if (arrangement?.uuid) target = arrs.find((a) => a.id?.uuid === arrangement.uuid);
   if (!target && arrangement?.name) target = arrs.find((a) => a.id?.name === arrangement.name);
+  // 21.4: the only thing identifying the live arrangement is how long it is.
+  // Ambiguous when two arrangements share a length — first wins, and the two
+  // are the same length so the scroll position stays honest either way.
+  if (!target && totalCues != null) target = arrs.find((a) => lengthOf(uuidsOf(a)) === totalCues);
   if (!target && pres.current_arrangement) target = arrs.find((a) => a.id?.uuid === pres.current_arrangement);
 
-  if (target && Array.isArray(target.groups)) {
-    const t = target.groups.reduce((s, u) => s + (gcount[typeof u === 'string' ? u : u?.uuid] || 0), 0);
-    if (t > 0) return t;
+  let order = target ? uuidsOf(target) : [];
+  if (lengthOf(order) === 0) order = (pres.groups ?? []).map((g) => g.uuid);
+
+  // Number each back-to-back run before expanding, while runs are still one
+  // entry per PLAY rather than one per slide.
+  const runs = [];
+  for (const [i, uuid] of order.entries()) {
+    const prev = runs[runs.length - 1];
+    if (prev && order[i - 1] === uuid) prev.push(uuid);
+    else runs.push([uuid]);
   }
-  const raw = Object.values(gcount).reduce((a, b) => a + b, 0);
-  return raw || null;
+
+  const out = [];
+  for (const run of runs) {
+    for (const [k, uuid] of run.entries()) {
+      const g = byUuid.get(uuid);
+      if (!g) continue; // an arrangement referencing a deleted group
+      const rep = run.length > 1 ? { at: k + 1, of: run.length } : null;
+      for (const s of g.slides ?? []) {
+        out.push({
+          text: typeof s.text === 'string' ? s.text : '',
+          section: g.name ?? '',
+          color: hexColor(g.color),
+          note: s.notes || null,
+          rep,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Total slide count of the active presentation for the given arrangement
+ * (songs repeat groups, so different arrangements have different totals).
+ * The length of the expansion above — one definition of "what order is this
+ * played in", so a slide bar and a lyric scroll cannot disagree about it.
+ */
+export function slideTotal(pres, arrangement = null) {
+  return arrangeSlides(pres, arrangement).length || null;
+}
+
+/** The raw `presentation` body of whatever is live. The expensive read here —
+ *  a whole song — so callers cache it against the presentation uuid. */
+export async function readActivePresentation(pp, signal) {
+  return (await ppGet(pp, '/v1/presentation/active', signal))?.presentation ?? null;
 }
 
 async function readSlideCount(pp, signal, arrangement) {
-  return slideTotal((await ppGet(pp, '/v1/presentation/active', signal)).presentation, arrangement);
+  return slideTotal(await readActivePresentation(pp, signal), arrangement);
 }
 
 // ── Timers ────────────────────────────────────────────────────────────────────

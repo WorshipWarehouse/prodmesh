@@ -125,6 +125,8 @@ export type WidgetType =
   | 'room-mode'
   | 'room-health'
   | 'captions'
+  | 'lyrics'
+  | 'slides-left'
   | 'clock';
 
 /** May this widget go on a view of this kind? */

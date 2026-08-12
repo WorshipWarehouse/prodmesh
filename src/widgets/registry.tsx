@@ -15,6 +15,8 @@ import { NowNextWidget } from './NowNextWidget';
 import { RoomHealthWidget } from './RoomHealthWidget';
 import { RoomModeWidget } from './RoomModeWidget';
 import { RunOfShowWidget } from './RunOfShowWidget';
+import { LyricsWidget } from './LyricsWidget';
+import { SlidesLeftWidget } from './SlidesLeftWidget';
 import { LoudnessWidget } from './LoudnessWidget';
 import { LoudnessTrendWidget } from './LoudnessTrendWidget';
 import { ViewersWidget } from './ViewersWidget';
@@ -118,6 +120,30 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     minSize: { w: 2, h: 1 },
     maxSize: { w: 3, h: 3 },
     defaultSpan: 'two-thirds',
+  },
+
+  'slides-left': {
+    title: 'Slides left',
+    description: 'How many slides — or how much video — until the current item ends.',
+    component: SlidesLeftWidget,
+    // One number and a label, so it fits where nothing else does. That is the
+    // point: a control room wall has room for this next to a multiview, and
+    // making it any bigger would only add whitespace around a countdown.
+    size: { w: 1, h: 1 },
+    defaultSpan: 'third',
+  },
+
+  lyrics: {
+    title: 'Lyrics',
+    description: 'The song ProPresenter has open, scrolled to the line that is up.',
+    component: LyricsWidget,
+    // Two rows is the floor because the whole idea is seeing PAST the current
+    // line: at one row this is Now & Next with extra steps. Width buys line
+    // length, which is what stops a lyric wrapping mid-phrase.
+    size: { w: 2, h: 2 },
+    minSize: { w: 2, h: 2 },
+    maxSize: { w: 3, h: 3 },
+    defaultSpan: 'third',
   },
 
   clock: {

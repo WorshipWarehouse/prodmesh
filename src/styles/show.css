@@ -857,3 +857,209 @@ span.ros-track__status {
 }
 
 .wgt__status--down { color: var(--danger); }
+
+/* ── Slides / video left ─────────────────────────────────────────────────────
+
+   A countdown read across a control room, so the number gets the whole cell
+   and the state is carried by colour AND by the border — a tinted edge is
+   what survives being seen from an angle, out of the corner of an eye, on a
+   multiview downscaled to a quarter of a screen. Nothing animates: this sits
+   in a director's peripheral vision for an hour, and movement there is a
+   distraction they cannot turn off. */
+
+.wgt--left {
+  container-type: inline-size;
+  justify-content: space-between;
+}
+
+/* Bigger than the shared .wgt__value, because this one IS the widget rather
+   than a headline above other content. Sized against the cell (cqi) and not
+   the viewport: a 1×1 on a 1600px dashboard and the same 1×1 upscaled on a
+   multiview are different widths of the same tile. */
+.wgt--left .wgt__value {
+  font-size: clamp(2.4rem, 22cqi + 0.4rem, 5rem);
+}
+
+.wgt--left--warn .wgt__value { color: var(--warn); }
+.wgt--left--over .wgt__value { color: var(--danger); }
+
+/* The card belongs to the LAYOUT, not the widget, so the tint reaches it with
+   :has() rather than by widening WidgetProps — the contract that lets a layout
+   be data is worth more than a border. The coloured number carries the state on
+   its own if this selector ever fails; the edge is what survives being seen at
+   an angle, downscaled, out of the corner of an eye. */
+.viewcell:has(.wgt--left--warn) { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.viewcell:has(.wgt--left--over) { border-color: color-mix(in srgb, var(--danger) 65%, var(--border)); }
+
+/* ── Lyrics ──────────────────────────────────────────────────────────────────
+
+   The current line centred, what has gone fading out above it, what is coming
+   plainly below. The fade is a mask rather than an overlay gradient, because an
+   overlay has to know the card's background colour and this widget goes on both
+   a booth dashboard and a black stage screen. mask-image dissolves the CONTENT,
+   so it is right on any background and needs no theme awareness at all. */
+
+.wgt--lyrics {
+  container-type: inline-size;
+  min-height: 0;
+}
+
+.lyr {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.lyr__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none; /* the position is in the header; a bar here is noise */
+
+  /* The top and bottom thirds fade. `scrollIntoView({block:'center'})` puts the
+     live line in the solid middle band, so the fade is what makes "past" and
+     "coming" legible at a glance rather than a decoration. */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgb(0 0 0 / 0.35) 8%,
+    rgb(0 0 0) 30%,
+    rgb(0 0 0) 70%,
+    rgb(0 0 0 / 0.55) 92%,
+    transparent 100%
+  );
+}
+
+.lyr__list::-webkit-scrollbar { display: none; }
+
+/* Half a cell of padding top and bottom, so the FIRST and LAST lines can still
+   reach the middle band. Without it the opening line can never be centred and
+   the song appears to start already scrolled. */
+.lyr__list::before,
+.lyr__list::after {
+  content: '';
+  display: block;
+  height: 38%;
+}
+
+.lyr__row {
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid transparent;
+}
+
+.lyr__section {
+  margin: 10px 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sec, var(--text-dim));
+}
+
+.lyr__row:first-child .lyr__section { margin-top: 0; }
+
+.lyr__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sec, var(--text-dim));
+  flex: none;
+}
+
+/* Which pass through a section this is. Dimmer than the section name because
+   it only matters on the sections that repeat, and on those it matters a lot. */
+.lyr__rep {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.lyr__text {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  /* Scales with the CELL, not the viewport: the same song is read at a desk
+     and from behind a drum kit ten feet from a stage screen. */
+  font-size: clamp(0.95rem, 2.2cqi + 0.5rem, 2rem);
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+/* One projected slide is one block. Its internal line breaks are the ones the
+   operator chose, so they are kept rather than reflowed into a paragraph. */
+.lyr__line { display: block; }
+
+.lyr__note {
+  margin: 2px 0 0;
+  font-size: 0.72em;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* An empty-text cue: an instrumental, a held chord, a deliberate black. Shown
+   as a real beat with a rule through it — the scroll has to keep moving here or
+   it reads as ProPresenter having hung. */
+.lyr__blank {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Holds the beat open when there is no note to put in it — the rule IS the
+     content in that case, and a collapsed row would read as a skipped cue. */
+  min-height: 1.4em;
+  font-size: 0.8em;
+  color: var(--text-dim);
+  text-transform: lowercase;
+  font-variant: small-caps;
+}
+
+.lyr__blank::before,
+.lyr__blank::after {
+  content: '';
+  flex: 1;
+  border-top: 1px dashed var(--border);
+}
+
+/* Already sung. Dimmed as well as masked, so the distinction survives the
+   moment the mask does not — a short song that does not fill the cell. */
+.lyr__row--past { opacity: 0.45; }
+
+.lyr__row--now {
+  border-left-color: var(--sec, var(--accent));
+  opacity: 1;
+}
+
+.lyr__row--now .lyr__text {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.lyr__pos {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.lyr__end {
+  margin-top: 12px;
+  padding-left: 10px;
+  font-size: 0.74em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* The last few cues. A director wants the warning, not the announcement — by
+   the time "End of song" is on screen the decision it informs has been made. */
+.lyr__end--near { color: var(--warn-text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lyr__list { scroll-behavior: auto; }
+}

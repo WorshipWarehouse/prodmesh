@@ -124,6 +124,7 @@ export const roomTopic = {
   health: (roomId: string) => `room:${roomId}:health`,
   video: (roomId: string) => `room:${roomId}:video`,
   captions: (roomId: string) => `room:${roomId}:captions`,
+  lyrics: (roomId: string) => `room:${roomId}:lyrics`,
 };
 
 /** Test hook: drop the connection and every cached value. */
