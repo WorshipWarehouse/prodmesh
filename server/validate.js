@@ -248,6 +248,10 @@ export const WIDGET_TYPES = new Map([
   ['propresenter-controls', { unique: true, display: false, size: { w: 2, h: 1 } }],
   ['slide-notes', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['propresenter-timers', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 1 }, max: { w: 3, h: 3 } }],
+  ['planning-center-service', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['planning-center-timers', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 4 } }],
+  ['planning-center-schedule', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['planning-center-teams', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 4 } }],
 ]);
 
 const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room

@@ -141,7 +141,11 @@ export type WidgetType =
   | 'propresenter-playlist'
   | 'propresenter-controls'
   | 'slide-notes'
-  | 'propresenter-timers';
+  | 'propresenter-timers'
+  | 'planning-center-service'
+  | 'planning-center-timers'
+  | 'planning-center-schedule'
+  | 'planning-center-teams';
 
 /** May this widget go on a view of this kind? */
 export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>

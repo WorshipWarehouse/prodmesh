@@ -21,6 +21,7 @@ import { LoudnessWidget } from './LoudnessWidget';
 import { LoudnessTrendWidget } from './LoudnessTrendWidget';
 import { ViewersWidget } from './ViewersWidget';
 import { ProPresenterControls, ProPresenterPlaylist, ProPresenterSlides, ProPresenterTimers, SlideNotes } from './ProPresenterWidgets';
+import { PlanningCenterSchedule, PlanningCenterService, PlanningCenterTeams, PlanningCenterTimers } from './PlanningCenterWidgets';
 import type { WidgetDef, WidgetType } from './types';
 
 export const widgetRegistry: Record<WidgetType, WidgetDef> = {
@@ -162,6 +163,10 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   'propresenter-controls': { title: 'ProPresenter Controls', description: 'Large previous and next slide controls.', component: ProPresenterControls, size: { w: 2, h: 1 }, kinds: ['dashboard'], defaultSpan: 'third' },
   'slide-notes': { title: 'Slide Notes', description: 'Operator notes for the active ProPresenter cue.', component: SlideNotes, size: { w: 2, h: 1 }, defaultSpan: 'third' },
   'propresenter-timers': { title: 'ProPresenter Timers', description: 'All configured ProPresenter timers, read-only.', component: ProPresenterTimers, size: { w: 2, h: 2 }, minSize: { w: 2, h: 1 }, maxSize: { w: 3, h: 3 }, defaultSpan: 'third' },
+  'planning-center-service': { title: 'Planning Center Service', description: 'The service title, date, and selected service time.', component: PlanningCenterService, size: { w: 2, h: 1 }, defaultSpan: 'third' },
+  'planning-center-timers': { title: 'Planning Center Timers', description: 'Scheduled item start times and lengths from the service plan.', component: PlanningCenterTimers, size: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 3, h: 4 }, defaultSpan: 'third' },
+  'planning-center-schedule': { title: 'Planning Center Schedule', description: 'How far ahead or behind the active service is.', component: PlanningCenterSchedule, size: { w: 2, h: 1 }, defaultSpan: 'third' },
+  'planning-center-teams': { title: 'Planning Center Teams', description: 'Scheduled people grouped by their Planning Center team.', component: PlanningCenterTeams, size: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 3, h: 4 }, defaultSpan: 'third' },
 };
 
 export const widgetTypes = Object.keys(widgetRegistry) as WidgetType[];

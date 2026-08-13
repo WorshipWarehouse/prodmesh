@@ -90,6 +90,15 @@
 .ppitem__empty { padding: 7px; color: var(--text-dim); font-size: .72rem; }
 .ppcue--active { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+.pcw { display: grid; align-content: start; gap: 8px; }
+.pcw__title { font-size: 1.05rem; }
+.pcw__list, .pcw--teams { overflow: auto; }
+.pcw__row { display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .82rem; }
+.pcw__row small { white-space: nowrap; }
+.pcw__team { margin-top: 6px; color: var(--accent); font-weight: 700; text-transform: uppercase; }
+.pcw__delta { font-size: 2rem; line-height: 1; }
+.pcw--behind .pcw__delta { color: #ff9c5b; }
+
 @media (max-width: 900px) {
   .ppitem__slides { grid-template-columns: repeat(auto-fill, minmax(min(max(32px, var(--pp-slide-size, 60px)), 42%), 1fr)); }
 }

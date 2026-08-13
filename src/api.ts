@@ -783,6 +783,8 @@ export interface PlanItem {
   description: string | null;
 }
 
+export interface PlanTeamMember { id: string; name: string; position: string; teamId: string | null; teamName: string; status: string | null; photoUrl: string | null; }
+
 export interface ServicePlan {
   id: string;
   serviceTypeId: string;
@@ -793,6 +795,7 @@ export interface ServicePlan {
   sortDate: string | null;
   times: PlanTime[];
   items: PlanItem[];
+  teamMembers?: PlanTeamMember[];
   _mock?: boolean;
 }
 
