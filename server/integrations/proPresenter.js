@@ -747,12 +747,14 @@ export async function controlAdjacentItem(pp, direction, signal) {
  * the device directly. Returns null for a missing thumbnail. */
 export async function readThumbnail(pp, presentationUuid, cueIndex, signal) {
   if (!/^[a-z0-9-]{8,}$/i.test(String(presentationUuid)) || !validIndex(cueIndex)) return null;
-  // PP renders slides one-based even though our internal/API cue indexes are
-  // zero-based. This is intentionally kept at the boundary, not sprinkled
-  // across widgets where it causes off-by-one thumbnails.
-  const res = await fetch(`${baseUrl(pp)}/v1/presentation/${encodeURIComponent(presentationUuid)}/thumbnail/${cueIndex + 1}`, {
+  // PP 7 documents this endpoint as one-based, but some newer builds respond
+  // with zero-based indexes. In that variant every final cue is requested one
+  // past the presentation, so retry the raw API cue index only after a miss.
+  const get = (index) => fetch(`${baseUrl(pp)}/v1/presentation/${encodeURIComponent(presentationUuid)}/thumbnail/${index}`, {
     signal: withTimeout(signal),
   });
+  let res = await get(cueIndex + 1);
+  if (!res.ok) res = await get(cueIndex);
   if (!res.ok) return null;
   const bytes = Buffer.from(await res.arrayBuffer());
   return { bytes, type: res.headers.get('content-type') || 'image/jpeg' };
