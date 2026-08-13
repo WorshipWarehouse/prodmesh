@@ -242,7 +242,7 @@ export const WIDGET_TYPES = new Map([
     size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 3 },
   }],
   ['propresenter-slides', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 3 } }],
-  ['propresenter-playlist', { unique: true, display: false, size: { w: 3, h: 3 }, min: { w: 2, h: 2 }, max: { w: 3, h: 5 } }],
+  ['propresenter-playlist', { unique: true, display: false, size: { w: 4, h: 4 }, min: { w: 3, h: 4 }, max: { w: 4, h: 4 } }],
   ['propresenter-controls', { unique: true, display: false, size: { w: 2, h: 1 } }],
   ['slide-notes', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['propresenter-timers', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 1 }, max: { w: 3, h: 3 } }],
@@ -366,7 +366,11 @@ function viewWidgetConfig(config) {
     if (typeof config[key] === 'boolean') out[key] = config[key];
   }
   if (['image', 'text'].includes(config.slideMode)) out.slideMode = config.slideMode;
-  if (['compact', 'comfortable', 'large'].includes(config.density)) out.density = config.density;
+  if (config.slideSize != null) {
+    const size = Number(config.slideSize);
+    if (!Number.isInteger(size) || size < 0 || size > 100) throw new Error('Slide size must be 0–100 pixels');
+    out.slideSize = size;
+  }
   if (['current', 'next', 'both'].includes(config.slides)) out.slides = config.slides;
   return out;
 }

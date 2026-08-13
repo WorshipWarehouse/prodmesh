@@ -39,7 +39,7 @@ router.get('/api/rooms/:id/propresenter/diagnostics', requirePermission('config.
 
 router.post('/api/rooms/:id/propresenter/control', requirePermission('propresenter.control'), async (req, res) => {
   const value = room(req, res); if (!value) return;
-  const { viewId, widgetId, action, playlistIndex, cueIndex } = req.body ?? {};
+  const { viewId, widgetId, action, playlistIndex, cueIndex, presentationUuid, isPco } = req.body ?? {};
   if (!id(viewId) || !id(widgetId) || !['previous', 'next', 'previous-item', 'next-item', 'presentation', 'cue'].includes(action)) {
     return res.status(400).json({ error: 'Invalid ProPresenter control request' });
   }
@@ -53,7 +53,7 @@ router.post('/api/rooms/:id/propresenter/control', requirePermission('propresent
   try {
     if (action === 'previous-item') await pp.controlAdjacentItem(value.proPresenter, -1);
     else if (action === 'next-item') await pp.controlAdjacentItem(value.proPresenter, 1);
-    else await pp.control(value.proPresenter, action, { playlistIndex, cueIndex });
+    else await pp.control(value.proPresenter, action, { playlistIndex, cueIndex, presentationUuid: id(presentationUuid) ? presentationUuid : null, isPco: Boolean(isPco) });
     auditSuccess(req, 'propresenter.control', { resourceType: 'view-widget', resourceId: widgetId, details: { action } });
     res.json({ ok: true });
   } catch (err) { res.status(502).json({ error: String(err.message ?? err) }); }

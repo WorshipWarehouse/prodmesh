@@ -18,11 +18,17 @@ const wait = (ms, signal) => new Promise((resolve) => {
 async function watch(roomId, signal) {
   let playlistKey = '';
   let previousRuntime = '';
+  let lastUsablePlaylist = null;
   while (!signal.aborted) {
     const config = rooms[roomId]?.proPresenter;
     try {
       if (!pp.isConfigured(config)) throw new Error('not configured');
-      const next = await pp.readConsoleState(config, signal);
+      let next = await pp.readConsoleState(config, signal);
+      // The focused endpoint occasionally emits a transient empty result while
+      // PP changes selection. Preserve the last complete playlist during that
+      // blip so the operator never sees a false "No focused playlist" state.
+      if (next.focusedPlaylist?.items?.length) lastUsablePlaylist = next.focusedPlaylist;
+      else if (lastUsablePlaylist) next = { ...next, focusedPlaylist: lastUsablePlaylist };
       const key = JSON.stringify(next.focusedPlaylist);
       const runtime = JSON.stringify(next.runtime);
       const full = key !== playlistKey;

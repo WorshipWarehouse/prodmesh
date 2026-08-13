@@ -42,6 +42,7 @@ export function ViewEditor({
   // Which card is in keyboard "grab" mode, and what the last move announced.
   const [grabbed, setGrabbed] = useState<string | null>(null);
   const [announcement, setAnnounce] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
 
   const placements = view.widgets;
 
@@ -143,7 +144,6 @@ export function ViewEditor({
     const held = grabbed === placement.id;
     const def = isWidgetType(placement.type) ? widgetRegistry[placement.type] : null;
     const resizable = def ? widgetResizable(def) : false;
-    const pp = placement.type.startsWith('propresenter-') || placement.type === 'slide-notes';
     return (
       <div className="viewcell__chrome">
         <button
@@ -160,6 +160,7 @@ export function ViewEditor({
               : 'Drag to move, or press Enter and use the arrow keys'
           }
           {...moveHandlers(placement)}
+          onClick={() => setSelected(placement.id)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -196,13 +197,6 @@ export function ViewEditor({
             aria-hidden
             {...resizeHandlers(placement, boundsFor(placement.type))}
           />
-        )}
-        {pp && (
-          <details className="viewcell__settings" onPointerDown={(event) => event.stopPropagation()}>
-            <summary>ProPresenter settings</summary>
-            {(placement.type === 'propresenter-playlist' || placement.type === 'propresenter-controls') && <label><input type="checkbox" checked={Boolean(placement.config.slideControls)} onChange={(event) => setConfig(placement.id, { slideControls: event.target.checked })} /> Slide controls enabled</label>}
-            {placement.type === 'propresenter-playlist' && <><label><input type="checkbox" checked={Boolean(placement.config.keyboardControls)} onChange={(event) => setConfig(placement.id, { keyboardControls: event.target.checked })} /> Arrow keys and spacebar enabled</label><label><input type="checkbox" checked={Boolean(placement.config.followActive)} onChange={(event) => setConfig(placement.id, { followActive: event.target.checked })} /> Follow active cue</label><label>Density <select value={String(placement.config.density ?? 'comfortable')} onChange={(event) => setConfig(placement.id, { density: event.target.value })}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="large">Large</option></select></label></>}
-          </details>
         )}
       </div>
     );
@@ -256,8 +250,16 @@ export function ViewEditor({
         )}
       </div>
 
+      <WidgetInspector placement={placements.find((p) => p.id === selected) ?? null} onChange={setConfig} />
+
       {/* Every keyboard move says where it landed, or that it refused. */}
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>
   );
+}
+
+/** Settings live beside the canvas, never inside a small widget cell. */
+function WidgetInspector({ placement, onChange }: { placement: ViewPlacement | null; onChange: (id: string, patch: Record<string, unknown>) => void }) {
+  const pp = placement && (placement.type === 'propresenter-playlist' || placement.type === 'propresenter-controls');
+  return <aside className="widgetinspector"><h2>Widget settings</h2>{!placement ? <p>Select a widget to configure it.</p> : !pp ? <p><strong>{placement.type}</strong><br />This widget has no settings.</p> : <><p className="widgetinspector__name">{placement.type === 'propresenter-playlist' ? 'ProPresenter Playlist' : 'ProPresenter Controls'}</p><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.slideControls)} onChange={(event) => onChange(placement.id, { slideControls: event.target.checked })} /> Enable slide controls</label>{placement.type === 'propresenter-playlist' && <><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.keyboardControls)} onChange={(event) => onChange(placement.id, { keyboardControls: event.target.checked })} /> Enable arrow keys and spacebar</label><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.followActive)} onChange={(event) => onChange(placement.id, { followActive: event.target.checked })} /> Follow active cue</label><label>Slide display<select value={placement.config.slideMode ?? 'image'} onChange={(event) => onChange(placement.id, { slideMode: event.target.value })}><option value="image">Rendered previews</option><option value="text">Slide text</option></select></label><label>Slide width (px)<input type="number" min="0" max="100" step="1" value={placement.config.slideSize ?? 60} onChange={(event) => onChange(placement.id, { slideSize: Number(event.target.value) })} /><small>0–100 px. Lower values fit more cues across; 0 uses a safe 32 px rendering floor.</small></label></>}</>}</aside>;
 }

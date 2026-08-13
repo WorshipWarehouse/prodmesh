@@ -35,7 +35,7 @@ export interface WidgetConfig {
   keyboardControls?: boolean;
   followActive?: boolean;
   slideMode?: 'image' | 'text';
-  density?: 'compact' | 'comfortable' | 'large';
+  slideSize?: number;
   slides?: 'current' | 'next' | 'both';
   /** Runtime-only identity injected by ViewCanvas; never persisted. */
   viewId?: string;

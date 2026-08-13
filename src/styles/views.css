@@ -424,7 +424,7 @@
 
 .vieweditor {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr) 240px;
   gap: 16px;
   align-items: start;
 }
@@ -445,6 +445,26 @@
   font-size: 0.88rem;
   text-align: center;
 }
+
+/* A deliberate inspector, matching the palette's visual language. Settings
+   need space to be read; putting them inside a 1×1 preview makes both the
+   settings and the preview worse. */
+.widgetinspector {
+  position: sticky;
+  top: 74px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  color: var(--text-dim);
+  font-size: .86rem;
+}
+.widgetinspector h2 { margin: 0 0 10px; color: var(--text); font-size: .9rem; }
+.widgetinspector p { margin: 0; line-height: 1.4; }
+.widgetinspector__name { color: var(--text); font-weight: 650; margin-bottom: 12px !important; }
+.widgetinspector label { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; color: var(--text-dim); }
+.widgetinspector .widgetinspector__check { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--text); }
+.widgetinspector select { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
 
 /* ── Palette ─────────────────────────────────────────────────────────────── */
 
