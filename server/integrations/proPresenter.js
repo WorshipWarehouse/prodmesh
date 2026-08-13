@@ -699,21 +699,19 @@ export async function control(pp, action, input = {}, signal) {
   }
   if (action === 'cue') {
     if (!validIndex(input.cueIndex)) throw new Error('Invalid cue index');
-    // ProPresenter trigger routes use one-based cue numbers, while the
-    // slide-index feed we use internally is zero-based. ChurchBoard follows
-    // this same boundary convention. Try the presentation route for every
-    // item first; PCO can reject it, in which case activating its playlist
-    // placement and then targeting the active presentation is reliable.
-    const cueNumber = input.cueIndex + 1;
+    // The display number is one-based, but ProPresenter's trigger endpoint
+    // itself expects the zero-based API cue index. Keep that conversion at the
+    // UI boundary; sending the display number advances every mouse cue by one.
+    const cueIndex = input.cueIndex;
     if (input.presentationUuid) {
-      try { return await ppControlGet(pp, `/v1/presentation/${encodeURIComponent(input.presentationUuid)}/trigger/${cueNumber}`, signal); }
+      try { return await ppControlGet(pp, `/v1/presentation/${encodeURIComponent(input.presentationUuid)}/trigger/${cueIndex}`, signal); }
       catch { /* deliberate fallback below */ }
     }
     await ppControlGet(pp, `/v1/playlist/focused/${input.playlistIndex}/trigger`, signal);
     // PP applies playlist activation asynchronously. Waiting a beat prevents
     // the cue request from being aimed at the presentation that just left air.
     await new Promise((resolve) => setTimeout(resolve, 150));
-    return ppControlGet(pp, `/v1/presentation/active/${cueNumber}/trigger`, signal);
+    return ppControlGet(pp, `/v1/presentation/active/${cueIndex}/trigger`, signal);
   }
   throw new Error('Unknown ProPresenter action');
 }
