@@ -158,7 +158,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     defaultSpan: 'third',
   },
   'propresenter-slides': { title: 'ProPresenter Slides', description: 'Current ProPresenter cue, notes and foreground video status.', component: ProPresenterSlides, size: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 3, h: 3 }, defaultSpan: 'third' },
-  'propresenter-playlist': { title: 'ProPresenter Playlist', description: 'Focused playlist with every available cue and optional slide controls.', component: ProPresenterPlaylist, size: { w: 4, h: 4 }, minSize: { w: 3, h: 4 }, maxSize: { w: 4, h: 4 }, kinds: ['dashboard'], defaultSpan: 'two-thirds' },
+  'propresenter-playlist': { title: 'ProPresenter Playlist', description: 'Focused playlist with every available cue and optional slide controls.', component: ProPresenterPlaylist, size: { w: 4, h: 4 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 5 }, kinds: ['dashboard'], defaultSpan: 'two-thirds' },
   'propresenter-controls': { title: 'ProPresenter Controls', description: 'Large previous and next slide controls.', component: ProPresenterControls, size: { w: 2, h: 1 }, kinds: ['dashboard'], defaultSpan: 'third' },
   'slide-notes': { title: 'Slide Notes', description: 'Operator notes for the active ProPresenter cue.', component: SlideNotes, size: { w: 2, h: 1 }, defaultSpan: 'third' },
   'propresenter-timers': { title: 'ProPresenter Timers', description: 'All configured ProPresenter timers, read-only.', component: ProPresenterTimers, size: { w: 2, h: 2 }, minSize: { w: 2, h: 1 }, maxSize: { w: 3, h: 3 }, defaultSpan: 'third' },

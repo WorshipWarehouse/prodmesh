@@ -242,7 +242,9 @@ export const WIDGET_TYPES = new Map([
     size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 3 },
   }],
   ['propresenter-slides', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 3 } }],
-  ['propresenter-playlist', { unique: true, display: false, size: { w: 4, h: 4 }, min: { w: 3, h: 4 }, max: { w: 4, h: 4 } }],
+  // A playlist needs useful room by default, but operators choose its height
+  // for the dashboard layout just like its width.
+  ['propresenter-playlist', { unique: true, display: false, size: { w: 4, h: 4 }, min: { w: 2, h: 2 }, max: { w: 4, h: 5 } }],
   ['propresenter-controls', { unique: true, display: false, size: { w: 2, h: 1 } }],
   ['slide-notes', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['propresenter-timers', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 1 }, max: { w: 3, h: 3 } }],
