@@ -10,9 +10,12 @@ import type { WidgetProps } from './types';
 function useProPresenterState(roomId: string) {
   const frame = useTopic<ProPresenterState>(roomTopic.proPresenter(roomId));
   const full = useRef<ProPresenterState | undefined>(undefined);
-  if (frame?.full) full.current = frame;
+  // A freshly reconnected PP stream can briefly label an empty focus response
+  // as a full frame. Never let that erase the playlist already on screen.
+  const hasPlaylist = Boolean(frame?.focusedPlaylist?.items?.length);
+  if (frame?.full && (hasPlaylist || !full.current?.focusedPlaylist?.items?.length)) full.current = frame;
   else if (frame && full.current) full.current = { ...full.current, ...frame, runtime: frame.runtime ?? full.current.runtime };
-  return frame?.full ? frame : (full.current ?? frame);
+  return full.current ?? frame;
 }
 const fmt = (n: number | null) => n == null ? '—' : `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
 
