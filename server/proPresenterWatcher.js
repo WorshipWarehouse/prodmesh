@@ -7,6 +7,10 @@ import * as pp from './integrations/proPresenter.js';
 
 const watchers = new Map();
 const states = new Map();
+// Keep the last rich playlist across SSE/browser watcher restarts. Device
+// polling is deliberately ref-counted, but an operator should not lose their
+// console merely because a tab briefly reconnects or PP has a short outage.
+const lastUsablePlaylists = new Map();
 export const proPresenterTopic = (roomId) => `room:${roomId}:propresenter`;
 
 const wait = (ms, signal) => new Promise((resolve) => {
@@ -18,7 +22,7 @@ const wait = (ms, signal) => new Promise((resolve) => {
 async function watch(roomId, signal) {
   let playlistKey = '';
   let previousRuntime = '';
-  let lastUsablePlaylist = null;
+  let lastUsablePlaylist = lastUsablePlaylists.get(roomId) ?? null;
   while (!signal.aborted) {
     const config = rooms[roomId]?.proPresenter;
     try {
@@ -27,7 +31,10 @@ async function watch(roomId, signal) {
       // The focused endpoint occasionally emits a transient empty result while
       // PP changes selection. Preserve the last complete playlist during that
       // blip so the operator never sees a false "No focused playlist" state.
-      if (next.focusedPlaylist?.items?.length) lastUsablePlaylist = next.focusedPlaylist;
+      if (next.focusedPlaylist?.items?.length) {
+        lastUsablePlaylist = next.focusedPlaylist;
+        lastUsablePlaylists.set(roomId, lastUsablePlaylist);
+      }
       else if (lastUsablePlaylist) next = { ...next, focusedPlaylist: lastUsablePlaylist };
       const key = JSON.stringify(next.focusedPlaylist);
       const runtime = JSON.stringify(next.runtime);
@@ -49,6 +56,13 @@ async function watch(roomId, signal) {
 
 function start(roomId) {
   if (watchers.has(roomId)) return;
+  const cached = lastUsablePlaylists.get(roomId);
+  // `subscribe()` calls start before snapshot(), so seed a reconnecting
+  // browser synchronously with the last usable playlist rather than a blank
+  // "No focused playlist" panel while the new device poll starts.
+  if (cached && !states.has(roomId)) {
+    states.set(roomId, { focusedPlaylist: cached, activePlaylist: null, runtime: null, full: true, connected: false });
+  }
   const controller = new AbortController(); watchers.set(roomId, controller);
   watch(roomId, controller.signal).catch(() => {});
 }
