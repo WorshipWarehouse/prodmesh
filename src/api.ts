@@ -970,6 +970,7 @@ export interface ShowCurrent {
   itemId: string | null;
   itemIndex: number | null;
   itemName: string | null;
+  startedAt?: number | null;
   slideIndex: number | null;
   slideCount: number | null;
 }

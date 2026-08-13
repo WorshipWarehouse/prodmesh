@@ -537,7 +537,7 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
     startedAt,
     items,
     itemById: new Map(items.map((i) => [i.id, i])),
-    current: { itemId: null, itemIndex: null, itemName: null, slideIndex: null, slideCount: null },
+    current: { itemId: null, itemIndex: null, itemName: null, startedAt: null, slideIndex: null, slideCount: null },
     follow: true,
     ppConnected: null,
     config: showConfig.getConfig(roomId, planId), // per-event automation settings
@@ -665,6 +665,7 @@ function onPoll(show, s) {
 function applyCurrent(show, itemId, fallbackName, index) {
   const pc = show.itemById.get(itemId);
   const name = pc?.title ?? fallbackName ?? null;
+  if (show.current.itemId !== itemId) show.current.startedAt = Date.now();
   show.current.itemId = itemId;
   show.current.itemIndex = index ?? null;
   show.current.itemName = name;
