@@ -83,6 +83,7 @@
 .ppitem__slides { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(32px, var(--pp-slide-size, 60px)), 1fr)); gap: 6px; padding: 7px; }
 .ppcue { position: relative; display: grid; grid-template-rows: auto auto; gap: 3px; min-width: 0; padding: 4px; font-size: 11px; }
 .ppcue img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 3px; background: #000; }
+.ppcue__fallback { display: grid; min-height: 3rem; place-items: center; padding: .45rem; color: var(--text-dim); text-align: center; }
 .ppcue b { position: absolute; z-index: 2; top: 7px; right: 7px; padding: 1px 4px; border-radius: 99px; background: #000c; font-size: .6rem; }
 .ppcue__section { position: absolute; z-index: 2; top: 7px; left: 7px; max-width: calc(100% - 34px); overflow: hidden; padding: 2px 4px; border-left: 3px solid var(--part-color); border-radius: 3px; background: #05080de6; color: #fff !important; font-size: .55rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .ppitem__empty { padding: 7px; color: var(--text-dim); font-size: .72rem; }

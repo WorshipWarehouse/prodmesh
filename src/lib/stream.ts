@@ -26,6 +26,7 @@ const values = new Map<string, unknown>();
 let source: EventSource | null = null;
 let connected = ''; // the topic list `source` was opened with
 let pending: ReturnType<typeof setTimeout> | null = null;
+let reconnect: ReturnType<typeof setTimeout> | null = null;
 
 // Long enough to batch a page's worth of mounting widgets into one connection,
 // short enough that nobody perceives it.
@@ -42,6 +43,7 @@ function wanted() {
 
 function connect() {
   pending = null;
+  if (reconnect) { clearTimeout(reconnect); reconnect = null; }
   const topics = wanted();
   if (topics === connected && source) return;
 
@@ -61,9 +63,14 @@ function connect() {
       /* a malformed frame must not tear down the connection */
     }
   });
-  // No error handler: EventSource reconnects on its own, and on reconnect the
-  // server re-sends every topic's current value. Adding our own retry on top
-  // would just race with the browser's.
+  // Native EventSource retries, but some browsers leave a dead LAN stream in
+  // CONNECTING indefinitely after a PP/server outage. Own a bounded reconnect
+  // so the current topic snapshot is re-requested without an operator refresh.
+  es.onerror = () => {
+    if (source !== es || reconnect) return;
+    es.close(); source = null; connected = '';
+    reconnect = setTimeout(() => { reconnect = null; connect(); }, 1000);
+  };
 }
 
 function schedule() {
@@ -132,6 +139,8 @@ export const roomTopic = {
 export function resetStream() {
   if (pending) clearTimeout(pending);
   pending = null;
+  if (reconnect) clearTimeout(reconnect);
+  reconnect = null;
   source?.close();
   source = null;
   connected = '';

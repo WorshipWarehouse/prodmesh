@@ -394,6 +394,16 @@ function hexColor(c) {
   return `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// PP uses `label` or `name` for some cue types (including the final utility
+// cue in certain Planning Center presentations), rather than `text`.
+function cueText(cue) {
+  return typeof cue?.text === 'string' && cue.text.trim()
+    ? cue.text
+    : typeof cue?.label === 'string' && cue.label.trim()
+      ? cue.label
+      : typeof cue?.name === 'string' ? cue.name : '';
+}
+
 /**
  * Flatten a presentation into the cue list it is actually played as.
  *
@@ -457,7 +467,7 @@ export function arrangeSlides(pres, arrangement = null, totalCues = null) {
       const rep = run.length > 1 ? { at: k + 1, of: run.length } : null;
       for (const [sourceIndex, s] of (g.slides ?? []).entries()) {
         out.push({
-          text: typeof s.text === 'string' ? s.text : '',
+          text: cueText(s),
           section: g.name ?? '',
           color: hexColor(g.color),
           note: s.notes || null,

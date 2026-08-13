@@ -368,7 +368,7 @@ function viewWidgetConfig(config) {
   if (['image', 'text'].includes(config.slideMode)) out.slideMode = config.slideMode;
   if (config.slideSize != null) {
     const size = Number(config.slideSize);
-    if (!Number.isInteger(size) || size < 0 || size > 150) throw new Error('Slide size must be 0–150 pixels');
+    if (!Number.isInteger(size) || size < 0 || size > 200) throw new Error('Slide size must be 0–200 pixels');
     out.slideSize = size;
   }
   if (['current', 'next', 'both'].includes(config.slides)) out.slides = config.slides;
