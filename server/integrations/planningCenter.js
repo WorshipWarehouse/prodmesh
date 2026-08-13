@@ -314,6 +314,32 @@ export function getPlanItems(serviceType, planId) {
   });
 }
 
+/** Scheduled team members for a plan. Keep only operational assignment data;
+ * contact details never leave Planning Center. */
+export function getPlanTeamMembers(serviceType, planId) {
+  return cached(`team-members:${planId}`, async () => {
+    if (!isConfigured()) return mockTeamMembers();
+    const body = await pcGet(`/service_types/${pcId(serviceType.id, 'service type id')}/plans/${pcId(planId, 'plan id')}/team_members?filter=not_declined&include=person,team&per_page=100`);
+    const included = new Map((body.included ?? []).map((row) => [`${row.type}:${row.id}`, row]));
+    return (body.data ?? []).map((row) => {
+      const attrs = row.attributes ?? {};
+      const teamRef = row.relationships?.team?.data ?? {};
+      const personRef = row.relationships?.person?.data ?? {};
+      const team = included.get(`${teamRef.type ?? 'Team'}:${teamRef.id}`)?.attributes ?? {};
+      const person = included.get(`${personRef.type ?? 'Person'}:${personRef.id}`)?.attributes ?? {};
+      return {
+        id: row.id,
+        name: attrs.name ?? person.full_name ?? person.name ?? 'Unassigned',
+        position: attrs.team_position_name ?? 'Team member',
+        teamId: teamRef.id ?? null,
+        teamName: team.name ?? 'Team',
+        status: attrs.status ?? null,
+        photoUrl: person.photo_thumbnail_url ?? person.photo_url ?? attrs.photo_thumbnail ?? null,
+      };
+    });
+  });
+}
+
 /** Series artwork + plan notes for the Event Detail page.
  *  Artwork lives on the plan's Series (verified live: `?include=series` →
  *  attributes.artwork_for_plan etc.); notes are the plan-level category notes. */
@@ -401,6 +427,14 @@ function mockItems() {
     leader: r.leader ?? null,
     description: null,
   }));
+}
+
+function mockTeamMembers() {
+  return [
+    { id: 'mock-team-1', name: 'Avery', position: 'Worship Leader', teamId: 'band', teamName: 'Band', status: 'Confirmed', photoUrl: null },
+    { id: 'mock-team-2', name: 'Riley', position: 'Guitar', teamId: 'band', teamName: 'Band', status: 'Confirmed', photoUrl: null },
+    { id: 'mock-team-3', name: 'Pastor Dave', position: 'Speaker', teamId: 'speaking', teamName: 'Speaking', status: 'Confirmed', photoUrl: null },
+  ];
 }
 
 function mockDetail() {

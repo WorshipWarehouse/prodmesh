@@ -66,7 +66,7 @@ export function ViewCanvas({
           key={placement.id}
           roomId={view.roomId}
           placement={placement}
-          config={mergeConfig(placement, config)}
+          config={{ ...mergeConfig(placement, config), viewId: view.id, widgetId: placement.id }}
           chrome={chromeFor?.(placement)}
         />
       ))}

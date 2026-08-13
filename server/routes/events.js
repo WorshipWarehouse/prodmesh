@@ -67,9 +67,10 @@ router.get('/api/rooms/:id/plan/:planId', async (req, res) => {
     const plan = (await upcomingForRoom(room.planningCenter, 10)).find((p) => p.id === req.params.planId);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
     const st = stOf(plan);
-    [plan.times, plan.items] = await Promise.all([
+    [plan.times, plan.items, plan.teamMembers] = await Promise.all([
       pco.getPlanTimes(st, plan.id),
       pco.getPlanItems(st, plan.id),
+      pco.getPlanTeamMembers(st, plan.id).catch(() => []),
     ]);
     res.json({ live: pco.isConfigured(), plan });
   } catch (err) {
@@ -297,9 +298,10 @@ router.get('/api/rooms/:id/service', async (req, res) => {
     await Promise.all(
       plans.map(async (plan, i) => {
         const st = stOf(plan);
-        [plan.times, plan.items] = await Promise.all([
+        [plan.times, plan.items, plan.teamMembers] = await Promise.all([
           pco.getPlanTimes(st, plan.id),
           i === 0 ? pco.getPlanItems(st, plan.id) : Promise.resolve([]),
+          i === 0 ? pco.getPlanTeamMembers(st, plan.id).catch(() => []) : Promise.resolve([]),
         ]);
       }),
     );
