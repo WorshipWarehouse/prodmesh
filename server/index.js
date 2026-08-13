@@ -25,6 +25,7 @@ import './roomHealth.js'; // registers the room:*:health topic
 import './videoWatcher.js'; // registers the room:*:video topic
 import './captionWatcher.js'; // registers the room:*:captions topic
 import './lyricsWatcher.js'; // registers the room:*:lyrics topic
+import './proPresenterWatcher.js'; // registers compact/rich ProPresenter console state
 import roomsRouter from './routes/rooms.js';
 import showsRouter from './routes/shows.js';
 import streamRouter from './routes/stream.js';
@@ -35,6 +36,7 @@ import assistanceRouter from './routes/assistance.js';
 import authRouter from './routes/auth.js';
 import adminConfigRouter from './routes/adminConfig.js';
 import systemRouter from './routes/system.js';
+import proPresenterRouter from './routes/proPresenter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -92,6 +94,7 @@ app.use(viewsRouter);
 app.use(authRouter);
 app.use(adminConfigRouter);
 app.use(systemRouter);
+app.use(proPresenterRouter);
 
 // ── Static frontend (production) ───────────────────────────────────────────────
 const distDir = join(__dirname, '..', 'dist');

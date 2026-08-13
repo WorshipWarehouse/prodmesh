@@ -31,6 +31,15 @@ export interface WidgetConfig {
   planId?: string;
   /** Which service time within that plan. Omitted = the plan's first service. */
   timeId?: string;
+  slideControls?: boolean;
+  keyboardControls?: boolean;
+  followActive?: boolean;
+  slideMode?: 'image' | 'text';
+  density?: 'compact' | 'comfortable' | 'large';
+  slides?: 'current' | 'next' | 'both';
+  /** Runtime-only identity injected by ViewCanvas; never persisted. */
+  viewId?: string;
+  widgetId?: string;
 }
 
 export interface WidgetProps {
@@ -127,7 +136,12 @@ export type WidgetType =
   | 'captions'
   | 'lyrics'
   | 'slides-left'
-  | 'clock';
+  | 'clock'
+  | 'propresenter-slides'
+  | 'propresenter-playlist'
+  | 'propresenter-controls'
+  | 'slide-notes'
+  | 'propresenter-timers';
 
 /** May this widget go on a view of this kind? */
 export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>

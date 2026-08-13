@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   ['rooms.mode.override_lock', 'Override protected modes', 'Bypass a scheduled room-mode lockout.'],
   ['shows.operate', 'Operate shows', 'Start, end, and manually follow a show.'],
   ['shows.configure', 'Configure show automation', 'Edit ProPresenter mappings and automation.'],
+  ['propresenter.control', 'Control ProPresenter', 'Trigger ProPresenter slides and playlist items from an approved dashboard widget.'],
   ['history.delete', 'Delete recorded shows', 'Remove a recorded run of show (and its timing/loudness data) from history.'],
   ['reports.view', 'View reports', 'View completed show reports and analytics.'],
   ['settings.manage', 'Manage settings', 'Edit operational settings and schedules.'],

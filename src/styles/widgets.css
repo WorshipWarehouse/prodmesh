@@ -62,3 +62,19 @@
   color: var(--text-dim);
   font-size: 0.85rem;
 }
+
+/* ProPresenter console: compact enough for a booth, but all state remains
+   textual when the thumbnail endpoint cannot supply an image. */
+.ppwidget { min-height: 0; overflow: auto; color: var(--text); }
+.ppwidget h3, .ppwidget p { margin: 0 0 8px; }
+.ppwidget h3, .ppwidget header { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.ppwidget small { display: block; color: var(--text-dim); }
+.ppcontrols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ppcontrols button, .ppitem > button, .ppcue { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; padding: 8px; text-align: left; }
+.ppitem { margin-top: 10px; border-left: 3px solid transparent; }
+.ppitem--active { border-left-color: var(--accent); }
+.ppitem > button { width: 100%; font-weight: 650; }
+.ppcue { display: grid; gap: 3px; width: 100%; margin-top: 3px; }
+.ppcue--active { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ppwidget--compact .ppcue { padding: 4px 6px; font-size: .78rem; }
+.ppwidget--large .ppcue, .ppwidget--large .ppitem > button { padding: 12px; font-size: 1.06rem; }

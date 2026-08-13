@@ -85,6 +85,15 @@ export function getView(viewId) {
   return row ? rowToView(row, widgetsFor(row.id)) : null;
 }
 
+/** Resolve a stored placement for a control request. The database, not a
+ * browser-provided type, decides whether this widget may touch a device. */
+export function getWidget(viewId, widgetId) {
+  const row = getDb().prepare(
+    'SELECT vw.*, v.room_id AS roomId, v.kind AS viewKind FROM view_widgets vw JOIN views v ON v.id = vw.view_id WHERE vw.view_id = ? AND vw.id = ?',
+  ).get(viewId, widgetId);
+  return row ? { ...rowToWidget(row), roomId: row.roomId, viewKind: row.viewKind } : null;
+}
+
 /**
  * Resolve the key in a URL. A station stores a view's UUID, but the URL a
  * human types into a kiosk is the slug — so both work, and renaming a view

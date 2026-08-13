@@ -74,6 +74,9 @@ export function ViewEditor({
   const resizeTo = (id: string, size: WidgetSize) =>
     onChange(placements.map((p) => (p.id === id ? { ...p, ...size } : p)));
 
+  const setConfig = (id: string, patch: Record<string, unknown>) =>
+    onChange(placements.map((p) => (p.id === id ? { ...p, config: { ...p.config, ...patch } } : p)));
+
   /** How far a widget may be stretched — the server enforces the same bounds. */
   const boundsFor = (type: string) => {
     const def = isWidgetType(type) ? widgetRegistry[type] : null;
@@ -140,6 +143,7 @@ export function ViewEditor({
     const held = grabbed === placement.id;
     const def = isWidgetType(placement.type) ? widgetRegistry[placement.type] : null;
     const resizable = def ? widgetResizable(def) : false;
+    const pp = placement.type.startsWith('propresenter-') || placement.type === 'slide-notes';
     return (
       <div className="viewcell__chrome">
         <button
@@ -192,6 +196,13 @@ export function ViewEditor({
             aria-hidden
             {...resizeHandlers(placement, boundsFor(placement.type))}
           />
+        )}
+        {pp && (
+          <details className="viewcell__settings" onPointerDown={(event) => event.stopPropagation()}>
+            <summary>ProPresenter settings</summary>
+            {(placement.type === 'propresenter-playlist' || placement.type === 'propresenter-controls') && <label><input type="checkbox" checked={Boolean(placement.config.slideControls)} onChange={(event) => setConfig(placement.id, { slideControls: event.target.checked })} /> Slide controls enabled</label>}
+            {placement.type === 'propresenter-playlist' && <><label><input type="checkbox" checked={Boolean(placement.config.keyboardControls)} onChange={(event) => setConfig(placement.id, { keyboardControls: event.target.checked })} /> Arrow keys and spacebar enabled</label><label><input type="checkbox" checked={Boolean(placement.config.followActive)} onChange={(event) => setConfig(placement.id, { followActive: event.target.checked })} /> Follow active cue</label><label>Density <select value={String(placement.config.density ?? 'comfortable')} onChange={(event) => setConfig(placement.id, { density: event.target.value })}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="large">Large</option></select></label></>}
+          </details>
         )}
       </div>
     );

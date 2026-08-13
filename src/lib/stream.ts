@@ -125,6 +125,7 @@ export const roomTopic = {
   video: (roomId: string) => `room:${roomId}:video`,
   captions: (roomId: string) => `room:${roomId}:captions`,
   lyrics: (roomId: string) => `room:${roomId}:lyrics`,
+  proPresenter: (roomId: string) => `room:${roomId}:propresenter`,
 };
 
 /** Test hook: drop the connection and every cached value. */

@@ -47,6 +47,15 @@ export const getRooms = () => getJson<RoomMeta[]>('/api/rooms');
 export const getRoomState = (id: string) =>
   getJson<RoomState>(`/api/rooms/${encodeURIComponent(id)}/state`);
 
+export interface ProPresenterCue { index: number; number: number; text: string; note: string | null; section: string; color: string | null; }
+export interface ProPresenterItem { index: number; title: string; presentationTitle?: string | null; presentationUuid: string | null; triggerable: boolean; placeholder: boolean; isPco: boolean; slides: ProPresenterCue[]; }
+export interface ProPresenterState { full?: boolean; connected?: boolean; focusedPlaylist?: { name: string | null; items: ProPresenterItem[] }; runtime: { activePresentationUuid: string | null; activePlaylistIndex: number | null; activeCueIndex: number | null; activeCueNumber: number | null; totalCues: number | null; timers: Array<{ uuid: string | null; name: string; state: string; remainingSeconds: number | null }>; video: { name: string | null; seconds: number | null; duration: number } | null } | null; }
+
+export async function proPresenterControl(roomId: string, input: { viewId?: string; widgetId?: string; action: 'previous' | 'next' | 'previous-item' | 'next-item' | 'presentation' | 'cue'; playlistIndex?: number; cueIndex?: number }) {
+  const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/propresenter/control`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify(input) });
+  await requireOk(res);
+}
+
 /** Thrown when a mode change is locked and the override PIN was missing/wrong. */
 export class OverrideRequiredError extends Error {
   constructor() {
@@ -1205,6 +1214,12 @@ export interface ViewPlacement {
 export interface WidgetConfigJson {
   planId?: string;
   timeId?: string;
+  slideControls?: boolean;
+  keyboardControls?: boolean;
+  followActive?: boolean;
+  slideMode?: 'image' | 'text';
+  density?: 'compact' | 'comfortable' | 'large';
+  slides?: 'current' | 'next' | 'both';
 }
 
 export interface ViewSummary {
