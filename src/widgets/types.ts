@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { ViewKind } from '../lib/gridLayout';
+import type { IntegrationId } from '../components/IntegrationBrand';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Widget contract.
@@ -79,6 +80,8 @@ export interface WidgetDef {
   title: string;
   /** One line on what it shows — the picker's subtitle. */
   description: string;
+  /** The system that supplies the widget's primary live data. */
+  integration?: IntegrationId;
   component: ComponentType<WidgetProps>;
 
   /** Size in grid units on a View canvas (6 wide on a dashboard, 3 on a

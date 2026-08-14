@@ -483,6 +483,19 @@
   color: var(--text-dim);
 }
 
+.palette__group + .palette__group { margin-top: 16px; }
+.palette__group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 7px;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .palette__list {
   list-style: none;
   margin: 0;
