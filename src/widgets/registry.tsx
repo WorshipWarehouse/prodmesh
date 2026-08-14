@@ -94,7 +94,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   'room-mode': {
     title: 'Room mode',
     description: 'What mode the room is in, in its own colour. Read-only.',
-    integration: 'prodmesh',
+    integration: 'companion',
     component: RoomModeWidget,
     // Two columns because this one shows WORDS. "Sunday Service" in a single
     // cell is either three characters wide or clipped.

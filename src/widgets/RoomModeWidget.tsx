@@ -1,8 +1,9 @@
-import { Lock, Radio } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { getRoom, type RoomMeta, type RoomState } from '../api';
 import { useQuery } from '../lib/useQuery';
 import { roomKey } from '../lib/keys';
 import { useTopic, roomTopic } from '../lib/stream';
+import { IntegrationBrand } from '../components/IntegrationBrand';
 import type { WidgetProps } from './types';
 
 // What mode the room is in, in the room's own colour.
@@ -60,7 +61,7 @@ export function RoomModeWidget({ roomId }: WidgetProps) {
   return (
     <div className={`wgt wgt--mode${offline ? ' wgt--fault' : ''}`}>
       <div className="wgt__head">
-        <span className="wgt__icon"><Radio size={16} /></span>
+        <span className="wgt__icon"><IntegrationBrand integration="companion" /></span>
         <span className="wgt__title">Room mode</span>
         {protection?.active && (
           <span className="wgt__status" title={protection.label ?? 'Schedule protection'}>

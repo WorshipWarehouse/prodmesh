@@ -1305,7 +1305,7 @@ function AuditTrail() {
 
 const TILE_TYPE_LABELS: Record<Tile['type'], string> = {
   route: 'Room Status link',
-  companion: 'Companion',
+  companion: 'Bitfocus Companion',
   screenshare: 'Screen Sharing (Mac)',
   link: 'Web link',
   placeholder: 'Placeholder',
@@ -2317,10 +2317,10 @@ function CompanionEditor({ roomId, initial, status }: { roomId: string; initial:
 
   return (
     <EditorSection
-      title="Companion & modes"
+      title={<IntegrationTitle integration="companion">Bitfocus Companion &amp; modes</IntegrationTitle>}
       status={status}
-      help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches its value. Every Companion lays its buttons out differently — set each mode's location to match this room's."
-      saveLabel="Save Companion"
+      help="The room's Bitfocus Companion install. Each mode presses a Bitfocus Companion button (page/row/column) and shows as active when the state variable matches its value. Every Bitfocus Companion lays its buttons out differently — set each mode's location to match this room's."
+      saveLabel="Save Bitfocus Companion"
       form={f}
     >
       <FormRow>
