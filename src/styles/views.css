@@ -130,26 +130,10 @@
   height: 100%;
 }
 
-/* A widget retains its authored design while the canvas scales it to the cell
-   the operator has chosen. */
-/* Some widgets use .wgt and others have a specialised root (for example,
-   Now & Next). Scale the first rendered root, not a particular class, so the
-   editor and live dashboard apply exactly the same fitting behavior. */
-.viewcell__body--scale-fit > * {
-  /* `flex: 1` would shrink this widened inner layout before `zoom` is applied,
-     leaving a blank strip on the right of scaled widgets such as Run of Show.
-     Keep its calculated dimensions intact; zoom then brings it back to the
-     exact size of the cell. */
-  flex: none;
-  zoom: var(--widget-scale);
-  width: calc(100% / var(--widget-scale));
-  height: calc(100% / var(--widget-scale));
-}
-
 /* A compact Now & Next cell used to hide the end of an item title with an
-   ellipsis. Inside a scaled canvas the entire point is fitting that content,
-   so give the scaled design enough lines instead of discarding the words. */
-.viewcell__body--scale-fit .nownext__title {
+   ellipsis. The canvas gives every widget its actual selected dimensions, so
+   use available lines rather than discarding content. */
+.viewcell__body .nownext__title {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;

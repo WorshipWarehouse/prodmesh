@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { PackageOpen } from 'lucide-react';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
 import type { WidgetConfig } from '../widgets/types';
@@ -50,17 +50,6 @@ export function PlacedWidget({
 }) {
   const def = isWidgetType(placement.type) ? widgetRegistry[placement.type] : null;
   const Component = def?.component;
-  // The widget remains responsible for its own layout. The canvas scales that
-  // existing design to the chosen cell without changing the widget itself.
-  // Do not make a one-cell placement illegibly small just because an older
-  // default happened to start at 2×3: the widened inner layout still fits the
-  // cell, while this readability floor lets text, controls and lists use the
-  // space the operator chose.
-  const authoredScale = def
-    ? Math.min(placement.w / def.size.w, placement.h / def.size.h)
-    : 1;
-  const scale = Math.max(0.75, authoredScale);
-
   return (
     <div
       className={`viewcell${def ? '' : ' viewcell--unknown'}${className ? ` ${className}` : ''}`}
@@ -83,9 +72,8 @@ export function PlacedWidget({
           fault. `data-title` + `:empty` in CSS labels it instead, with no way
           for the widget to have to know it is on a canvas. */}
       <div
-        className={`viewcell__body${scale !== 1 ? ' viewcell__body--scale-fit' : ''}`}
+        className="viewcell__body"
         data-title={def?.title ?? placement.type}
-        style={{ '--widget-scale': scale } as CSSProperties}
       >
         {Component ? (
           <Component roomId={roomId} config={config} />
