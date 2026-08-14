@@ -151,7 +151,9 @@ export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>
 
 export const MAX_WIDGET_SIZE: WidgetSize = { w: 6, h: 5 };
 
-export const widgetMin = (def: WidgetDef): WidgetSize => def.minSize ?? def.size;
+// Widgets keep their authored starting size, but users may resize every one
+// down to a single cell. Their content then scales with the chosen cell.
+export const widgetMin = (_def: WidgetDef): WidgetSize => ({ w: 1, h: 1 });
 // A dashboard is six columns wide. Displays are smaller, and their grid
 // validation naturally limits a resize to what fits on that display.
 export const widgetMax = (_def: WidgetDef): WidgetSize => MAX_WIDGET_SIZE;

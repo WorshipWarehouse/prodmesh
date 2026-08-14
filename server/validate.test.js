@@ -128,9 +128,8 @@ test('validateView takes a scale from a short list, defaulting to actual size', 
 test('validateView gives every widget adjustable width and height', () => {
   assert.doesNotThrow(() => validateView(view({ widgets: [at('run-of-show', 0, 0, 6, 5)] })));
   assert.throws(() => validateView(view({ widgets: [at('run-of-show', 0, 0, 2, 6)] })),
-    /between 2×3 and 6×5 — got 2×6/);
-  assert.throws(() => validateView(view({ widgets: [at('run-of-show', 0, 0, 2, 2)] })),
-    /between 2×3 and 6×5/);
+    /between 1×1 and 6×5 — got 2×6/);
+  assert.doesNotThrow(() => validateView(view({ widgets: [at('run-of-show', 0, 0, 1, 1)] })));
   assert.doesNotThrow(() => validateView(view({ widgets: [at('loudness', 0, 0, 4, 2)] })));
   assert.doesNotThrow(() => validateView(view({ widgets: [at('room-health', 0, 0, 6, 5)] })));
   assert.throws(() => validateView(view({ widgets: [at('room-health', 0, 0, 7, 1)] })),

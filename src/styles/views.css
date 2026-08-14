@@ -82,12 +82,67 @@
   gap: 10px;
 }
 
+/* Every placed widget identifies both the information it shows and the
+   integration responsible for it. The editor uses its drag header instead. */
+.viewcell__widget-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  line-height: 1;
+}
+
+.viewcell__widget-head .integration-brand__mark {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+  border-radius: 5px;
+}
+
+/* Keep the supplied square source artwork centered in the fixed integration
+   mark instead of cropping the edges when a logo has its own safe area. */
+.viewcell__widget-head .integration-brand__mark img {
+  object-fit: contain;
+}
+
+.viewcell__widget-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* No box inside a box. A widget that draws its own card is right in the flow
    grid, where it IS the card; inside a cell that already has a border and a
    background it reads as a nested panel. The cell owns the frame here. */
 .viewcell__body > .wgt {
   flex: 1;
   min-height: 0;
+}
+
+/* A widget retains its authored design while the canvas scales it to the cell
+   the operator has chosen. */
+/* Some widgets use .wgt and others have a specialised root (for example,
+   Now & Next). Scale the first rendered root, not a particular class, so the
+   editor and live dashboard apply exactly the same fitting behavior. */
+.viewcell__body--scale-fit > * {
+  zoom: var(--widget-scale);
+  width: calc(100% / var(--widget-scale));
+  height: calc(100% / var(--widget-scale));
+}
+
+/* A compact Now & Next cell used to hide the end of an item title with an
+   ellipsis. Inside a scaled canvas the entire point is fitting that content,
+   so give the scaled design enough lines instead of discarding the words. */
+.viewcell__body--scale-fit .nownext__title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
 }
 
 /* A widget with nothing to show renders null, so its body is genuinely empty.
@@ -463,6 +518,7 @@
 .widgetinspector p { margin: 0; line-height: 1.4; }
 .widgetinspector__name { color: var(--text); font-weight: 650; margin-bottom: 12px !important; }
 .widgetinspector label { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; color: var(--text-dim); }
+.widgetinspector small { display: block; color: var(--text-dim); line-height: 1.35; }
 .widgetinspector .widgetinspector__check { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--text); }
 .widgetinspector select { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
 
@@ -575,8 +631,10 @@
    staying narrow is why a layout can be data at all. */
 .viewgrid--editing .viewcell__body {
   pointer-events: none;
-  padding: 0 14px 14px;
-  opacity: 0.9;
+  /* Match a live cell's content inset. The edit chrome is the only extra
+     furniture, so the preview remains a truthful layout decision. */
+  padding: 16px 18px;
+  opacity: 1;
 }
 
 .viewcell__chrome {
@@ -604,6 +662,14 @@
   text-align: left;
   cursor: grab;
   touch-action: none;
+}
+
+/* Match the widget palette's 20px integration marks in the editor. */
+.viewcell__grip .integration-brand__mark {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+  border-radius: 5px;
 }
 
 .viewcell__grip:active {

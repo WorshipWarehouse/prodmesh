@@ -54,7 +54,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   },
 
   viewers: {
-    title: 'Live viewers',
+    title: 'YouTube Live Viewers',
     description: 'Concurrent YouTube viewers while the room is streaming.',
     integration: 'youtube',
     component: ViewersWidget,

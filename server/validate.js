@@ -316,7 +316,7 @@ export function validateView(input) {
     // A placement may only be the size its widget allows. The editor already
     // refuses out-of-range handles; this is the door that matters, because a
     // stored layout is data and data arrives from anywhere.
-    const min = def.min ?? def.size;
+    const min = { w: 1, h: 1 };
     // Widgets may expand up to the dashboard's full width and five rows tall.
     // The display grid still rejects anything that cannot fit its 3×3 canvas.
     const max = MAX_WIDGET_SIZE;
