@@ -118,10 +118,16 @@
 
 /* No box inside a box. A widget that draws its own card is right in the flow
    grid, where it IS the card; inside a cell that already has a border and a
-   background it reads as a nested panel. The cell owns the frame here. */
-.viewcell__body > .wgt {
-  flex: 1;
+   background it reads as a nested panel. The cell owns the frame here.
+
+   This must cover every widget root, not just `.wgt`: Run of Show and Now &
+   Next use purpose-built roots. A placement can be resized in either
+   direction, so every root receives the entire usable cell and can grow its
+   own flexible content (lists, charts, and text) into that space. */
+.viewcell__body > * {
+  flex: 1 1 0;
   min-height: 0;
+  height: 100%;
 }
 
 /* A widget retains its authored design while the canvas scales it to the cell
