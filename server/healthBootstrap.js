@@ -21,6 +21,7 @@ import * as ppro from './integrations/proPresenter.js';
 import * as companion from './companion.js';
 import * as smaart from './integrations/smaart.js';
 import * as rta from './integrations/rta.js';
+import * as openSoundMeter from './integrations/openSoundMeter.js';
 import * as slack from './integrations/slack.js';
 
 export function declareConfiguredIntegrations() {
@@ -33,8 +34,8 @@ export function declareConfiguredIntegrations() {
     if (ppro.isConfigured(room.proPresenter)) declare(ppro.healthKey(room.proPresenter));
     if (room.companion?.host && !room.companion.mock) declare(companion.healthKey(room.companion));
     const a = room.analysis;
-    if (a?.host && !a.mock) {
-      declare(a.source === 'rta' ? rta.healthKey(a) : smaart.healthKey(a));
+    if ((a?.host || a?.source === 'open-sound-meter') && !a.mock) {
+      declare(a.source === 'rta' ? rta.healthKey(a) : a.source === 'open-sound-meter' ? openSoundMeter.healthKey(a) : smaart.healthKey(a));
     }
   }
 }

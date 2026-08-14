@@ -4,7 +4,7 @@
 //
 //  Migrated so far:
 //    planningCenter — which PC service types feed the room
-//    analysis       — SPL source (Smaart or ProdMesh Remote RTA) + dB goals
+//    analysis       — SPL source (Smaart, ProdMesh Remote RTA, or OSM) + dB goals
 //    proPresenter   — the room's ProPresenter API (host/port, optional timer)
 //    companion      — Companion host/port + state variable + the room's MODES
 //                     (stored as one blob; applied onto the legacy room keys
@@ -91,8 +91,8 @@ export function validateAnalysis(input) {
   if (typeof input !== 'object' || Array.isArray(input)) throw new Error('analysis must be an object');
   const source = String(input.source ?? 'smaart');
   if (!SOURCES.includes(source)) throw new Error(`Unknown analysis source "${source}"`);
-  const host = validateHost(input.host, 'Analysis source needs a host');
-  const out = { source, host };
+  const out = { source };
+  if (source !== 'open-sound-meter') out.host = validateHost(input.host, 'Analysis source needs a host');
   const port = input.port === '' || input.port == null ? null : Number(input.port);
   if (port != null) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
@@ -111,6 +111,19 @@ export function validateAnalysis(input) {
   if (metric) {
     if (metric.length > 60) throw new Error('metric must be at most 60 characters');
     out.metric = metric;
+  }
+  if (source === 'open-sound-meter') {
+    const sourceId = String(input.sourceId ?? '').trim();
+    if (sourceId) {
+      if (sourceId.length > 200) throw new Error('sourceId must be at most 200 characters');
+      out.sourceId = sourceId;
+    }
+    const weighting = String(input.weighting ?? 'A').toUpperCase();
+    if (!['A', 'B', 'C', 'Z'].includes(weighting)) throw new Error('weighting must be A, B, C, or Z');
+    out.weighting = weighting;
+    const response = String(input.response ?? 'Slow').toLowerCase();
+    if (response !== 'fast' && response !== 'slow') throw new Error('response must be Fast or Slow');
+    out.response = response === 'fast' ? 'Fast' : 'Slow';
   }
   if (source === 'smaart') {
     const password = String(input.password ?? '');

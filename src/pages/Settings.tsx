@@ -2137,12 +2137,15 @@ function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeCo
 // Draft form state for the analysis source — everything as strings so the
 // inputs stay controlled; the server normalizes numbers on save.
 interface AnalysisDraft {
-  source: 'none' | 'smaart' | 'rta';
+  source: 'none' | 'smaart' | 'rta' | 'open-sound-meter';
   host: string;
   port: string;
   target: string;
   limit: string;
   metric: string;
+  sourceId: string;
+  weighting: 'A' | 'B' | 'C' | 'Z';
+  response: 'Fast' | 'Slow';
   password: string;
   logControl: boolean;
 }
@@ -2155,6 +2158,9 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
     target: cfg?.target != null ? String(cfg.target) : '',
     limit: cfg?.limit != null ? String(cfg.limit) : '',
     metric: cfg?.metric ?? '',
+    sourceId: cfg?.sourceId ?? '',
+    weighting: cfg?.weighting ?? 'A',
+    response: cfg?.response ?? 'Slow',
     password: '',
     logControl: Boolean(cfg?.logControl),
   };
@@ -2174,6 +2180,9 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
             target: d.target === '' ? undefined : Number(d.target),
             limit: d.limit === '' ? undefined : Number(d.limit),
             metric: d.metric || undefined,
+            sourceId: d.sourceId || undefined,
+            weighting: d.source === 'open-sound-meter' ? d.weighting : undefined,
+            response: d.source === 'open-sound-meter' ? d.response : undefined,
             logControl: d.source === 'smaart' && d.logControl ? true : undefined,
             // Omit password unless typed — omitted keeps the stored one.
             ...(d.password ? { password: d.password } : {}),
@@ -2200,7 +2209,7 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
     <EditorSection
       title="Analysis source"
       status={status}
-      help="Where this room's SPL numbers come from — a Smaart rig or the free ProdMesh Remote RTA app. Target and limit set the dB goals on the live meter and show reports."
+      help="Where this room's SPL numbers come from — a Smaart rig, ProdMesh Remote RTA, or Open Sound Meter. Target and limit set the dB goals on the live meter and show reports."
       saveLabel="Save analysis source"
       form={f}
     >
@@ -2211,19 +2220,20 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
             <option value="none">None</option>
             <option value="smaart">Smaart</option>
             <option value="rta">ProdMesh Remote RTA</option>
+            <option value="open-sound-meter">Open Sound Meter</option>
           </SelectField>
         </Field>
         {draft.source !== 'none' && (
           <>
-            <Field label="Host" width="grow">
+            {draft.source !== 'open-sound-meter' && <Field label="Host" width="grow">
               <input className="field" placeholder="e.g. 192.168.1.120" value={draft.host}
                 onChange={(e) => f.patch({ host: e.target.value })} />
-            </Field>
-            <Field label="Port" width="sm">
+            </Field>}
+            {draft.source !== 'open-sound-meter' && <Field label="Port" width="sm">
               <input className="field" inputMode="numeric"
                 placeholder={draft.source === 'smaart' ? '26000' : '8517'} value={draft.port}
                 onChange={(e) => f.patch({ port: e.target.value })} />
-            </Field>
+            </Field>}
           </>
         )}
       </FormRow>
@@ -2238,10 +2248,15 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
             <input className="field" inputMode="numeric" placeholder="e.g. 95"
               value={draft.limit} onChange={(e) => f.patch({ limit: e.target.value })} />
           </Field>
-          <Field label="Metric" width="grow">
+          {draft.source !== 'open-sound-meter' && <Field label="Metric" width="grow">
             <input className="field" placeholder={draft.source === 'smaart' ? 'SPL A Slow' : 'slow_db'}
               value={draft.metric} onChange={(e) => f.patch({ metric: e.target.value })} />
-          </Field>
+          </Field>}
+          {draft.source === 'open-sound-meter' && <>
+            <Field label="Weighting" width="sm"><SelectField value={draft.weighting} onChange={(e) => f.patch({ weighting: e.target.value as AnalysisDraft['weighting'] })}><option value="A">A-weighted</option><option value="B">B-weighted</option><option value="C">C-weighted</option><option value="Z">Z-weighted</option></SelectField></Field>
+            <Field label="Response" width="sm"><SelectField value={draft.response} onChange={(e) => f.patch({ response: e.target.value as AnalysisDraft['response'] })}><option value="Fast">Fast</option><option value="Slow">Slow</option></SelectField></Field>
+            <Field label="Measurement source ID" width="grow"><input className="field" placeholder="Optional — first active source" value={draft.sourceId} onChange={(e) => f.patch({ sourceId: e.target.value })} /></Field>
+          </>}
           {draft.source === 'smaart' && (
             <Field label="API password">
               <input className="field" type="password" autoComplete="off"

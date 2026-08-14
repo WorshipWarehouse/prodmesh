@@ -571,7 +571,7 @@ export interface PcServiceType {
   name: string;
 }
 
-export type AnalysisSource = 'smaart' | 'rta';
+export type AnalysisSource = 'smaart' | 'rta' | 'open-sound-meter';
 
 // The room's SPL source. `password` is write-only (send to change, omit to
 // keep); reads report hasPassword instead. `mock` marks the dev fixture.
@@ -582,6 +582,9 @@ export interface AnalysisConfig {
   target?: number;
   limit?: number;
   metric?: string;
+  sourceId?: string;
+  weighting?: 'A' | 'B' | 'C' | 'Z';
+  response?: 'Fast' | 'Slow';
   password?: string;
   hasPassword?: boolean;
   logControl?: boolean;

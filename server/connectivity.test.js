@@ -50,6 +50,17 @@ test('setAnalysis validates, persists, and applies to the live rooms map', () =>
   assert.equal(rooms['north-youth'].analysis, undefined);
 });
 
+test('Open Sound Meter uses its multicast Remote API without a host', () => {
+  const clean = conn.validateAnalysis({
+    source: 'open-sound-meter', target: 88, weighting: 'c', response: 'fast', sourceId: 'house-spl',
+  });
+  assert.deepEqual(clean, {
+    source: 'open-sound-meter', target: 88, weighting: 'C', response: 'Fast', sourceId: 'house-spl',
+  });
+  assert.throws(() => conn.validateAnalysis({ source: 'open-sound-meter', weighting: 'X' }), /weighting must/);
+  assert.throws(() => conn.validateAnalysis({ source: 'open-sound-meter', response: 'instant' }), /response must/);
+});
+
 test('a cleared analysis source stays cleared across applyConnectivity', () => {
   // north-main declares an analysis block in rooms.config.js; once cleared,
   // the seeded marker keeps the file entry from resurrecting it.
