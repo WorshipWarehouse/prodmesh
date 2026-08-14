@@ -7,6 +7,7 @@ import { PersonPicker } from '../components/PersonPicker';
 import { SelectField } from '../components/SelectField';
 import { ColorInput } from '../components/form/ColorInput';
 import { EditorSection } from '../components/form/EditorSection';
+import { IntegrationBrand, IntegrationTitle, type IntegrationId } from '../components/IntegrationBrand';
 import { Field } from '../components/form/Field';
 import { FormRow } from '../components/form/FormRow';
 import { useDraft } from '../components/form/useDraft';
@@ -763,6 +764,10 @@ function SecurityPanel() {
   );
 }
 
+const secretGroupIntegration = (id: string): IntegrationId => ({
+  planningCenter: 'planning-center', slack: 'slack', youtube: 'youtube', restream: 'restream',
+}[id] as IntegrationId | undefined) ?? 'prodmesh';
+
 // Credentials for Planning Center and Slack. WRITE-ONLY on purpose: the server
 // never returns a stored credential, so this shows WHETHER one is set (as a
 // row of dots) and never what it is. Editing opens a modal per integration, so
@@ -791,7 +796,7 @@ function SecretsPanel() {
         {groups.map((group) => (
           <div key={group.id} className="integration">
             <div className="integration__head">
-              <span className="integration__name">{group.label}</span>
+              <span className="integration__name"><IntegrationBrand integration={secretGroupIntegration(group.id)} />{group.label}</span>
               <span className={`integration__state integration__state--${group.configured ? 'on' : 'off'}`}>
                 {group.configured ? 'Configured' : 'Not configured'}
               </span>
@@ -1919,7 +1924,7 @@ function PcServiceTypesEditor({ roomId, initial, status }: { roomId: string; ini
 
   return (
     <EditorSection
-      title="Planning Center service types"
+      title={<IntegrationTitle integration="planning-center">Planning Center service types</IntegrationTitle>}
       status={status}
       help="The event types this room hosts. The ID is in the Planning Center Services URL for that service type."
       saveLabel="Save service types"
@@ -2078,7 +2083,7 @@ function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeCo
 
   return (
     <EditorSection
-      title="YouTube Live"
+      title={<IntegrationTitle integration="youtube">YouTube Live</IntegrationTitle>}
       help="Records how many people watched the stream, for the show report. Needs a YouTube API key under Admin → General → Integrations. Viewer counts are only available while a broadcast is live — YouTube does not report them afterwards, so nothing is recorded for services that ran before this was set up. Find the channel ID in YouTube Studio → Settings → Channel → Advanced."
       saveLabel="Save YouTube"
       form={f}
@@ -2427,7 +2432,7 @@ function ProPresenterEditor({ roomId, initial, status }: { roomId: string; initi
 
   return (
     <EditorSection
-      title="ProPresenter"
+      title={<IntegrationTitle integration="propresenter">ProPresenter</IntegrationTitle>}
       status={status}
       help="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter."
       saveLabel="Save ProPresenter"

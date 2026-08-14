@@ -5,7 +5,7 @@ import type { DraftForm } from './useDraft';
 // Section wrapper for a useDraft-backed editor: title + one primary save
 // action, with the error/success line adjacent to the content it belongs to.
 export function EditorSection({ title, help, status, saveLabel, form, children }: {
-  title: string;
+  title: ReactNode;
   help?: string;
   status?: ReactNode;
   saveLabel: string;
