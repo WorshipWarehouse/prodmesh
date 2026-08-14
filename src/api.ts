@@ -153,6 +153,15 @@ async function requireOk(res: Response) {
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
 }
 
+/** Begin OAuth in an authenticated fetch, then hand the browser to Restream. */
+export async function connectRestream() {
+  const res = await fetch('/api/integrations/restream/connect', { method: 'POST', headers: requestHeaders() });
+  await requireOk(res);
+  const body = await res.json() as { url?: string };
+  if (!body.url) throw new Error('ProdMesh did not receive a Restream authorization URL.');
+  window.location.assign(body.url);
+}
+
 export interface Station {
   id: string;
   name: string;
