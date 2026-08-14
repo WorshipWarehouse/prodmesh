@@ -132,7 +132,7 @@ Other findings:
 - `/v1/status/slide` reports the **media's** uuid in `current.uuid` with empty
   `text` while a video is up, so it cannot distinguish a video from a slide.
 
-### The presentation body — probed live 2026-08-11, PP 21.4
+### The presentation body — probed live 2026-08-13, PP 21.4
 
 `GET /v1/presentation/active` returns the WHOLE song in one response, which is
 what makes a lyric view cheap: one request per song rather than per slide.
