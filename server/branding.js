@@ -73,6 +73,31 @@ export function readLogo() {
 }
 
 /**
+ * Wrap a PNG in a one-image ICO container. Modern ICO files may hold PNG
+ * payloads directly; this lets Safari consume the uploaded logo through its
+ * canonical /favicon.ico path without pretending a PNG is an ICO response.
+ */
+export function pngAsIco(buffer) {
+  if (!Buffer.isBuffer(buffer) || !SIGNATURES[0].test(buffer) || buffer.length < 24) return null;
+  const width = buffer.readUInt32BE(16);
+  const height = buffer.readUInt32BE(20);
+  if (!width || !height) return null;
+  const header = Buffer.alloc(22);
+  header.writeUInt16LE(0, 0); // ICONDIR: reserved
+  header.writeUInt16LE(1, 2); // type: icon
+  header.writeUInt16LE(1, 4); // one image
+  header[6] = width >= 256 ? 0 : width;
+  header[7] = height >= 256 ? 0 : height;
+  header[8] = 0; // colour palette count
+  header[9] = 0;
+  header.writeUInt16LE(1, 10); // planes
+  header.writeUInt16LE(32, 12); // bit depth
+  header.writeUInt32LE(buffer.length, 14);
+  header.writeUInt32LE(22, 18); // PNG begins immediately after ICONDIR
+  return Buffer.concat([header, buffer]);
+}
+
+/**
  * Store a new logo. Throws with `code = 'bad_image'` / 'too_large' so the
  * route can answer 400 rather than 500.
  */

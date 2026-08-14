@@ -23,6 +23,16 @@ test('accepts real raster images and reports the sniffed type', () => {
   }
 });
 
+test('wraps a PNG logo in a standards-compliant ICO container for Safari', () => {
+  const ico = branding.pngAsIco(PNG);
+  assert.ok(ico);
+  assert.equal(ico.readUInt16LE(0), 0);
+  assert.equal(ico.readUInt16LE(2), 1);
+  assert.equal(ico.readUInt16LE(4), 1);
+  assert.equal(ico.readUInt32LE(18), 22);
+  assert.ok(ico.subarray(22).equals(PNG));
+});
+
 test('refuses SVG — it is a script document, not an image', () => {
   const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
   assert.throws(() => branding.setLogo(svg), /PNG, JPEG, GIF or WebP/);

@@ -115,21 +115,40 @@ router.get('/api/secrets/check', requirePermission('*'), async (_req, res) => {
 
 // ── Branding (institution logo) ───────────────────────────────────────────────
 
-// Public read: every page renders it, including anonymous booth screens.
-// 404 means "no override" and the client falls back to the bundled default.
 // The Content-Type is the type SNIFFED at upload, never anything the uploader
 // claimed, and nosniff stops the browser second-guessing it.
-router.get('/api/branding/logo', (_req, res) => {
-  const logo = branding.readLogo();
-  if (!logo) return res.status(404).end();
+function sendLogo(res, logo, asIco = false) {
+  const ico = asIco && logo.type === 'image/png' ? branding.pngAsIco(logo.buffer) : null;
   res.set({
-    'Content-Type': logo.type,
+    'Content-Type': ico ? 'image/x-icon' : logo.type,
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
     'Cache-Control': 'no-cache',
     ETag: `"${logo.updatedAt}"`,
   });
-  res.end(logo.buffer);
+  res.end(ico ?? logo.buffer);
+}
+
+// Public read: every page renders it, including anonymous booth screens.
+// 404 means "no override" and the client falls back to the bundled default.
+router.get('/api/branding/logo', (_req, res) => {
+  const logo = branding.readLogo();
+  if (!logo) return res.status(404).end();
+  sendLogo(res, logo);
+});
+
+// Safari (and some kiosk browsers) request /favicon.ico before they honour an
+// HTML <link rel="icon">. Serve the church override at that canonical URL too,
+// so its tab badge is the same logo on the very first page load.
+router.get('/favicon.ico', (_req, res, next) => {
+  const logo = branding.readLogo();
+  if (!logo) return next();
+  sendLogo(res, logo, true);
+});
+router.get('/favicon.png', (_req, res, next) => {
+  const logo = branding.readLogo();
+  if (!logo) return next();
+  sendLogo(res, logo);
 });
 
 // Raw body, capped, no multipart parser: this is one file, and every parser is
