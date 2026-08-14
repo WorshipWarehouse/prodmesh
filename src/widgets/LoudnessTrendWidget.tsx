@@ -34,7 +34,8 @@ export function LoudnessTrendWidget({ roomId, config }: WidgetProps) {
   // The topic publishes null when no analyzer is configured or it has stopped
   // answering, which is exactly when the curve should be dropped rather than
   // left standing as though it were still current.
-  const selected = spl && config.metric ? spl.readings?.[config.metric] ?? spl.current : spl?.current;
+  const measurement = config.metric || `SPL ${config.weighting ?? 'A'} ${config.response ?? 'Slow'}`;
+  const selected = spl ? spl.readings?.[measurement] ?? spl.current : undefined;
   const history = useSeries(selected, spl != null, { limit: HISTORY, everyMs: EVERY_MS });
 
   if (!spl) return null;

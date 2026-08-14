@@ -51,14 +51,8 @@ test('setAnalysis validates, persists, and applies to the live rooms map', () =>
 });
 
 test('Open Sound Meter uses its multicast Remote API without a host', () => {
-  const clean = conn.validateAnalysis({
-    source: 'open-sound-meter', weighting: 'c', response: 'fast',
-  });
-  assert.deepEqual(clean, {
-    source: 'open-sound-meter', weighting: 'C', response: 'Fast',
-  });
-  assert.throws(() => conn.validateAnalysis({ source: 'open-sound-meter', weighting: 'X' }), /weighting must/);
-  assert.throws(() => conn.validateAnalysis({ source: 'open-sound-meter', response: 'instant' }), /response must/);
+  const clean = conn.validateAnalysis({ source: 'open-sound-meter' });
+  assert.deepEqual(clean, { source: 'open-sound-meter' });
 });
 
 test('a cleared analysis source stays cleared across applyConnectivity', () => {

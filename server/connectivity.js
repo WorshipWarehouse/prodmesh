@@ -99,12 +99,6 @@ export function validateAnalysis(input) {
     out.port = port;
   }
   if (source === 'open-sound-meter') {
-    const weighting = String(input.weighting ?? 'A').toUpperCase();
-    if (!['A', 'B', 'C', 'Z'].includes(weighting)) throw new Error('weighting must be A, B, C, or Z');
-    out.weighting = weighting;
-    const response = String(input.response ?? 'Slow').toLowerCase();
-    if (response !== 'fast' && response !== 'slow') throw new Error('response must be Fast or Slow');
-    out.response = response === 'fast' ? 'Fast' : 'Slow';
   }
   if (source === 'smaart') {
     const password = String(input.password ?? '');

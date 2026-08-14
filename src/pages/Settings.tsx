@@ -2141,8 +2141,6 @@ interface AnalysisDraft {
   source: 'none' | 'smaart' | 'rta' | 'open-sound-meter';
   host: string;
   port: string;
-  weighting: 'A' | 'B' | 'C' | 'Z';
-  response: 'Fast' | 'Slow';
   password: string;
   logControl: boolean;
 }
@@ -2152,8 +2150,6 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
     source: cfg ? cfg.source : 'none',
     host: cfg?.host ?? '',
     port: cfg?.port != null ? String(cfg.port) : '',
-    weighting: cfg?.weighting ?? 'A',
-    response: cfg?.response ?? 'Slow',
     password: '',
     logControl: Boolean(cfg?.logControl),
   };
@@ -2165,8 +2161,6 @@ function analysisFromDraft(d: AnalysisDraft): AnalysisConfig | null {
     source: d.source,
     host: d.host || undefined,
     port: d.port === '' ? undefined : Number(d.port),
-    weighting: d.source === 'open-sound-meter' ? d.weighting : undefined,
-    response: d.source === 'open-sound-meter' ? d.response : undefined,
     logControl: d.source === 'smaart' && d.logControl ? true : undefined,
     ...(d.password ? { password: d.password } : {}),
   };
@@ -2240,12 +2234,6 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
         )}
       </FormRow>
 
-      {draft.source === 'open-sound-meter' && (
-        <FormRow>
-            <Field label="Weighting" width="sm"><SelectField value={draft.weighting} onChange={(e) => f.patch({ weighting: e.target.value as AnalysisDraft['weighting'] })}><option value="A">A-weighted</option><option value="B">B-weighted</option><option value="C">C-weighted</option><option value="Z">Z-weighted</option></SelectField></Field>
-            <Field label="Response" width="sm"><SelectField value={draft.response} onChange={(e) => f.patch({ response: e.target.value as AnalysisDraft['response'] })}><option value="Fast">Fast</option><option value="Slow">Slow</option></SelectField></Field>
-        </FormRow>
-      )}
       {draft.source === 'smaart' && (
         <FormRow>
             <Field label="API password">

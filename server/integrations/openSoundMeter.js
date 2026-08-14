@@ -39,7 +39,14 @@ export function sampleFromPacket(data, cfg, selectedSource) {
   try {
     packet = JSON.parse(Buffer.isBuffer(data) ? data.toString('utf8') : String(data));
   } catch {
-    return null;
+    // Some OSM versions emit a compact `key=value` levels packet. Accept the
+    // same fallback ChurchBoard uses instead of silently declaring a healthy
+    // multicast connection offline.
+    const text = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
+    const fields = Object.fromEntries([...text.matchAll(/([A-Za-z_][\w.-]*)\s*[=:]\s*(-?\d+(?:\.\d+)?)/g)].map((m) => [m[1].toLowerCase(), Number(m[2])]));
+    const raw = fields.a_slow ?? fields.slow ?? fields.slow_db;
+    if (!Number.isFinite(raw)) return null;
+    return { sourceId: selectedSource ?? '', sample: { ts: Date.now(), spl: Math.round(Math.max(0, raw + SPL_OFFSET) * 10) / 10 } };
   }
   const sourceId = String(packet.source ?? '');
   const expected = cfg.sourceId ?? selectedSource ?? sourceId;

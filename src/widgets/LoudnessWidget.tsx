@@ -47,7 +47,8 @@ export function LoudnessWidget({ roomId, config }: WidgetProps) {
   const spl = useTopic<SplState | null>(roomTopic.spl(roomId));
   if (!spl) return null;
 
-  const configured = { ...spl, current: config.metric ? spl.readings?.[config.metric] ?? spl.current : spl.current, target: config.target ?? spl.target, limit: config.limit ?? spl.limit };
+  const measurement = config.metric || `SPL ${config.weighting ?? 'A'} ${config.response ?? 'Slow'}`;
+  const configured = { ...spl, current: spl.readings?.[measurement] ?? spl.current, target: config.target ?? spl.target, limit: config.limit ?? spl.limit };
 
   const zone = splZone(configured);
   // Meter bar spans a fixed 70–100 dB window (where worship services live).

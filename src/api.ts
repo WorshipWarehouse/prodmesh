@@ -580,8 +580,6 @@ export interface AnalysisConfig {
   source: AnalysisSource;
   host?: string;
   port?: number;
-  weighting?: 'A' | 'B' | 'C' | 'Z';
-  response?: 'Fast' | 'Slow';
   password?: string;
   hasPassword?: boolean;
   logControl?: boolean;
@@ -1255,6 +1253,8 @@ export interface WidgetConfigJson {
   target?: number;
   limit?: number;
   metric?: string;
+  weighting?: 'A' | 'B' | 'C' | 'Z';
+  response?: 'Fast' | 'Slow';
 }
 
 export interface ViewSummary {

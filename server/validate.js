@@ -218,7 +218,7 @@ const VIEW_KINDS = new Set(['dashboard', 'display']);
 // fixed size — see WidgetDef in src/widgets/types.ts for why most stay fixed.
 export const WIDGET_TYPES = new Map([
   ['countdown', { unique: true, display: true, size: { w: 2, h: 1 } }],
-  ['loudness', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['loudness', { unique: false, display: true, size: { w: 2, h: 1 } }],
   ['loudness-trend', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['viewers', { unique: true, display: true, size: { w: 1, h: 1 } }],
   ['restream', { unique: true, display: true, size: { w: 2, h: 2 } }],
@@ -392,6 +392,8 @@ function viewWidgetConfig(config) {
     if (typeof config.metric !== 'string' || config.metric.length > 60) throw new Error('Widget metric must be at most 60 characters');
     out.metric = config.metric;
   }
+  if (['A', 'B', 'C', 'Z'].includes(config.weighting)) out.weighting = config.weighting;
+  if (['Fast', 'Slow'].includes(config.response)) out.response = config.response;
   if (['current', 'next', 'both'].includes(config.slides)) out.slides = config.slides;
   return out;
 }
