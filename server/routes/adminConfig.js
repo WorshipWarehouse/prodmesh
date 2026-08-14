@@ -21,9 +21,22 @@ const router = express.Router();
 const restreamStates = new Map();
 const restreamCallback = (req) => `${req.protocol}://${req.get('host')}/api/integrations/restream/callback`;
 
-router.get('/api/integrations/restream/connect', requirePermission('*'), (req, res) => {
-  try { const state = crypto.randomUUID(); restreamStates.set(state, Date.now()); res.redirect(restream.authorizeUrl(restreamCallback(req), state)); }
+function beginRestreamConnection(req, res) {
+  try {
+    const state = crypto.randomUUID();
+    restreamStates.set(state, Date.now());
+    res.json({ url: restream.authorizeUrl(restreamCallback(req), state) });
+  }
   catch (err) { res.status(400).json({ error: String(err.message ?? err) }); }
+}
+// This is POST rather than a normal link because admin authentication is held
+// in a bearer token. The browser fetches this URL, then navigates to Restream.
+router.post('/api/integrations/restream/connect', requirePermission('*'), beginRestreamConnection);
+// The browser can be served through a development proxy, so return the URL
+// from the same request path that starts OAuth. This guarantees the address
+// shown in Settings is byte-for-byte the redirect_uri sent to Restream.
+router.get('/api/integrations/restream/config', requirePermission('*'), (req, res) => {
+  res.json({ redirectUrl: restreamCallback(req) });
 });
 router.get('/api/integrations/restream/callback', async (req, res) => {
   const state = String(req.query.state ?? ''); const issued = restreamStates.get(state); restreamStates.delete(state);

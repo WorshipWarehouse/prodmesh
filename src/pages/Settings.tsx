@@ -72,6 +72,8 @@ import {
   getSecrets,
   saveSecrets,
   checkIntegrations,
+  connectRestream,
+  getRestreamConfig,
   type SecretGroup,
   type Version,
 } from '../api';
@@ -771,9 +773,14 @@ function SecurityPanel() {
 function SecretsPanel() {
   const [groups, setGroups] = useState<SecretGroup[] | null>(null);
   const [editing, setEditing] = useState<SecretGroup | null>(null);
+  const [connectingRestream, setConnectingRestream] = useState(false);
+  const [restreamError, setRestreamError] = useState<string | null>(null);
+  const [restreamRedirectUrl, setRestreamRedirectUrl] = useState('');
+  const [copiedRestreamUrl, setCopiedRestreamUrl] = useState(false);
 
   const load = useCallback(() => {
     getSecrets().then((r) => setGroups(r.secrets)).catch(() => setGroups([]));
+    getRestreamConfig().then((r) => setRestreamRedirectUrl(r.redirectUrl)).catch(() => {});
   }, []);
   useEffect(load, [load]);
 
@@ -815,9 +822,29 @@ function SecretsPanel() {
               ))}
             </dl>
             {group.id === 'restream' && (
-              <p className="settings__muted integration__redirect">Redirect URL: <code>{`${window.location.origin}/api/integrations/restream/callback`}</code></p>
+              <>
+                <p className="settings__muted integration__redirect">
+                  Redirect URL: <code>{restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`}</code>
+                  <button className="btn btn--sm" type="button" onClick={() => {
+                    const url = restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`;
+                    navigator.clipboard.writeText(url).then(() => { setCopiedRestreamUrl(true); window.setTimeout(() => setCopiedRestreamUrl(false), 1800); }).catch(() => setRestreamError('Could not copy the Redirect URL. Please select and copy it manually.'));
+                  }}>{copiedRestreamUrl ? 'Copied' : 'Copy'}</button>
+                </p>
+                <p className="settings__muted">After saving the credentials and registering that exact URL in Restream, connect the Restream account that owns your broadcasts.</p>
+                {restreamError && <p className="settings__msg settings__msg--bad">{restreamError}</p>}
+              </>
             )}
-            <button className="btn btn--sm" onClick={() => setEditing(group)}>Edit</button>
+            <div className="integration__actions">
+              <button className="btn btn--sm" onClick={() => setEditing(group)}>Edit</button>
+              {group.id === 'restream' && (
+                <button className="btn btn--sm" disabled={!group.configured || connectingRestream} onClick={() => {
+                  setRestreamError(null); setConnectingRestream(true);
+                  connectRestream().catch((err) => { setRestreamError(err instanceof Error ? err.message : String(err)); setConnectingRestream(false); });
+                }}>
+                  {connectingRestream ? 'Connecting…' : 'Connect account'}
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
