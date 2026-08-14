@@ -116,6 +116,56 @@
   white-space: nowrap;
 }
 
+/* The canvas header is the one consistent, branded title for a widget. A few
+   older widgets also render their own icon + name inside the card, which
+   produces "Comms / Comms" and "Planning Center Service / Planning Center
+   service". Flatten those legacy headers so their meaningful status remains
+   visible, but the duplicate icon and label do not take a second line. Data
+   headers such as Clock's date and Lyrics' current song are intentionally not
+   included: they are content, not a repeated widget title. */
+.viewcell[data-widget="captions"] .wgt__head,
+.viewcell[data-widget="countdown"] .wgt__head,
+.viewcell[data-widget="loudness"] .wgt__head,
+.viewcell[data-widget="loudness-trend"] .wgt__head,
+.viewcell[data-widget="room-health"] .wgt__head,
+.viewcell[data-widget="restream"] .wgt__head,
+.viewcell[data-widget="slides-left"] .wgt__head,
+.viewcell[data-widget="planning-center-service"] .wgt__head,
+.viewcell[data-widget="planning-center-timers"] .wgt__head,
+.viewcell[data-widget="planning-center-schedule"] .wgt__head,
+.viewcell[data-widget="planning-center-teams"] .wgt__head {
+  display: contents;
+}
+
+.viewcell[data-widget="captions"] .wgt__head .wgt__icon,
+.viewcell[data-widget="captions"] .wgt__head .wgt__title,
+.viewcell[data-widget="countdown"] .wgt__head .wgt__icon,
+.viewcell[data-widget="countdown"] .wgt__head .wgt__title,
+.viewcell[data-widget="loudness"] .wgt__head .wgt__icon,
+.viewcell[data-widget="loudness"] .wgt__head .wgt__title,
+.viewcell[data-widget="loudness-trend"] .wgt__head .wgt__icon,
+.viewcell[data-widget="loudness-trend"] .wgt__head .wgt__title,
+.viewcell[data-widget="room-health"] .wgt__head .wgt__icon,
+.viewcell[data-widget="room-health"] .wgt__head .wgt__title,
+.viewcell[data-widget="restream"] .wgt__head .wgt__icon,
+.viewcell[data-widget="restream"] .wgt__head .wgt__title,
+.viewcell[data-widget="slides-left"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-service"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-service"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-timers"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-timers"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-schedule"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-schedule"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-teams"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-teams"] .wgt__head .wgt__title {
+  display: none;
+}
+
+.viewcell .wgt__head .wgt__status {
+  align-self: flex-end;
+  margin-left: 0;
+}
+
 /* No box inside a box. A widget that draws its own card is right in the flow
    grid, where it IS the card; inside a cell that already has a border and a
    background it reads as a nested panel. The cell owns the frame here.
