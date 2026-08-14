@@ -166,6 +166,15 @@
   margin-left: 0;
 }
 
+/* The branded card header already identifies the integration. Do not repeat
+   a second product/utility icon inside a widget's own header; icons within
+   real content (for example, song rows in Run of Show) are not affected. */
+.viewcell__body .wgt__head > svg,
+.viewcell__body .wgt__head .wgt__icon,
+.viewcell__body .wgt__head .wgt__brand {
+  display: none;
+}
+
 /* No box inside a box. A widget that draws its own card is right in the flow
    grid, where it IS the card; inside a cell that already has a border and a
    background it reads as a nested panel. The cell owns the frame here.
