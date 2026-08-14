@@ -15,7 +15,7 @@ const rows = () => [...document.querySelectorAll('.lyr__row')];
 const sections = () => [...document.querySelectorAll('.lyr__section')].map((n) => n.textContent);
 const now = () => document.querySelector('.lyr__row--now');
 
-// A song shaped like the one probed on 2026-08-11: a bridge played four times
+// A song shaped like the one probed on 2026-08-13: a bridge played four times
 // back to back, a chorus that comes round again much later, and a blank cue at
 // the end with the operator's note on it.
 const SONG: RoomLyrics = {

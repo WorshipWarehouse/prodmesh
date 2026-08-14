@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { arrangeSlides, slideTotal } from './integrations/proPresenter.js';
 
-// The SHAPE below is verbatim from ProPresenter 21.4 on 2026-08-11 (see
+// The SHAPE below is verbatim from ProPresenter 21.4 on 2026-08-13 (see
 // docs/INTEGRATION-NOTES.md) — float colour components, an arrangement that is
 // a flat list of group uuids with repeats, an empty-text "Blank" group with a
 // note on it, and a presentation-level total_cues that is the RAW sum rather
