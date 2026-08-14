@@ -116,6 +116,19 @@
   white-space: nowrap;
 }
 
+/* Connection states belong to the same information plane as the branded
+   widget title. Reserve room for the badge before placing it on that row. */
+.viewcell:not(.viewcell--editing):has(.wgt__status) .viewcell__widget-head {
+  padding-right: 76px;
+}
+
+.viewcell:not(.viewcell--editing) .wgt__status {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 1;
+}
+
 /* The canvas header is the one consistent, branded title for a widget. A few
    older widgets also render their own icon + name inside the card, which
    produces "Comms / Comms" and "Planning Center Service / Planning Center

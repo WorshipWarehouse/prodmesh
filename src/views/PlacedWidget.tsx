@@ -52,7 +52,7 @@ export function PlacedWidget({
   const Component = def?.component;
   return (
     <div
-      className={`viewcell${def ? '' : ' viewcell--unknown'}${className ? ` ${className}` : ''}`}
+      className={`viewcell${def ? '' : ' viewcell--unknown'}${chrome ? ' viewcell--editing' : ''}${className ? ` ${className}` : ''}`}
       style={{
         gridColumn: `${placement.x + 1} / span ${placement.w}`,
         gridRow: `${placement.y + 1} / span ${placement.h}`,
