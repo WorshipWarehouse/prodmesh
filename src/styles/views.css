@@ -641,6 +641,7 @@
   flex-direction: column;
   gap: 8px;
 }
+.palette__list[hidden] { display: none; }
 
 .palette__item {
   display: flex;

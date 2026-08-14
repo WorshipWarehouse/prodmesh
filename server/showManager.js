@@ -592,6 +592,17 @@ export function endShow(roomId) {
   }
   show.abort.abort();
   timeline.finalize(instanceId(show));
+  // Freeze a loudness summary for each item before raw SPL retention can prune
+  // the samples. This is intentionally independent of which live widget was
+  // on screen: service reporting follows the show, not a browser tab.
+  const finished = timeline.get(instanceId(show));
+  if (finished?.items?.length) {
+    timeline.setItemSpl(instanceId(show), finished.items.map((item) => (
+      item.startedAt != null && item.endedAt != null
+        ? splStore.aggregateRange(instanceId(show), item.startedAt, item.endedAt)
+        : null
+    )));
+  }
   summaries.refresh(instanceId(show)); // the summary row is stamped at show end
   shows.delete(roomId);
   removeShowFile(roomId);

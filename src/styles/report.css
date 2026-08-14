@@ -109,6 +109,18 @@
   display: block;
 }
 
+/* Reset belongs to one completed service report, never the whole history. */
+.report__reset {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.report__reset .btn { color: var(--danger); }
+.report__reset small { color: var(--text-faint); }
+
 .spark__line {
   fill: none;
   stroke: var(--accent);

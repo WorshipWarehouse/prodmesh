@@ -273,6 +273,22 @@ router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
     ? { ...agg, target: analysisCfg?.target ?? null, limit: analysisCfg?.limit ?? null }
     : null;
 
+  // During a live show the current item's SPL remains current from raw
+  // samples. On completion showManager persists the same aggregates onto the
+  // timeline, so a report remains item-by-item useful after retention prunes.
+  const recordedItems = timeline.get(instance)?.items ?? [];
+  report.items = report.items.map((item, index) => {
+    const recorded = recordedItems[index];
+    const liveSpl = recorded?.startedAt != null
+      ? splStore.aggregateRange(instance, recorded.startedAt, recorded.endedAt ?? Date.now())
+      : null;
+    const itemSpl = liveSpl ?? item.spl ?? null;
+    return {
+      ...item,
+      spl: itemSpl ? { ...itemSpl, target: analysisCfg?.target ?? null, limit: analysisCfg?.limit ?? null } : null,
+    };
+  });
+
   // Viewership, same fallback: aggregate from raw samples while they exist,
   // otherwise the block copied into the summary row. The curve comes only from
   // raw samples — once those are pruned the KPIs survive and the sparkline

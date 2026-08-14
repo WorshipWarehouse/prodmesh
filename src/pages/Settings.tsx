@@ -2033,7 +2033,7 @@ function CaptionsEditor({ roomId, initial }: { roomId: string; initial: Captions
 
   return (
     <EditorSection
-      title="Comms captions"
+      title="Captions"
       help="Live transcript of the production comms channels, so the band can read what the music director and monitor engineer are saying. Shown by the Comms widget on a dashboard or display; nothing else surfaces it. prodmesh reads only — it never renames a channel or clears a transcript."
       saveLabel="Save captions"
       form={f}

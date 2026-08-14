@@ -100,4 +100,5 @@ describe('Analytics', () => {
     // Row still present (the title also appears in the open dialog, hence All).
     expect(screen.getAllByText('Sunday Service').length).toBeGreaterThanOrEqual(2);
   });
+
 });

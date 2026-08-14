@@ -5,9 +5,11 @@ import slackLogo from '../assets/integrations/slack.png';
 import youTubeLogo from '../assets/integrations/youtube.png';
 import restreamLogo from '../assets/integrations/restream.png';
 import companionLogo from '../assets/integrations/companion.png';
+import prodMeshLogo from '../assets/prodmesh-logo.svg';
 import prodMeshRtaLogo from '../assets/integrations/prodmesh-rta.svg';
 import smaartLogo from '../assets/integrations/smaart.png';
 import openSoundMeterLogo from '../assets/integrations/open-sound-meter.png';
+import prodComLogo from '../assets/integrations/prodcom.png';
 
 /** The integrations shown in Settings and in the widget picker. Keeping their
  * identity here means a widget and its configuration card always use the same
@@ -15,10 +17,10 @@ import openSoundMeterLogo from '../assets/integrations/open-sound-meter.png';
 export type IntegrationId =
   | 'prodmesh' | 'propresenter' | 'planning-center' | 'restream'
   | 'youtube' | 'slack' | 'companion' | 'analysis' | 'captions'
-  | 'prodmesh-rta' | 'smaart' | 'open-sound-meter';
+  | 'prodmesh-rta' | 'smaart' | 'open-sound-meter' | 'prodcom';
 
 export const integrationInfo: Record<IntegrationId, { name: string; mark: string; logo?: string }> = {
-  prodmesh: { name: 'ProdMesh', mark: 'PM' },
+  prodmesh: { name: 'ProdMesh', mark: 'PM', logo: prodMeshLogo },
   propresenter: { name: 'ProPresenter', mark: 'P', logo: proPresenterLogo },
   'planning-center': { name: 'Planning Center', mark: 'PC', logo: planningCenterLogo },
   restream: { name: 'Restream', mark: 'R', logo: restreamLogo },
@@ -29,7 +31,10 @@ export const integrationInfo: Record<IntegrationId, { name: string; mark: string
   'prodmesh-rta': { name: 'ProdMesh RTA', mark: 'R', logo: prodMeshRtaLogo },
   smaart: { name: 'Smaart', mark: 'S', logo: smaartLogo },
   'open-sound-meter': { name: 'Open Sound Meter', mark: 'OSM', logo: openSoundMeterLogo },
-  captions: { name: 'Captions', mark: 'CC' },
+  // Captions is a built-in ProdMesh integration, so it deliberately carries
+  // the same mark rather than looking like a separate third-party service.
+  captions: { name: 'Captions', mark: 'PM', logo: prodMeshLogo },
+  prodcom: { name: 'ProdCom', mark: 'P', logo: prodComLogo },
 };
 
 export function IntegrationBrand({ integration, label = false }: { integration: IntegrationId; label?: boolean }) {

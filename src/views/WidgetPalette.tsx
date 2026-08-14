@@ -4,9 +4,10 @@ import { widgetRegistry, widgetTypes } from '../widgets/registry';
 import { widgetAllowedOn, widgetIsUnique, type WidgetType } from '../widgets/types';
 import { IntegrationBrand, integrationInfo, type IntegrationId } from '../components/IntegrationBrand';
 import { findFirstFit, type Grid, type ViewKind } from '../lib/gridLayout';
-import type { ViewPlacement } from '../api';
+import type { CaptionsConfig, ViewPlacement } from '../api';
 import type { AnalysisSource } from '../api';
 import { analysisIntegration, analysisWidgetTitle } from '../lib/analysisSource';
+import { captionIntegration, captionWidgetTitle } from '../lib/captionSource';
 
 // What can go on this view, and whether there is anywhere to put it.
 //
@@ -25,7 +26,7 @@ export interface PaletteEntry {
   blocked: string | null;
 }
 
-export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[], analysisSource?: AnalysisSource | null): PaletteEntry[] {
+export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[], analysisSource?: AnalysisSource | null, captionSource?: CaptionsConfig['source'] | null): PaletteEntry[] {
   return widgetTypes
     .filter((type) => widgetAllowedOn(widgetRegistry[type], kind))
     // Loudness widgets are supplied by the selected analysis integration, not
@@ -36,12 +37,13 @@ export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement
       const def = widgetRegistry[type];
       const placed = placements.some((p) => p.type === type);
       const analysisTitle = analysisWidgetTitle(type, analysisSource);
+      const captionTitle = type === 'captions' ? captionWidgetTitle(captionSource) : null;
       return {
         type,
-        title: analysisTitle ?? def.title,
+        title: analysisTitle ?? captionTitle ?? def.title,
         description: def.description,
         size: def.size,
-        integration: analysisTitle ? analysisIntegration(analysisSource) : def.integration ?? 'prodmesh',
+        integration: analysisTitle ? analysisIntegration(analysisSource) : captionTitle ? captionIntegration(captionSource) : def.integration ?? 'prodmesh',
         blocked:
           widgetIsUnique(def) && placed
             ? 'Already on this view'
@@ -64,9 +66,7 @@ export function WidgetPalette({
   // The integration headers are genuine dropdowns. Start collapsed so a long
   // widget catalogue stays scannable and users deliberately open the source
   // they want to add from.
-  const [openGroups, setOpenGroups] = useState<Set<IntegrationId>>(
-    () => new Set(),
-  );
+  const [openGroup, setOpenGroup] = useState<IntegrationId | null>(null);
   const groups = entries.reduce((all, entry) => {
     (all.get(entry.integration) ?? all.set(entry.integration, []).get(entry.integration)!).push(entry);
     return all;
@@ -76,7 +76,7 @@ export function WidgetPalette({
     <aside className="palette">
       <h2 className="palette__title">Widgets</h2>
       {[...groups.entries()].map(([integration, group]) => {
-        const open = openGroups.has(integration);
+        const open = openGroup === integration;
         const name = integrationInfo[integration].name;
         return (
         <section className={`palette__group${open ? ' palette__group--open' : ''}`} key={integration} aria-label={`${name} widgets`}>
@@ -86,12 +86,7 @@ export function WidgetPalette({
             aria-label={`${name} widgets`}
             aria-expanded={open}
             aria-controls={`palette-${integration}`}
-            onClick={() => setOpenGroups((current) => {
-              const next = new Set(current);
-              if (next.has(integration)) next.delete(integration);
-              else next.add(integration);
-              return next;
-            })}
+            onClick={() => setOpenGroup((current) => current === integration ? null : integration)}
           >
             <IntegrationBrand integration={integration} />
             <span>{name}</span>

@@ -123,9 +123,11 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   },
 
   captions: {
-    title: 'Comms',
+    title: 'Captions',
     description: 'Live transcript of the production comms channels, colour-coded by speaker.',
-    integration: 'captions',
+    // ProdMesh Caption is supplied by ProdMesh itself, and belongs alongside
+    // Clock and Integrations in the editor's one ProdMesh dropdown.
+    integration: 'prodmesh',
     component: CaptionsWidget,
     size: { w: 2, h: 1 },
     // Two columns is the narrowest that fits a speaker name and a line of

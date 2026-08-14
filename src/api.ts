@@ -946,6 +946,8 @@ export interface ReportItem {
   actualSeconds: number;
   delta: number | null;
   ongoing: boolean;
+  /** Loudness during this individual Planning Center item. */
+  spl?: SplReport | null;
 }
 
 export interface SplReport {

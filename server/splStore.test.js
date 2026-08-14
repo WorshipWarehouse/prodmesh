@@ -32,6 +32,20 @@ test('samples round-trip through SQLite with correct aggregates', () => {
   assert.equal(spl.aggregate('nope__x'), null);
 });
 
+test('aggregateRange keeps an item’s samples separate from the next item', () => {
+  const inst = 'plan-range__t1';
+  spl.record('room-a', inst, 1_000, 80);
+  spl.record('room-a', inst, 2_000, 90);
+  spl.record('room-a', inst, 3_000, 100);
+  const first = spl.aggregateRange(inst, 1_000, 3_000);
+  const second = spl.aggregateRange(inst, 3_000, 4_000);
+  assert.equal(first.count, 2);
+  assert.equal(first.peak, 90);
+  assert.equal(second.count, 1);
+  assert.equal(second.leq, 100);
+  assert.equal(spl.aggregateRange(inst, 4_000, 4_000), null);
+});
+
 test('runningStats seeds continuation of a reopened show', () => {
   const inst = 'plan2__t1';
   spl.record('room-a', inst, 1, 88);

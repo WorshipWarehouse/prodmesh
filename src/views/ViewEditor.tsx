@@ -7,9 +7,10 @@ import { findFirstFit, isFree, occupancy, rowCount, type Grid } from '../lib/gri
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
 import { widgetMax, widgetMin, widgetResizable, type WidgetSize } from '../widgets/types';
 import { IntegrationBrand } from '../components/IntegrationBrand';
-import { getRoom, type View, type ViewPlacement } from '../api';
+import { getRoom, getRoomConnectivity, type View, type ViewPlacement } from '../api';
 import { useQuery } from '../lib/useQuery';
 import { analysisIntegration, analysisWidgetTitle } from '../lib/analysisSource';
+import { captionIntegration, captionWidgetTitle } from '../lib/captionSource';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Arranging a view.
@@ -49,7 +50,9 @@ export function ViewEditor({
 
   const placements = view.widgets;
   const room = useQuery(`room:${view.roomId}`, () => getRoom(view.roomId), { staleMs: 60_000 }).data;
+  const connectivity = useQuery(`room-connectivity:${view.roomId}`, () => getRoomConnectivity(view.roomId), { staleMs: 15_000 }).data;
   const analysisSource = room?.analysisSource;
+  const captionSource = connectivity?.captions?.source;
 
   // ONE row count for the canvas and the pointer maths. A dashboard normally
   // sizes to its content, which would leave the editor dividing by rows the
@@ -58,7 +61,7 @@ export function ViewEditor({
   // widget is what lets a dashboard be extended by dropping below it.
   const rows =
     grid.maxRows ?? Math.max(rowCount(grid, placements) + 1, grid.defaultRows ?? 1);
-  const palette = useMemo(() => paletteFor(view.kind, grid, placements, analysisSource), [view.kind, grid, placements, analysisSource]);
+  const palette = useMemo(() => paletteFor(view.kind, grid, placements, analysisSource, captionSource), [view.kind, grid, placements, analysisSource, captionSource]);
 
   const place = (type: string, at: Cell) => {
     const def = isWidgetType(type) ? widgetRegistry[type] : null;
@@ -109,11 +112,12 @@ export function ViewEditor({
   };
 
   const titleOf = (type: string) =>
-    isWidgetType(type) ? analysisWidgetTitle(type, analysisSource) ?? widgetRegistry[type].title : type;
+    isWidgetType(type) ? analysisWidgetTitle(type, analysisSource) ?? (type === 'captions' ? captionWidgetTitle(captionSource) : null) ?? widgetRegistry[type].title : type;
 
   const integrationOf = (type: string) =>
     isWidgetType(type) && analysisWidgetTitle(type, analysisSource)
       ? analysisIntegration(analysisSource)
+    : type === 'captions' ? captionIntegration(captionSource)
       : isWidgetType(type) ? widgetRegistry[type].integration ?? 'prodmesh' : 'prodmesh';
 
   /** Arrow-key movement for the grabbed card. Refuses rather than shoves. */
