@@ -9,7 +9,7 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { rooms } from './roomsStore.js';
 import { validateRooms } from './validate.js';
@@ -37,6 +37,7 @@ import authRouter from './routes/auth.js';
 import adminConfigRouter from './routes/adminConfig.js';
 import systemRouter from './routes/system.js';
 import proPresenterRouter from './routes/proPresenter.js';
+import * as branding from './branding.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -99,11 +100,23 @@ app.use(proPresenterRouter);
 // ── Static frontend (production) ───────────────────────────────────────────────
 const distDir = join(__dirname, '..', 'dist');
 if (existsSync(distDir)) {
-  app.use(express.static(distDir));
+  const indexPath = join(distDir, 'index.html');
+  // Keep index.html out of the static middleware so we can put the configured
+  // church favicon in the *initial* document. Safari selects its tab icon
+  // before React mounts and can otherwise retain a previous /favicon.ico.
+  app.use(express.static(distDir, { index: false }));
   // SPA fallback: any non-API route serves index.html so /room/:id works on reload.
   app.use((req, res, next) => {
     if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
-    res.sendFile(join(distDir, 'index.html'));
+    const logo = branding.getLogoMeta();
+    if (!logo) return res.sendFile(indexPath);
+    const favicon = [
+      `<link id="app-favicon" rel="icon" type="image/x-icon" href="/favicon.ico?v=${logo.updatedAt}" />`,
+      `<link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=${logo.updatedAt}" />`,
+    ].join('');
+    const html = readFileSync(indexPath, 'utf8')
+      .replace(/<link id="app-favicon"[^>]*\/>/, favicon);
+    res.set('Cache-Control', 'no-store').type('html').send(html);
   });
 }
 
