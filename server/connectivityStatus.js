@@ -59,7 +59,7 @@ async function analysisStatus(cfg) {
     const snap = snapshot()[openSoundMeter.healthKey(cfg)];
     if (!snap || snap.ok == null) return { ok: null, detail: 'Waiting for Open Sound Meter multicast levels' };
     if (!snap.ok) return { ok: false, detail: snap.lastError?.message ?? 'Open Sound Meter listener error' };
-    return { ok: true, detail: 'Receiving Open Sound Meter levels' };
+    return { ok: true, detail: 'Connected' };
   }
   const label = cfg.source === 'rta' ? 'RTA app' : 'Smaart';
   const key = (cfg.source === 'rta' ? rta : smaart).healthKey(cfg);

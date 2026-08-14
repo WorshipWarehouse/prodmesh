@@ -47,7 +47,7 @@ export function LoudnessWidget({ roomId, config }: WidgetProps) {
   const spl = useTopic<SplState | null>(roomTopic.spl(roomId));
   if (!spl) return null;
 
-  const measurement = config.metric || `SPL ${config.weighting ?? 'A'} ${config.response ?? 'Slow'}`;
+  const measurement = `SPL ${config.weighting ?? 'A'} ${config.response ?? 'Slow'}`;
   const configured = { ...spl, current: spl.readings?.[measurement] ?? spl.current, target: config.target ?? spl.target, limit: config.limit ?? spl.limit };
 
   const zone = splZone(configured);

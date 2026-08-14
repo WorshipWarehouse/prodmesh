@@ -135,7 +135,7 @@ export function testConnection(cfg, timeoutMs = 5_000) {
     watchSpl(cfg, (sample) => {
       clearTimeout(timer);
       controller.abort();
-      resolve({ detail: `Receiving ${cfg.weighting ?? 'A'}-${cfg.response ?? 'Slow'} SPL (${sample.spl.toFixed(1)} dB)` });
+      resolve({ detail: 'Connected' });
     }, controller.signal).catch((err) => {
       clearTimeout(timer);
       reject(err);
@@ -150,7 +150,7 @@ function waitForPacket(cfg, timeoutMs) {
       const parsed = sampleFromPacket(data, cfg, null);
       if (!parsed) return;
       done();
-      resolve({ detail: `Receiving ${cfg.weighting ?? 'A'}-${cfg.response ?? 'Slow'} SPL (${parsed.sample.spl.toFixed(1)} dB)` });
+      resolve({ detail: 'Connected' });
     };
     const timer = setTimeout(() => {
       done();
