@@ -330,6 +330,10 @@ span.ros-track__status {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* This widget lives in a resizable canvas cell. Give the flex layout a
+     definite height so the service list grows into any extra room instead of
+     leaving an unused band at the bottom of a larger placement. */
+  height: 100%;
   min-height: 0;
   flex: 1;
 }
@@ -368,7 +372,7 @@ span.ros-track__status {
 /* The scroll container, not the widget. Without min-height:0 a flex child
    refuses to shrink below its content and the list pushes the cell open. */
 .rosw__list {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   margin: 0 -4px;
@@ -584,9 +588,16 @@ span.ros-track__status {
    so it comes down a step and is allowed a second line. `anywhere` rather than
    break-word because a room may be named something long with no space in it. */
 .wgt--mode .wgt__value {
-  font-size: clamp(1.3rem, 2.6vw, 2.2rem);
+  /* The mode is the whole point of this card. Size it from this card—not the
+     browser viewport—so a roomy Companion widget makes "Sunday" prominent,
+     while a narrow one still wraps safely inside its bounds. */
+  font-size: clamp(1.3rem, min(22cqw, 40cqh), 5rem);
   line-height: 1.15;
   overflow-wrap: anywhere;
+}
+
+.wgt--mode {
+  container-type: size;
 }
 
 /* A room that should be talking to Companion and isn't. Not the same as a mock
