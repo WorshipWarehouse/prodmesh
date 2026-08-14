@@ -33,3 +33,22 @@ test('validation rejects bad shapes', () => {
   assert.throws(() => cfg.setConfig('r', 'p', { map: { a: { ppIndex: 'x' } } }), /ppIndex/);
   assert.throws(() => cfg.setConfig('r', 'p', { map: { a: { ppIndex: -1 } } }), /ppIndex/);
 });
+
+test('Services LIVE can be armed independently of Run of Show', () => {
+  const saved = cfg.setConfig('r-live', 'p-live', {
+    servicesLiveFromProPresenter: true,
+    servicesLiveStartMode: 'service-time',
+    servicesLiveStartTimeId: 'time-9am',
+  });
+  assert.equal(saved.servicesLiveFromProPresenter, true);
+  assert.equal(saved.servicesLiveStartMode, 'service-time');
+  assert.equal(saved.servicesLiveStartTimeId, 'time-9am');
+  assert.equal(saved.startItemId, null, 'Run of Show remains optional');
+});
+
+test('a mapping can explicitly exclude an item from automatic matching', () => {
+  const saved = cfg.setConfig('r-none', 'p-none', {
+    map: { 'pc-no-presentation': { disabled: true } },
+  });
+  assert.deepEqual(saved.map, { 'pc-no-presentation': { disabled: true } });
+});

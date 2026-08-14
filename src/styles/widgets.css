@@ -62,3 +62,44 @@
   color: var(--text-dim);
   font-size: 0.85rem;
 }
+
+/* ProPresenter console: compact enough for a booth, but all state remains
+   textual when the thumbnail endpoint cannot supply an image. */
+.ppwidget { min-height: 0; color: var(--text); }
+.ppwidget--playlist { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; overflow: hidden; }
+.ppwidget h3, .ppwidget p { margin: 0 0 8px; }
+.ppwidget h3, .ppwidget header { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.ppwidget__toggles { display: flex; gap: 8px; font-size: .78rem; color: var(--text-dim); }
+.ppwidget__notice { color: var(--text-dim); font-size: .8rem; }
+.ppwidget__error { margin: 0; color: #ff8f8f; font-size: .8rem; }
+.ppwidget small { display: block; color: var(--text-dim); }
+.ppcontrols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ppcontrols button, .ppitem__header, .ppcue { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: inherit; padding: 8px; text-align: left; }
+.ppplaylist__scroll { min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 1px; }
+.ppitem { margin: 0 0 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
+.ppitem--active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.ppitem__header { width: 100%; border: 0; border-radius: 8px 8px 0 0; font-weight: 650; }
+.ppitem__header > span { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 7px; border-radius: 50%; background: var(--bg-raised); font-size: .68rem; }
+.ppitem__slides { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(32px, var(--pp-slide-size, 60px)), 1fr)); gap: 6px; padding: 7px; }
+.ppcue { position: relative; display: block; aspect-ratio: 16 / 9; min-width: 0; overflow: hidden; padding: 4px; font-size: 11px; }
+.ppcue img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 3px; background: #000; }
+.ppcue__fallback[hidden] { display: none; }
+.ppcue__fallback { display: grid; width: 100%; height: 100%; min-width: 0; box-sizing: border-box; place-items: center; padding: .45rem; color: var(--text-dim); overflow: hidden; overflow-wrap: anywhere; text-align: center; }
+.ppcue b { position: absolute; z-index: 2; top: 7px; right: 7px; padding: 1px 4px; border-radius: 99px; background: #000c; font-size: .6rem; }
+.ppcue__section { position: absolute; z-index: 2; top: 7px; left: 7px; max-width: calc(100% - 34px); overflow: hidden; padding: 2px 4px; border-left: 3px solid var(--part-color); border-radius: 3px; background: #05080de6; color: #fff !important; font-size: .55rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.ppitem__empty { padding: 7px; color: var(--text-dim); font-size: .72rem; }
+.ppcue--active { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.pcw { display: grid; align-content: start; gap: 8px; }
+.pcw__title { font-size: clamp(1.3rem, 2vw, 2.1rem); line-height: 1.05; overflow-wrap: anywhere; }
+.pcw__list, .pcw--teams { overflow: auto; }
+.pcw__row { display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .82rem; }
+.pcw__row small { white-space: nowrap; }
+.pcw__team { margin-top: 6px; color: var(--accent); font-weight: 700; text-transform: uppercase; }
+.pcw__delta { font-size: clamp(2.2rem, 4vw, 3.8rem); line-height: .9; letter-spacing: -.06em; }
+.pcw--schedule .pcw__delta { color: #42db98; }
+.pcw--behind .pcw__delta { color: #ff9c5b; }
+
+@media (max-width: 900px) {
+  .ppitem__slides { grid-template-columns: repeat(auto-fill, minmax(min(max(32px, var(--pp-slide-size, 60px)), 42%), 1fr)); }
+}

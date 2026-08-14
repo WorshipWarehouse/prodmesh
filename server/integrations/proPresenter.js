@@ -73,7 +73,7 @@ export function mapIndexToItemId(items, active) {
 
 /**
  * Mapping with per-event manual overrides layered on top (Event Detail →
- * Show Config): overrides = { '<pc item id>': { ppIndex, ppName } }. An
+ * Show Config): overrides = { '<pc item id>': { ppIndex, ppName } | { disabled: true } }. An
  * override wins by playlist index, with a tolerant-name rescue for when the
  * playlist was re-pushed and indices shifted but names survived.
  */
@@ -82,6 +82,7 @@ export function mapActiveToItemId(items, active, overrides = null) {
   if (overrides) {
     for (const [pcId, pp] of Object.entries(overrides)) {
       if (pp == null) continue;
+      if (pp.disabled) continue;
       if (pp.ppIndex === active.index || (pp.ppName && namesMatch(pp.ppName, active.name))) {
         return pcId;
       }
@@ -394,6 +395,16 @@ function hexColor(c) {
   return `#${rgb.map((n) => n.toString(16).padStart(2, '0')).join('')}`;
 }
 
+// PP uses `label` or `name` for some cue types (including the final utility
+// cue in certain Planning Center presentations), rather than `text`.
+function cueText(cue) {
+  return typeof cue?.text === 'string' && cue.text.trim()
+    ? cue.text
+    : typeof cue?.label === 'string' && cue.label.trim()
+      ? cue.label
+      : typeof cue?.name === 'string' ? cue.name : '';
+}
+
 /**
  * Flatten a presentation into the cue list it is actually played as.
  *
@@ -414,7 +425,16 @@ function hexColor(c) {
 export function arrangeSlides(pres, arrangement = null, totalCues = null) {
   if (!pres) return [];
   const byUuid = new Map();
-  for (const g of pres.groups ?? []) byUuid.set(g.uuid, g);
+  const thumbnailOffsets = new Map();
+  let thumbnailOffset = 0;
+  for (const g of pres.groups ?? []) {
+    byUuid.set(g.uuid, g);
+    // Arrangement order may repeat a group, but PP's thumbnail endpoint is
+    // addressed in the source presentation's original cue order. Keep this
+    // source index beside every expanded cue (ChurchBoard's key insight).
+    thumbnailOffsets.set(g.uuid, thumbnailOffset);
+    thumbnailOffset += (g.slides ?? []).length;
+  }
   const arrs = pres.arrangements ?? [];
   const uuidsOf = (a) => (Array.isArray(a?.groups) ? a.groups : []).map((u) => (typeof u === 'string' ? u : u?.uuid));
   const lengthOf = (uuids) => uuids.reduce((s, u) => s + (byUuid.get(u)?.slides ?? []).length, 0);
@@ -446,13 +466,14 @@ export function arrangeSlides(pres, arrangement = null, totalCues = null) {
       const g = byUuid.get(uuid);
       if (!g) continue; // an arrangement referencing a deleted group
       const rep = run.length > 1 ? { at: k + 1, of: run.length } : null;
-      for (const s of g.slides ?? []) {
+      for (const [sourceIndex, s] of (g.slides ?? []).entries()) {
         out.push({
-          text: typeof s.text === 'string' ? s.text : '',
+          text: cueText(s),
           section: g.name ?? '',
           color: hexColor(g.color),
           note: s.notes || null,
           rep,
+          thumbnailIndex: (thumbnailOffsets.get(uuid) ?? 0) + sourceIndex,
         });
       }
     }
@@ -536,6 +557,208 @@ export async function readTimers(pp, signal) {
     ppGet(pp, '/v1/timers/current', signal),
   ]);
   return parseTimers(defs, currents);
+}
+
+// ── Production-console playlist model ───────────────────────────────────────
+//
+// Playlist bodies have changed shape across PP 7/21 and Planning Center adds
+// rows which look like presentations but cannot be triggered. Keep that mess at
+// this boundary: widgets receive one stable model and never invent HTTP paths.
+
+const detailCache = new Map(); // machine|presentation uuid -> { value, at }
+const DETAIL_TTL_MS = 5 * 60_000;
+
+const nonEmpty = (...values) => values.find((v) => typeof v === 'string' && v.trim()) ?? null;
+
+function rawPlaylistItems(body) {
+  return body?.items ?? body?.playlist_items ?? body?.children ?? [];
+}
+
+/** Normalize one playlist entry without claiming an arbitrary named node is playable. */
+export function normalizePlaylistItem(raw, position = 0) {
+  const id = raw?.id ?? raw?.playlist_item?.id ?? {};
+  const info = raw?.presentation_info ?? raw?.presentation ?? raw?.playlist_item?.presentation_info ?? {};
+  const type = String(raw?.type ?? raw?.field_type ?? raw?.item_type ?? '').toLowerCase();
+  const presentationUuid = nonEmpty(
+    info.presentation_uuid, info.uuid, raw?.presentation_uuid, raw?.presentation?.id?.uuid,
+  );
+  const isPco = Boolean(raw?.is_pco ?? raw?.planning_center ?? raw?.pco ?? info.is_pco);
+  const index = Number.isInteger(id.index) ? id.index : position;
+  const title = nonEmpty(id.name, raw?.name, raw?.title, info.name) ?? 'Untitled item';
+  const placeholder = Boolean(raw?.placeholder) || /header|folder|placeholder/.test(type);
+  return {
+    index, title, type: type || (presentationUuid ? 'presentation' : 'placeholder'),
+    uuid: id.uuid ?? null, presentationUuid, isPco, placeholder,
+    // A PCO shell may carry a presentation UUID for reading/thumbnails while
+    // refusing UUID activation, so it remains triggerable via item fallback.
+    triggerable: !placeholder && (Boolean(presentationUuid) || isPco),
+    presentationTitle: nonEmpty(info.name, raw?.presentation_name) ?? null,
+    slides: [],
+  };
+}
+
+export function normalizePlaylist(body) {
+  const playlist = body?.playlist ?? body?.id ?? {};
+  return {
+    uuid: playlist.uuid ?? null,
+    name: playlist.name ?? body?.name ?? null,
+    items: rawPlaylistItems(body).map(normalizePlaylistItem),
+  };
+}
+
+/** Presentation detail, cached independently of fast current-cue polling. */
+export async function readPresentationDetail(pp, uuid, signal, { fresh = false } = {}) {
+  if (!/^[a-z0-9-]{8,}$/i.test(String(uuid))) return null;
+  const key = `${healthKey(pp)}|${uuid}`;
+  const cached = detailCache.get(key);
+  if (!fresh && cached && Date.now() - cached.at < DETAIL_TTL_MS) return cached.value;
+  // PP's documented endpoint has varied. Keep failure local to this item.
+  const value = await ppGet(pp, `/v1/presentation/${encodeURIComponent(uuid)}`, signal)
+    .then((body) => body?.presentation ?? body)
+    .catch(() => null);
+  if (value) detailCache.set(key, { value, at: Date.now() });
+  return value;
+}
+
+/** A compact current/next state. API indexes remain zero-based; display is +1. */
+export function runtimeFrom(slide, active, timers, video) {
+  return {
+    activePresentationUuid: slide?.presUuid ?? active?.presentationUuid ?? null,
+    activePlaylistIndex: active?.index ?? null,
+    activeCueIndex: Number.isInteger(slide?.slideIndex) ? slide.slideIndex : null,
+    activeCueNumber: Number.isInteger(slide?.slideIndex) ? slide.slideIndex + 1 : null,
+    totalCues: slide?.totalCues ?? null,
+    timers: timers ?? [], video: video ?? null,
+  };
+}
+
+/** Read focused and active playlists separately; focused is browser state only. */
+export async function readConsoleState(pp, signal) {
+  const [focusedRaw, activeRaw, slide, timers, video] = await Promise.all([
+    ppGet(pp, '/v1/playlist/focused', signal).catch(() => null),
+    ppGet(pp, '/v1/playlist/active', signal).catch(() => null),
+    readSlide(pp, signal).catch(() => null),
+    readTimers(pp, signal).catch(() => []),
+    readTransport(pp, signal).catch(() => null),
+  ]);
+  const focusedRef = focusedRaw?.playlist ?? null;
+  const activeRef = activeRaw?.presentation?.playlist ?? null;
+  const focusedBody = focusedRef?.uuid
+    ? await fetchPlaylistBody(pp, focusedRef, signal).catch(() => null)
+    : null;
+  // PP can briefly return a focused playlist shell with no body while an
+  // operator changes selection. Do not let that empty shell hide a usable
+  // active playlist (the watcher additionally retains the last rich state).
+  const focusedPlaylist = normalizePlaylist(focusedBody ?? focusedRaw ?? {});
+  const activePlaylist = normalizePlaylist(activeRaw ?? {});
+  const focusedUsable = Boolean(focusedPlaylist.uuid || focusedPlaylist.items.length);
+  const playlist = focusedUsable ? focusedPlaylist : activePlaylist;
+  const active = parseActive(activeRaw);
+  // Fetch detail lazily and independently: a malformed/missing presentation
+  // must never erase the rest of the playlist.
+  const items = await Promise.all(playlist.items.map(async (item) => {
+    const detail = item.presentationUuid
+      ? await readPresentationDetail(pp, item.presentationUuid, signal, {
+        fresh: item.presentationUuid === slide?.presUuid,
+      })
+      : null;
+    const arrangement = item.presentationUuid === slide?.presUuid
+      ? { uuid: active.arrangementUuid, name: active.arrangementName }
+      : null;
+    return { ...item, slides: detail ? arrangeSlides(detail, arrangement, item.presentationUuid === slide?.presUuid ? slide?.totalCues : null)
+      .map((cue, index) => ({ ...cue, index, number: index + 1 })) : [] };
+  }));
+  return {
+    focusedPlaylist: { ...playlist, items, source: focusedUsable ? 'focused' : 'active-fallback' },
+    activePlaylist: activeRef ? { uuid: activeRef.uuid ?? null, name: activeRef.name ?? null } : null,
+    runtime: runtimeFrom(slide, active, timers, video),
+  };
+}
+
+function validIndex(value) {
+  return Number.isInteger(value) && value >= 0 && value <= 10_000;
+}
+
+/** Control routes commonly answer with an empty 200 body. `ppGet` is right for
+ * data but treats that successful response as broken JSON; actions need their
+ * own narrow transport. */
+async function ppControlGet(pp, path, signal) {
+  const key = healthKey(pp);
+  try {
+    const res = await fetch(`${baseUrl(pp)}${path}`, { signal: withTimeout(signal) });
+    if (!res.ok) throw new Error(`ProPresenter ${res.status}`);
+    report(key, true);
+  } catch (err) {
+    if (err?.name !== 'AbortError') report(key, false, String(err.message ?? err));
+    throw err;
+  }
+}
+
+export async function control(pp, action, input = {}, signal) {
+  if (!isConfigured(pp)) throw new Error('ProPresenter is not configured');
+  if (action === 'next') return ppControlGet(pp, '/v1/trigger/next', signal);
+  if (action === 'previous') return ppControlGet(pp, '/v1/trigger/previous', signal);
+  if (!validIndex(input.playlistIndex)) throw new Error('Invalid playlist index');
+  if (action === 'presentation') {
+    // UUID activation is the stable path even for PCO items when supported;
+    // only fall back to their playlist position when that PP build rejects it.
+    if (input.presentationUuid) {
+      try { return await ppControlGet(pp, `/v1/presentation/${encodeURIComponent(input.presentationUuid)}/trigger`, signal); }
+      catch { /* playlist placement is the compatibility fallback */ }
+    }
+    return ppControlGet(pp, `/v1/playlist/focused/${input.playlistIndex}/trigger`, signal);
+  }
+  if (action === 'cue') {
+    if (!validIndex(input.cueIndex)) throw new Error('Invalid cue index');
+    // The display number is one-based, but ProPresenter's trigger endpoint
+    // itself expects the zero-based API cue index. Keep that conversion at the
+    // UI boundary; sending the display number advances every mouse cue by one.
+    const cueIndex = input.cueIndex;
+    if (input.presentationUuid) {
+      try { return await ppControlGet(pp, `/v1/presentation/${encodeURIComponent(input.presentationUuid)}/trigger/${cueIndex}`, signal); }
+      catch { /* deliberate fallback below */ }
+    }
+    await ppControlGet(pp, `/v1/playlist/focused/${input.playlistIndex}/trigger`, signal);
+    // PP applies playlist activation asynchronously. Waiting a beat prevents
+    // the cue request from being aimed at the presentation that just left air.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return ppControlGet(pp, `/v1/presentation/active/${cueIndex}/trigger`, signal);
+  }
+  throw new Error('Unknown ProPresenter action');
+}
+
+/** Find the adjacent playable row by actual playlist index, not array position:
+ * headers, folders and unresolved PCO shells occupy positions too. */
+export function adjacentPlayable(items, fromIndex, direction) {
+  const sorted = [...(items ?? [])].sort((a, b) => a.index - b.index);
+  const candidates = direction > 0 ? sorted : sorted.reverse();
+  return candidates.find((item) => item.triggerable && (direction > 0 ? item.index > fromIndex : item.index < fromIndex)) ?? null;
+}
+
+export async function controlAdjacentItem(pp, direction, signal) {
+  const state = await readConsoleState(pp, signal);
+  const activeIndex = state.runtime.activePlaylistIndex;
+  if (!Number.isInteger(activeIndex)) throw new Error('No active playlist item');
+  const target = adjacentPlayable(state.focusedPlaylist.items, activeIndex, direction);
+  if (!target) throw new Error(direction > 0 ? 'No next playable playlist item' : 'No previous playable playlist item');
+  return control(pp, 'presentation', { playlistIndex: target.index }, signal);
+}
+
+/** Fetch a rendered cue image for our own proxy route; never send clients to
+ * the device directly. Returns null for a missing thumbnail. */
+export async function readThumbnail(pp, presentationUuid, cueIndex, signal) {
+  if (!/^[a-z0-9-]{8,}$/i.test(String(presentationUuid)) || !validIndex(cueIndex)) return null;
+  // PP 7 documents this endpoint as one-based, but some newer builds respond
+  // with zero-based indexes. In that variant every final cue is requested one
+  // past the presentation, so retry the raw API cue index only after a miss.
+  const get = (index) => fetch(`${baseUrl(pp)}/v1/presentation/${encodeURIComponent(presentationUuid)}/thumbnail/${index}`, {
+    signal: withTimeout(signal),
+  });
+  let res = await get(cueIndex + 1);
+  if (!res.ok) res = await get(cueIndex);
+  if (!res.ok) return null;
+  const bytes = Buffer.from(await res.arrayBuffer());
+  return { bytes, type: res.headers.get('content-type') || 'image/jpeg' };
 }
 
 function sleep(ms, signal) {

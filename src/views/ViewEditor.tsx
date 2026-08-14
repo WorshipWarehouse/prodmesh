@@ -42,6 +42,7 @@ export function ViewEditor({
   // Which card is in keyboard "grab" mode, and what the last move announced.
   const [grabbed, setGrabbed] = useState<string | null>(null);
   const [announcement, setAnnounce] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
 
   const placements = view.widgets;
 
@@ -73,6 +74,9 @@ export function ViewEditor({
 
   const resizeTo = (id: string, size: WidgetSize) =>
     onChange(placements.map((p) => (p.id === id ? { ...p, ...size } : p)));
+
+  const setConfig = (id: string, patch: Record<string, unknown>) =>
+    onChange(placements.map((p) => (p.id === id ? { ...p, config: { ...p.config, ...patch } } : p)));
 
   /** How far a widget may be stretched — the server enforces the same bounds. */
   const boundsFor = (type: string) => {
@@ -156,6 +160,7 @@ export function ViewEditor({
               : 'Drag to move, or press Enter and use the arrow keys'
           }
           {...moveHandlers(placement)}
+          onClick={() => setSelected(placement.id)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -183,12 +188,12 @@ export function ViewEditor({
           <X size={14} />
         </button>
 
-        {/* Only where the widget declares a range. Most stay one size, so a
-            handle on them would only offer the bad version of two designs. */}
+        {/* Every widget can grow in both directions within the shared layout
+            range; the server applies the exact same bounds on save. */}
         {resizable && (
           <span
             className="viewcell__resize"
-            title={`Drag to resize (${widgetMin(def!).h}–${widgetMax(def!).h} rows)`}
+            title={`Drag to resize (${widgetMin(def!).w}–${widgetMax(def!).w} columns, ${widgetMin(def!).h}–${widgetMax(def!).h} rows)`}
             aria-hidden
             {...resizeHandlers(placement, boundsFor(placement.type))}
           />
@@ -245,8 +250,16 @@ export function ViewEditor({
         )}
       </div>
 
+      <WidgetInspector placement={placements.find((p) => p.id === selected) ?? null} onChange={setConfig} />
+
       {/* Every keyboard move says where it landed, or that it refused. */}
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>
   );
+}
+
+/** Settings live beside the canvas, never inside a small widget cell. */
+function WidgetInspector({ placement, onChange }: { placement: ViewPlacement | null; onChange: (id: string, patch: Record<string, unknown>) => void }) {
+  const pp = placement && (placement.type === 'propresenter-playlist' || placement.type === 'propresenter-controls');
+  return <aside className="widgetinspector"><h2>Widget settings</h2>{!placement ? <p>Select a widget to configure it.</p> : !pp ? <p><strong>{placement.type}</strong><br />This widget has no settings.</p> : <><p className="widgetinspector__name">{placement.type === 'propresenter-playlist' ? 'ProPresenter Playlist' : 'ProPresenter Controls'}</p><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.slideControls)} onChange={(event) => onChange(placement.id, { slideControls: event.target.checked })} /> Enable slide controls</label>{placement.type === 'propresenter-playlist' && <><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.keyboardControls)} onChange={(event) => onChange(placement.id, { keyboardControls: event.target.checked })} /> Enable arrow keys and spacebar</label><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.followActive)} onChange={(event) => onChange(placement.id, { followActive: event.target.checked })} /> Follow active cue</label><label>Slide display<select value={placement.config.slideMode ?? 'image'} onChange={(event) => onChange(placement.id, { slideMode: event.target.value })}><option value="image">Rendered previews</option><option value="text">Slide text</option></select></label><label>Slide width (px)<input type="number" min="0" max="200" step="1" value={placement.config.slideSize ?? 60} onChange={(event) => onChange(placement.id, { slideSize: Number(event.target.value) })} /><small>0–200 px. Lower values fit more cues across; 0 uses a safe 32 px rendering floor.</small></label></>}</>}</aside>;
 }
