@@ -136,6 +136,11 @@
    Now & Next). Scale the first rendered root, not a particular class, so the
    editor and live dashboard apply exactly the same fitting behavior. */
 .viewcell__body--scale-fit > * {
+  /* `flex: 1` would shrink this widened inner layout before `zoom` is applied,
+     leaving a blank strip on the right of scaled widgets such as Run of Show.
+     Keep its calculated dimensions intact; zoom then brings it back to the
+     exact size of the cell. */
+  flex: none;
   zoom: var(--widget-scale);
   width: calc(100% / var(--widget-scale));
   height: calc(100% / var(--widget-scale));
