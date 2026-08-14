@@ -381,6 +381,17 @@ function viewWidgetConfig(config) {
     if (!Number.isInteger(size) || size < 0 || size > 200) throw new Error('Slide size must be 0–200 pixels');
     out.slideSize = size;
   }
+  for (const key of ['target', 'limit']) {
+    if (config[key] == null || config[key] === '') continue;
+    const value = Number(config[key]);
+    if (!Number.isFinite(value) || value < 40 || value > 130) throw new Error(`Widget ${key} must be 40–130 dB`);
+    out[key] = value;
+  }
+  if (out.target != null && out.limit != null && out.limit < out.target) throw new Error('Widget limit must be at or above target');
+  if (config.metric != null && config.metric !== '') {
+    if (typeof config.metric !== 'string' || config.metric.length > 60) throw new Error('Widget metric must be at most 60 characters');
+    out.metric = config.metric;
+  }
   if (['current', 'next', 'both'].includes(config.slides)) out.slides = config.slides;
   return out;
 }

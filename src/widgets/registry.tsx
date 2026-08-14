@@ -42,6 +42,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     component: LoudnessWidget,
     size: { w: 2, h: 1 },
     defaultSpan: 'third',
+    unique: false,
   },
 
   'loudness-trend': {
@@ -51,6 +52,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     component: LoudnessTrendWidget,
     size: { w: 2, h: 1 },
     defaultSpan: 'third',
+    unique: false,
   },
 
   viewers: {

@@ -19,6 +19,8 @@ import { report } from '../health.js';
 export const MULTICAST_GROUP = '239.255.42.42';
 export const DEFAULT_PORT = 49007;
 const SPL_OFFSET = 140;
+let activeWatchers = 0;
+const packetObservers = new Set();
 
 export const isConfigured = (cfg) => Boolean(cfg && cfg.source === 'open-sound-meter');
 export const healthKey = (cfg) => `analysis@osm:${MULTICAST_GROUP}:${cfg?.port ?? DEFAULT_PORT}`;
@@ -46,7 +48,13 @@ export function sampleFromPacket(data, cfg, selectedSource) {
   if (level == null) return null;
   return {
     sourceId: expected || sourceId,
-    sample: { ts: Date.now(), spl: Math.round(level * 10) / 10 },
+    sample: {
+      ts: Date.now(), spl: Math.round(level * 10) / 10,
+      readings: Object.fromEntries(['A', 'B', 'C', 'Z'].flatMap((weighting) => ['Fast', 'Slow'].flatMap((response) => {
+        const raw = packet.data?.[weighting]?.[response];
+        return typeof raw === 'number' && Number.isFinite(raw) ? [[`SPL ${weighting} ${response}`, Math.round((raw + SPL_OFFSET) * 10) / 10]] : [];
+      }))),
+    },
   };
 }
 
@@ -56,9 +64,11 @@ export function watchSpl(cfg, onSample, signal) {
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
     let selectedSource = cfg.sourceId ?? null;
     let closed = false;
+    activeWatchers += 1;
     const finish = (err) => {
       if (closed) return;
       closed = true;
+      activeWatchers -= 1;
       signal?.removeEventListener('abort', onAbort);
       try { socket.close(); } catch { /* already closed */ }
       err ? reject(err) : resolve();
@@ -68,6 +78,7 @@ export function watchSpl(cfg, onSample, signal) {
 
     socket.once('error', finish);
     socket.on('message', (data) => {
+      for (const observer of packetObservers) observer(data);
       const parsed = sampleFromPacket(data, cfg, selectedSource);
       if (!parsed) return;
       selectedSource = parsed.sourceId;
@@ -88,6 +99,10 @@ export function watchSpl(cfg, onSample, signal) {
  * validates the measurement that will drive the widget, not merely whether a
  * UDP port happened to be open. */
 export function testConnection(cfg, timeoutMs = 5_000) {
+  // A dashboard may already be listening for the live widget. macOS does not
+  // allow a second socket to bind this multicast port, so observe that shared
+  // listener instead of competing with it (the former EADDRINUSE failure).
+  if (activeWatchers > 0) return waitForPacket(cfg, timeoutMs);
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
@@ -102,5 +117,22 @@ export function testConnection(cfg, timeoutMs = 5_000) {
       clearTimeout(timer);
       reject(err);
     });
+  });
+}
+
+function waitForPacket(cfg, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const done = () => { clearTimeout(timer); packetObservers.delete(onPacket); };
+    const onPacket = (data) => {
+      const parsed = sampleFromPacket(data, cfg, null);
+      if (!parsed) return;
+      done();
+      resolve({ detail: `Receiving ${cfg.weighting ?? 'A'}-${cfg.response ?? 'Slow'} SPL (${parsed.sample.spl.toFixed(1)} dB)` });
+    };
+    const timer = setTimeout(() => {
+      done();
+      reject(new Error(`No matching Open Sound Meter level packet received within ${Math.ceil(timeoutMs / 1000)} seconds`));
+    }, timeoutMs);
+    packetObservers.add(onPacket);
   });
 }

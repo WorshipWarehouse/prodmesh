@@ -2141,10 +2141,6 @@ interface AnalysisDraft {
   source: 'none' | 'smaart' | 'rta' | 'open-sound-meter';
   host: string;
   port: string;
-  target: string;
-  limit: string;
-  metric: string;
-  sourceId: string;
   weighting: 'A' | 'B' | 'C' | 'Z';
   response: 'Fast' | 'Slow';
   password: string;
@@ -2156,10 +2152,6 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
     source: cfg ? cfg.source : 'none',
     host: cfg?.host ?? '',
     port: cfg?.port != null ? String(cfg.port) : '',
-    target: cfg?.target != null ? String(cfg.target) : '',
-    limit: cfg?.limit != null ? String(cfg.limit) : '',
-    metric: cfg?.metric ?? '',
-    sourceId: cfg?.sourceId ?? '',
     weighting: cfg?.weighting ?? 'A',
     response: cfg?.response ?? 'Slow',
     password: '',
@@ -2173,10 +2165,6 @@ function analysisFromDraft(d: AnalysisDraft): AnalysisConfig | null {
     source: d.source,
     host: d.host || undefined,
     port: d.port === '' ? undefined : Number(d.port),
-    target: d.target === '' ? undefined : Number(d.target),
-    limit: d.limit === '' ? undefined : Number(d.limit),
-    metric: d.metric || undefined,
-    sourceId: d.sourceId || undefined,
     weighting: d.source === 'open-sound-meter' ? d.weighting : undefined,
     response: d.source === 'open-sound-meter' ? d.response : undefined,
     logControl: d.source === 'smaart' && d.logControl ? true : undefined,
@@ -2252,32 +2240,19 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
         )}
       </FormRow>
 
-      {draft.source !== 'none' && (
+      {draft.source === 'open-sound-meter' && (
         <FormRow>
-          <Field label="Target dB" width="sm">
-            <input className="field" inputMode="numeric" placeholder="e.g. 90"
-              value={draft.target} onChange={(e) => f.patch({ target: e.target.value })} />
-          </Field>
-          <Field label="Limit dB" width="sm">
-            <input className="field" inputMode="numeric" placeholder="e.g. 95"
-              value={draft.limit} onChange={(e) => f.patch({ limit: e.target.value })} />
-          </Field>
-          {draft.source !== 'open-sound-meter' && <Field label="Metric" width="grow">
-            <input className="field" placeholder={draft.source === 'smaart' ? 'SPL A Slow' : 'slow_db'}
-              value={draft.metric} onChange={(e) => f.patch({ metric: e.target.value })} />
-          </Field>}
-          {draft.source === 'open-sound-meter' && <>
             <Field label="Weighting" width="sm"><SelectField value={draft.weighting} onChange={(e) => f.patch({ weighting: e.target.value as AnalysisDraft['weighting'] })}><option value="A">A-weighted</option><option value="B">B-weighted</option><option value="C">C-weighted</option><option value="Z">Z-weighted</option></SelectField></Field>
             <Field label="Response" width="sm"><SelectField value={draft.response} onChange={(e) => f.patch({ response: e.target.value as AnalysisDraft['response'] })}><option value="Fast">Fast</option><option value="Slow">Slow</option></SelectField></Field>
-            <Field label="Measurement source ID" width="grow"><input className="field" placeholder="Optional — first active source" value={draft.sourceId} onChange={(e) => f.patch({ sourceId: e.target.value })} /></Field>
-          </>}
-          {draft.source === 'smaart' && (
+        </FormRow>
+      )}
+      {draft.source === 'smaart' && (
+        <FormRow>
             <Field label="API password">
               <input className="field" type="password" autoComplete="off"
                 placeholder={hasPassword ? 'unchanged' : 'none'} value={draft.password}
                 onChange={(e) => f.patch({ password: e.target.value })} />
             </Field>
-          )}
         </FormRow>
       )}
 

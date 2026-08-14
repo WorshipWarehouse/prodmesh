@@ -37,6 +37,12 @@ export interface WidgetConfig {
   followActive?: boolean;
   slideMode?: 'image' | 'text';
   slideSize?: number;
+  /** Per-meter thresholds and selected analyzer reading. */
+  target?: number;
+  limit?: number;
+  metric?: string;
+  weighting?: 'A' | 'B' | 'C' | 'Z';
+  response?: 'Fast' | 'Slow';
   slides?: 'current' | 'next' | 'both';
   /** Runtime-only identity injected by ViewCanvas; never persisted. */
   viewId?: string;

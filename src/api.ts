@@ -580,10 +580,6 @@ export interface AnalysisConfig {
   source: AnalysisSource;
   host?: string;
   port?: number;
-  target?: number;
-  limit?: number;
-  metric?: string;
-  sourceId?: string;
   weighting?: 'A' | 'B' | 'C' | 'Z';
   response?: 'Fast' | 'Slow';
   password?: string;
@@ -1031,6 +1027,7 @@ export interface SplState {
   peak: number | null; // show peak — only while a show is live
   target: number | null;
   limit: number | null;
+  readings?: Record<string, number> | null;
   ca?: CaState | null;
 }
 
@@ -1255,6 +1252,9 @@ export interface WidgetConfigJson {
   slideMode?: 'image' | 'text';
   slideSize?: number;
   slides?: 'current' | 'next' | 'both';
+  target?: number;
+  limit?: number;
+  metric?: string;
 }
 
 export interface ViewSummary {

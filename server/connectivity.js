@@ -98,26 +98,7 @@ export function validateAnalysis(input) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
     out.port = port;
   }
-  for (const key of ['target', 'limit']) {
-    const v = input[key] === '' || input[key] == null ? null : Number(input[key]);
-    if (v == null) continue;
-    if (!Number.isFinite(v) || v < 40 || v > 130) throw new Error(`${key} must be 40–130 dB`);
-    out[key] = v;
-  }
-  if (out.target != null && out.limit != null && out.limit < out.target) {
-    throw new Error('limit must be at or above target');
-  }
-  const metric = String(input.metric ?? '').trim();
-  if (metric) {
-    if (metric.length > 60) throw new Error('metric must be at most 60 characters');
-    out.metric = metric;
-  }
   if (source === 'open-sound-meter') {
-    const sourceId = String(input.sourceId ?? '').trim();
-    if (sourceId) {
-      if (sourceId.length > 200) throw new Error('sourceId must be at most 200 characters');
-      out.sourceId = sourceId;
-    }
     const weighting = String(input.weighting ?? 'A').toUpperCase();
     if (!['A', 'B', 'C', 'Z'].includes(weighting)) throw new Error('weighting must be A, B, C, or Z');
     out.weighting = weighting;

@@ -417,6 +417,7 @@ function onSpl(roomId, sample) {
     peak,
     target: cfg.target ?? null,
     limit: cfg.limit ?? null,
+    readings: sample.readings ?? null,
     // C-A ratio rides along when the analysis source provides it (RTA).
     // Its target band comes from the analyzer app's own config.
     ca:
