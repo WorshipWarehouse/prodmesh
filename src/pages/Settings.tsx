@@ -43,6 +43,7 @@ import {
   getRoomConnectivityStatus,
   savePcServiceTypes,
   saveAnalysis,
+  testAnalysisConnection,
   saveYouTube,
   saveCaptions,
   downloadBackup,
@@ -2166,32 +2167,45 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
   };
 }
 
+function analysisFromDraft(d: AnalysisDraft): AnalysisConfig | null {
+  if (d.source === 'none') return null;
+  return {
+    source: d.source,
+    host: d.host || undefined,
+    port: d.port === '' ? undefined : Number(d.port),
+    target: d.target === '' ? undefined : Number(d.target),
+    limit: d.limit === '' ? undefined : Number(d.limit),
+    metric: d.metric || undefined,
+    sourceId: d.sourceId || undefined,
+    weighting: d.source === 'open-sound-meter' ? d.weighting : undefined,
+    response: d.source === 'open-sound-meter' ? d.response : undefined,
+    logControl: d.source === 'smaart' && d.logControl ? true : undefined,
+    ...(d.password ? { password: d.password } : {}),
+  };
+}
+
 function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: AnalysisConfig | null; status?: ReactNode }) {
   const [hasPassword, setHasPassword] = useState(Boolean(initial?.hasPassword));
+  const [testState, setTestState] = useState<{ busy: boolean; ok?: boolean; detail?: string }>({ busy: false });
   const f = useDraft(toDraft(initial), async (d) => {
     const stored = await saveAnalysis(
       roomId,
-      d.source === 'none'
-        ? null
-        : {
-            source: d.source,
-            host: d.host,
-            port: d.port === '' ? undefined : Number(d.port),
-            target: d.target === '' ? undefined : Number(d.target),
-            limit: d.limit === '' ? undefined : Number(d.limit),
-            metric: d.metric || undefined,
-            sourceId: d.sourceId || undefined,
-            weighting: d.source === 'open-sound-meter' ? d.weighting : undefined,
-            response: d.source === 'open-sound-meter' ? d.response : undefined,
-            logControl: d.source === 'smaart' && d.logControl ? true : undefined,
-            // Omit password unless typed — omitted keeps the stored one.
-            ...(d.password ? { password: d.password } : {}),
-          },
+      analysisFromDraft(d),
     );
     setHasPassword(Boolean(stored?.hasPassword));
     return toDraft(stored);
   });
   const { draft } = f;
+  const runTest = async () => {
+    const analysis = analysisFromDraft(draft);
+    if (!analysis) return;
+    setTestState({ busy: true });
+    try {
+      setTestState({ busy: false, ...(await testAnalysisConnection(roomId, analysis)) });
+    } catch (err) {
+      setTestState({ busy: false, ok: false, detail: err instanceof Error ? err.message : String(err) });
+    }
+  };
 
   if (initial?.mock) {
     return (
@@ -2277,6 +2291,21 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
             onChange={(e) => f.patch({ logControl: e.target.checked })}
           />
         </FormRow>
+      )}
+      {draft.source === 'open-sound-meter' && (
+        <p className="settings__muted">
+          In Open Sound Meter, enable the Wi‑Fi icon’s <strong>Remote API Server</strong>.
+          ProdMesh listens for multicast level packets at 239.255.42.42:49007; both
+          computers must be on the same multicast-enabled network.
+        </p>
+      )}
+      {draft.source !== 'none' && (
+        <div className="fsection__actions">
+          <button type="button" className="btn btn--secondary" onClick={runTest} disabled={testState.busy || f.busy}>
+            {testState.busy ? 'Testing connection…' : 'Test connection'}
+          </button>
+          {testState.detail && <span className={testState.ok ? 'fsection__ok' : 'fsection__error'}>{testState.detail}</span>}
+        </div>
       )}
     </EditorSection>
   );

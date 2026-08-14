@@ -14,6 +14,7 @@ import * as secrets from '../secrets.js';
 import * as setup from '../setup.js';
 import * as pco from '../integrations/planningCenter.js';
 import * as restream from '../integrations/restream.js';
+import * as analysis from '../integrations/analysis.js';
 import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, permissionRequired, auditSuccess } from '../httpAuth.js';
 
@@ -303,6 +304,21 @@ router.get('/api/config/rooms/:roomId/connectivity/status', requirePermission('c
   const room = rooms[req.params.roomId];
   if (!room) return res.status(404).json({ error: 'unknown room' });
   res.json(await roomStatus(room));
+});
+
+// Tests the same data path the Loudness widgets consume. The draft is accepted
+// without saving it, so an operator can verify an address/source before making
+// it the room's production configuration.
+router.post('/api/config/rooms/:roomId/connectivity/analysis/test', requirePermission('config.manage'), async (req, res) => {
+  if (!rooms[req.params.roomId]) return res.status(404).json({ error: 'unknown room' });
+  try {
+    const cfg = connectivity.validateAnalysis(req.body?.analysis);
+    if (!cfg) throw new Error('Choose an analysis source first');
+    const result = await analysis.testConnection(cfg);
+    res.json({ ok: true, detail: result.detail });
+  } catch (err) {
+    res.json({ ok: false, detail: String(err?.message ?? err) });
+  }
 });
 
 router.put('/api/config/rooms/:roomId/connectivity/planning-center', requirePermission('config.manage'), (req, res) => {

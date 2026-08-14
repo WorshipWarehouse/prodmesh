@@ -74,12 +74,33 @@ export function watchSpl(cfg, onSample, signal) {
       report(healthKey(cfg), true);
       onSample(parsed.sample);
     });
-    socket.bind(cfg.port ?? DEFAULT_PORT, () => {
+    socket.bind({ address: '0.0.0.0', port: cfg.port ?? DEFAULT_PORT, exclusive: false }, () => {
       try {
         socket.addMembership(MULTICAST_GROUP, cfg.interface || undefined);
       } catch (err) {
         finish(err);
       }
+    });
+  });
+}
+
+/** Wait for a real, matching Remote API level packet. This deliberately
+ * validates the measurement that will drive the widget, not merely whether a
+ * UDP port happened to be open. */
+export function testConnection(cfg, timeoutMs = 5_000) {
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`No matching Open Sound Meter level packet received within ${Math.ceil(timeoutMs / 1000)} seconds`));
+    }, timeoutMs);
+    watchSpl(cfg, (sample) => {
+      clearTimeout(timer);
+      controller.abort();
+      resolve({ detail: `Receiving ${cfg.weighting ?? 'A'}-${cfg.response ?? 'Slow'} SPL (${sample.spl.toFixed(1)} dB)` });
+    }, controller.signal).catch((err) => {
+      clearTimeout(timer);
+      reject(err);
     });
   });
 }

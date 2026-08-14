@@ -36,7 +36,7 @@ export function IntegrationBrand({ integration, label = false }: { integration: 
   const info = integrationInfo[integration];
   return (
     <span className={`integration-brand integration-brand--${integration}`} title={info.name}>
-      <span className="integration-brand__mark" aria-hidden>
+      <span className={`integration-brand__mark${info.logo ? ' integration-brand__mark--image' : ''}`} aria-hidden>
         {info.logo ? <img src={info.logo} alt="" /> : info.mark}
       </span>
       {label && <span className="integration-brand__label">{info.name}</span>}

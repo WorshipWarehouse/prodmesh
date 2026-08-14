@@ -1072,6 +1072,20 @@
   overflow: hidden;
 }
 .integration-brand__mark img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 1px; }
+.integration-brand__mark--image {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0;
+  overflow: visible;
+}
+.integration-brand__mark--image img {
+  padding: 0;
+  border: 0 !important;
+  outline: 0;
+  box-shadow: none !important;
+  background: transparent;
+}
 .integration-brand--propresenter .integration-brand__mark { background: #3169b5; }
 .integration-brand--planning-center .integration-brand__mark { background: #ef6b3e; }
 .integration-brand--restream .integration-brand__mark { background: #5968f2; }

@@ -28,6 +28,25 @@ export function watchSpl(cfg, onSample, signal, intervalMs = 1000) {
   return openSoundMeter.watchSpl(cfg, onSample, signal, intervalMs);
 }
 
+/** Run a short end-to-end check. A green result means the exact SPL sample
+ * path used by the widgets is working, rather than only that a port accepts a
+ * TCP handshake. */
+export function testConnection(cfg, timeoutMs = 5_000) {
+  if (cfg?.source === 'open-sound-meter') return openSoundMeter.testConnection(cfg, timeoutMs);
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`No SPL level received within ${Math.ceil(timeoutMs / 1000)} seconds`));
+    }, timeoutMs);
+    watchSpl(cfg, (sample) => {
+      clearTimeout(timer);
+      controller.abort();
+      resolve({ detail: `Receiving SPL (${sample.spl.toFixed(1)} dB)` });
+    }, controller.signal);
+  });
+}
+
 // Only Smaart has controllable SPL logging — the RTA app always streams.
 export const supportsLogControl = (cfg) =>
   Boolean(cfg?.host) && !cfg?.mock && (cfg?.source ?? 'smaart') === 'smaart';

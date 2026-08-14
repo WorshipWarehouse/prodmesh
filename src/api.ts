@@ -578,7 +578,7 @@ export type AnalysisSource = 'smaart' | 'rta' | 'open-sound-meter';
 // keep); reads report hasPassword instead. `mock` marks the dev fixture.
 export interface AnalysisConfig {
   source: AnalysisSource;
-  host: string;
+  host?: string;
   port?: number;
   target?: number;
   limit?: number;
@@ -690,6 +690,16 @@ export async function saveAnalysis(
   await requireOk(res);
   return (await res.json()).analysis;
 }
+
+export const testAnalysisConnection = (roomId: string, analysis: AnalysisConfig) =>
+  fetch(`/api/config/rooms/${roomId}/connectivity/analysis/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ analysis }),
+  }).then(async (res) => {
+    await requireOk(res);
+    return res.json() as Promise<{ ok: boolean; detail: string }>;
+  });
 
 /** Save a room's caption source. Omitting `key` keeps the stored one — the
  *  editor never receives it, so it cannot send it back. */

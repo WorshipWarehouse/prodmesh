@@ -28,6 +28,10 @@ export interface PaletteEntry {
 export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[], analysisSource?: AnalysisSource | null): PaletteEntry[] {
   return widgetTypes
     .filter((type) => widgetAllowedOn(widgetRegistry[type], kind))
+    // Loudness widgets are supplied by the selected analysis integration, not
+    // a generic "audio" bucket. With no source configured there is nothing
+    // useful to add yet, so keep them out of the picker until one is chosen.
+    .filter((type) => !['loudness', 'loudness-trend'].includes(type) || Boolean(analysisSource))
     .map((type) => {
       const def = widgetRegistry[type];
       const placed = placements.some((p) => p.type === type);
@@ -57,10 +61,11 @@ export function WidgetPalette({
   onAdd: (type: WidgetType) => void;
   dragHandlers: (type: string, size: { w: number; h: number }) => Record<string, unknown>;
 }) {
-  // Keep the existing immediately-available palette behavior on first open;
-  // each integration can then be collapsed into its dropdown header.
+  // The integration headers are genuine dropdowns. Start collapsed so a long
+  // widget catalogue stays scannable and users deliberately open the source
+  // they want to add from.
   const [openGroups, setOpenGroups] = useState<Set<IntegrationId>>(
-    () => new Set(entries.map((entry) => entry.integration)),
+    () => new Set(),
   );
   const groups = entries.reduce((all, entry) => {
     (all.get(entry.integration) ?? all.set(entry.integration, []).get(entry.integration)!).push(entry);
