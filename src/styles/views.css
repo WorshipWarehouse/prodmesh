@@ -606,22 +606,36 @@
   color: var(--text-dim);
 }
 
-.palette__group + .palette__group { margin-top: 16px; }
+.palette__group + .palette__group { margin-top: 8px; }
 .palette__group-title {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 0 0 7px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-dim);
   font-size: 0.76rem;
   font-weight: 650;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
 }
+
+.palette__group-title:hover,
+.palette__group-title:focus-visible { background: var(--bg-tile); color: var(--text); }
+.palette__group-title .integration-brand__mark { flex: none; }
+.palette__group-count { margin-left: auto; color: var(--text-faint); font-size: 0.72rem; }
+.palette__group-chevron { flex: none; transition: transform .16s ease; }
+.palette__group--open .palette__group-chevron { transform: rotate(180deg); }
 
 .palette__list {
   list-style: none;
-  margin: 0;
+  margin: 7px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;

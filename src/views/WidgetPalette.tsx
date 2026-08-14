@@ -1,4 +1,5 @@
-import { Plus } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { widgetRegistry, widgetTypes } from '../widgets/registry';
 import { widgetAllowedOn, widgetIsUnique, type WidgetType } from '../widgets/types';
 import { IntegrationBrand, integrationInfo, type IntegrationId } from '../components/IntegrationBrand';
@@ -53,6 +54,11 @@ export function WidgetPalette({
   onAdd: (type: WidgetType) => void;
   dragHandlers: (type: string, size: { w: number; h: number }) => Record<string, unknown>;
 }) {
+  // Keep the existing immediately-available palette behavior on first open;
+  // each integration can then be collapsed into its dropdown header.
+  const [openGroups, setOpenGroups] = useState<Set<IntegrationId>>(
+    () => new Set(entries.map((entry) => entry.integration)),
+  );
   const groups = entries.reduce((all, entry) => {
     (all.get(entry.integration) ?? all.set(entry.integration, []).get(entry.integration)!).push(entry);
     return all;
@@ -61,10 +67,30 @@ export function WidgetPalette({
   return (
     <aside className="palette">
       <h2 className="palette__title">Widgets</h2>
-      {[...groups.entries()].map(([integration, group]) => (
-        <section className="palette__group" key={integration} aria-label={`${integrationInfo[integration].name} widgets`}>
-          <h3 className="palette__group-title"><IntegrationBrand integration={integration} />{integrationInfo[integration].name}</h3>
-          <ul className="palette__list">
+      {[...groups.entries()].map(([integration, group]) => {
+        const open = openGroups.has(integration);
+        const name = integrationInfo[integration].name;
+        return (
+        <section className={`palette__group${open ? ' palette__group--open' : ''}`} key={integration} aria-label={`${name} widgets`}>
+          <button
+            type="button"
+            className="palette__group-title"
+            aria-label={`${name} widgets`}
+            aria-expanded={open}
+            aria-controls={`palette-${integration}`}
+            onClick={() => setOpenGroups((current) => {
+              const next = new Set(current);
+              if (next.has(integration)) next.delete(integration);
+              else next.add(integration);
+              return next;
+            })}
+          >
+            <IntegrationBrand integration={integration} />
+            <span>{name}</span>
+            <span className="palette__group-count">{group.length}</span>
+            <ChevronDown className="palette__group-chevron" size={16} aria-hidden />
+          </button>
+          <ul className="palette__list" id={`palette-${integration}`} hidden={!open}>
             {group.map((entry) => (
               <li
                 key={entry.type}
@@ -92,7 +118,8 @@ export function WidgetPalette({
             ))}
           </ul>
         </section>
-      ))}
+        );
+      })}
     </aside>
   );
 }
