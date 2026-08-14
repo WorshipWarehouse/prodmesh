@@ -83,7 +83,10 @@ export function watchSpl(cfg, onSample, signal) {
         for (const observer of packetObservers) observer(data);
         for (const watcher of entry.watchers) watcher.receive(data);
       });
-      socket.bind({ address: '0.0.0.0', port: cfg.port ?? DEFAULT_PORT, exclusive: false }, () => {
+      // OSM itself commonly holds a wildcard UDP socket on macOS. Binding the
+      // multicast group (rather than 0.0.0.0) lets this receiver coexist with
+      // that sender while still receiving 239.255.42.42 traffic.
+      socket.bind({ address: MULTICAST_GROUP, port: cfg.port ?? DEFAULT_PORT, exclusive: false }, () => {
         try { socket.addMembership(MULTICAST_GROUP, cfg.interface || undefined); }
         catch (err) { for (const watcher of [...entry.watchers]) watcher.finish(err); }
       });
