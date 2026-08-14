@@ -5,6 +5,8 @@ import { widgetAllowedOn, widgetIsUnique, type WidgetType } from '../widgets/typ
 import { IntegrationBrand, integrationInfo, type IntegrationId } from '../components/IntegrationBrand';
 import { findFirstFit, type Grid, type ViewKind } from '../lib/gridLayout';
 import type { ViewPlacement } from '../api';
+import type { AnalysisSource } from '../api';
+import { analysisIntegration, analysisWidgetTitle } from '../lib/analysisSource';
 
 // What can go on this view, and whether there is anywhere to put it.
 //
@@ -23,18 +25,19 @@ export interface PaletteEntry {
   blocked: string | null;
 }
 
-export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[]): PaletteEntry[] {
+export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[], analysisSource?: AnalysisSource | null): PaletteEntry[] {
   return widgetTypes
     .filter((type) => widgetAllowedOn(widgetRegistry[type], kind))
     .map((type) => {
       const def = widgetRegistry[type];
       const placed = placements.some((p) => p.type === type);
+      const analysisTitle = analysisWidgetTitle(type, analysisSource);
       return {
         type,
-        title: def.title,
+        title: analysisTitle ?? def.title,
         description: def.description,
         size: def.size,
-        integration: def.integration ?? 'prodmesh',
+        integration: analysisTitle ? analysisIntegration(analysisSource) : def.integration ?? 'prodmesh',
         blocked:
           widgetIsUnique(def) && placed
             ? 'Already on this view'

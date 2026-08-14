@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { PackageOpen } from 'lucide-react';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
-import type { WidgetConfig } from '../widgets/types';
+import type { WidgetConfig, WidgetType } from '../widgets/types';
 import { IntegrationBrand } from '../components/IntegrationBrand';
-import type { ViewPlacement } from '../api';
+import { getRoom, type ViewPlacement } from '../api';
+import { useQuery } from '../lib/useQuery';
+import { analysisIntegration, analysisWidgetTitle } from '../lib/analysisSource';
 
 // One cell of a View's grid.
 //
@@ -50,6 +52,12 @@ export function PlacedWidget({
 }) {
   const def = isWidgetType(placement.type) ? widgetRegistry[placement.type] : null;
   const Component = def?.component;
+  const room = useQuery(`room:${roomId}`, () => getRoom(roomId), { staleMs: 60_000 }).data;
+  const source = room?.analysisSource;
+  const title = def ? analysisWidgetTitle(placement.type as WidgetType, source) ?? def.title : placement.type;
+  const integration = def && (placement.type === 'loudness' || placement.type === 'loudness-trend')
+    ? analysisIntegration(source)
+    : def?.integration ?? 'prodmesh';
   return (
     <div
       className={`viewcell${def ? '' : ' viewcell--unknown'}${chrome ? ' viewcell--editing' : ''}${className ? ` ${className}` : ''}`}
@@ -62,8 +70,8 @@ export function PlacedWidget({
       {chrome}
       {!chrome && def && (
         <header className="viewcell__widget-head">
-          <IntegrationBrand integration={def.integration ?? 'prodmesh'} />
-          <span>{def.title}</span>
+          <IntegrationBrand integration={integration} />
+          <span>{title}</span>
         </header>
       )}
       {/* A widget with nothing to say renders null — LoudnessWidget with no
@@ -73,7 +81,7 @@ export function PlacedWidget({
           for the widget to have to know it is on a canvas. */}
       <div
         className="viewcell__body"
-        data-title={def?.title ?? placement.type}
+        data-title={title}
       >
         {Component ? (
           <Component roomId={roomId} config={config} />

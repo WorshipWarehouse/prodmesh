@@ -14,6 +14,7 @@ export interface RoomMeta {
   name: string;
   site: string | null;
   hasCompanion: boolean;
+  analysisSource?: AnalysisSource | null;
   modes: RoomMode[];
 }
 
