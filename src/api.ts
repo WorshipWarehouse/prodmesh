@@ -162,6 +162,8 @@ export async function connectRestream() {
   window.location.assign(body.url);
 }
 
+export const getRestreamConfig = () => getJson<{ redirectUrl: string }>('/api/integrations/restream/config');
+
 export interface Station {
   id: string;
   name: string;

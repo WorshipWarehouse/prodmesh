@@ -32,6 +32,12 @@ function beginRestreamConnection(req, res) {
 // This is POST rather than a normal link because admin authentication is held
 // in a bearer token. The browser fetches this URL, then navigates to Restream.
 router.post('/api/integrations/restream/connect', requirePermission('*'), beginRestreamConnection);
+// The browser can be served through a development proxy, so return the URL
+// from the same request path that starts OAuth. This guarantees the address
+// shown in Settings is byte-for-byte the redirect_uri sent to Restream.
+router.get('/api/integrations/restream/config', requirePermission('*'), (req, res) => {
+  res.json({ redirectUrl: restreamCallback(req) });
+});
 router.get('/api/integrations/restream/callback', async (req, res) => {
   const state = String(req.query.state ?? ''); const issued = restreamStates.get(state); restreamStates.delete(state);
   if (!issued || Date.now() - issued > 10 * 60_000 || !req.query.code) return res.status(400).send('Invalid or expired Restream authorization. Please connect again from ProdMesh Settings.');
