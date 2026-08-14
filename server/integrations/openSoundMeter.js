@@ -19,7 +19,7 @@ import { report } from '../health.js';
 export const MULTICAST_GROUP = '239.255.42.42';
 export const DEFAULT_PORT = 49007;
 const SPL_OFFSET = 140;
-let activeWatchers = 0;
+const listeners = new Map(); // socket key -> { socket, watchers }
 const packetObservers = new Set();
 
 export const isConfigured = (cfg) => Boolean(cfg && cfg.source === 'open-sound-meter');
@@ -68,37 +68,50 @@ export function sampleFromPacket(data, cfg, selectedSource) {
 /** Listen to OSM's Remote API until aborted. */
 export function watchSpl(cfg, onSample, signal) {
   return new Promise((resolve, reject) => {
-    const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    const key = `${cfg.port ?? DEFAULT_PORT}|${cfg.interface ?? ''}`;
     let selectedSource = cfg.sourceId ?? null;
     let closed = false;
-    activeWatchers += 1;
+    let entry = listeners.get(key);
+    if (!entry) {
+      const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+      entry = { socket, watchers: new Set() };
+      listeners.set(key, entry);
+      socket.on('error', (err) => {
+        for (const watcher of [...entry.watchers]) watcher.finish(err);
+      });
+      socket.on('message', (data) => {
+        for (const observer of packetObservers) observer(data);
+        for (const watcher of entry.watchers) watcher.receive(data);
+      });
+      socket.bind({ address: '0.0.0.0', port: cfg.port ?? DEFAULT_PORT, exclusive: false }, () => {
+        try { socket.addMembership(MULTICAST_GROUP, cfg.interface || undefined); }
+        catch (err) { for (const watcher of [...entry.watchers]) watcher.finish(err); }
+      });
+    }
     const finish = (err) => {
       if (closed) return;
       closed = true;
-      activeWatchers -= 1;
       signal?.removeEventListener('abort', onAbort);
-      try { socket.close(); } catch { /* already closed */ }
+      entry.watchers.delete(watcher);
+      if (!entry.watchers.size) {
+        listeners.delete(key);
+        try { entry.socket.close(); } catch { /* already closed */ }
+      }
       err ? reject(err) : resolve();
     };
     const onAbort = () => finish();
+    const watcher = {
+      finish,
+      receive(data) {
+        const parsed = sampleFromPacket(data, cfg, selectedSource);
+        if (!parsed) return;
+        selectedSource = parsed.sourceId;
+        report(healthKey(cfg), true);
+        onSample(parsed.sample);
+      },
+    };
+    entry.watchers.add(watcher);
     signal?.addEventListener('abort', onAbort, { once: true });
-
-    socket.once('error', finish);
-    socket.on('message', (data) => {
-      for (const observer of packetObservers) observer(data);
-      const parsed = sampleFromPacket(data, cfg, selectedSource);
-      if (!parsed) return;
-      selectedSource = parsed.sourceId;
-      report(healthKey(cfg), true);
-      onSample(parsed.sample);
-    });
-    socket.bind({ address: '0.0.0.0', port: cfg.port ?? DEFAULT_PORT, exclusive: false }, () => {
-      try {
-        socket.addMembership(MULTICAST_GROUP, cfg.interface || undefined);
-      } catch (err) {
-        finish(err);
-      }
-    });
   });
 }
 
@@ -109,7 +122,7 @@ export function testConnection(cfg, timeoutMs = 5_000) {
   // A dashboard may already be listening for the live widget. macOS does not
   // allow a second socket to bind this multicast port, so observe that shared
   // listener instead of competing with it (the former EADDRINUSE failure).
-  if (activeWatchers > 0) return waitForPacket(cfg, timeoutMs);
+  if (listeners.size > 0) return waitForPacket(cfg, timeoutMs);
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
