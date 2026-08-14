@@ -82,12 +82,12 @@ describe('ViewEditor', () => {
     expect(at('loudness').style.gridRow).toBe('2 / span 1');
 
     // The 1-wide viewers fits that gap on row 1 rather than starting a row.
-    await user.click(screen.getByRole('button', { name: 'Add Live viewers' }));
+    await user.click(screen.getByRole('button', { name: 'Add YouTube Live Viewers' }));
     expect(at('viewers').style.gridColumn).toBe('3 / span 1');
     expect(at('viewers').style.gridRow).toBe('1 / span 1');
 
     // All three placed and unique, so the palette offers nothing further.
-    for (const name of ['Countdown', 'Loudness', 'Live viewers']) {
+    for (const name of ['Countdown', 'Loudness', 'YouTube Live Viewers']) {
       expect(screen.getByRole('button', { name: `Add ${name}` })).toBeDisabled();
     }
   });
@@ -158,7 +158,7 @@ describe('ViewEditor', () => {
 
   it('the grip label carries the position, so it is not a mystery button', async () => {
     render(<Harness initial={[{ id: 'a', type: 'viewers', x: 4, y: 2, w: 2, h: 1, config: {} }]} />);
-    expect(screen.getByRole('button', { name: 'Move Live viewers, column 5, row 3, 2 by 1' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move YouTube Live Viewers, column 5, row 3, 2 by 1' })).toBeInTheDocument();
   });
 
   describe('stretching', () => {

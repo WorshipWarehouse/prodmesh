@@ -6,6 +6,7 @@ import { useGridDrag, type Cell } from './useGridDrag';
 import { findFirstFit, isFree, occupancy, rowCount, type Grid } from '../lib/gridLayout';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
 import { widgetMax, widgetMin, widgetResizable, type WidgetSize } from '../widgets/types';
+import { IntegrationBrand } from '../components/IntegrationBrand';
 import type { View, ViewPlacement } from '../api';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,6 +178,7 @@ export function ViewEditor({
           }}
         >
           <GripVertical size={14} aria-hidden />
+          {def && <IntegrationBrand integration={def.integration ?? 'prodmesh'} />}
           <span className="viewcell__name">{title}</span>
         </button>
         <button

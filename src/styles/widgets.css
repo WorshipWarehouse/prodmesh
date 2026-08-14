@@ -91,7 +91,7 @@
 .ppcue--active { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .pcw { display: grid; align-content: start; gap: 8px; }
-.pcw__title { font-size: clamp(1.3rem, 2vw, 2.1rem); line-height: 1.05; overflow-wrap: anywhere; }
+.pcw__title { max-inline-size: 100%; min-width: 0; font-size: clamp(1.3rem, 2vw, 2.1rem); line-height: 1.05; overflow-wrap: anywhere; }
 .pcw__list, .pcw--teams { overflow: auto; }
 .pcw__row { display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: .82rem; }
 .pcw__row small { white-space: nowrap; }

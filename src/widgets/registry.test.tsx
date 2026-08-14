@@ -119,9 +119,9 @@ describe('the registry contract', () => {
       expect(server.size, `${type} size`).toEqual(def.size);
       expect(server.unique, `${type} unique`).toBe(widgetIsUnique(def));
       expect(server.display, `${type} display`).toBe(widgetAllowedOn(def, 'display'));
-      // Every widget shares a practical layout maximum; minima remain
-      // widget-specific so content never starts squeezed.
-      expect(server.min ?? def.size, `${type} min`).toEqual(widgetMin(def));
+      // Widgets start at their authored size, but the layout lets the user
+      // choose any fitting size from one cell upward.
+      expect({ w: 1, h: 1 }, `${type} min`).toEqual(widgetMin(def));
       expect(MAX_WIDGET_SIZE, `${type} max`).toEqual(widgetMax(def));
     }
   });
