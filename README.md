@@ -98,6 +98,7 @@ build, both test layers and lint on every branch.
 | | |
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | Conventions, constraints and workflow — start here if you are contributing |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to send a pull request, and what it needs to carry |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Mental model, patterns, invariants, gotchas |
 | [`docs/STATE.md`](docs/STATE.md) | What is live vs mock, and the roadmap |
 | [`docs/INTEGRATION-NOTES.md`](docs/INTEGRATION-NOTES.md) | Hard-won device and API behaviour |

@@ -53,13 +53,32 @@ rather than hotlinking it.
 
 **Branch, then merge locally.** `feat/<name>` (or `fix/`, `chore/`, `docs/`) →
 tests green → live-verify against a running server → **the maintainer tests it**
-→ merge `--no-ff` to main → push → delete the branch both sides. No pull
-requests are ever opened, so CI must trigger on `push: branches: ['**']` with
-publishing steps gated on
-`github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')`.
-Branches with nothing user-visible (server refactors, test additions) may merge
-once tests are green and a live boot is verified. Anything a user can see or
-click waits for the maintainer.
+→ merge `--no-ff` to main → push → delete the branch both sides. The maintainer
+opens no pull requests against this repo: a PR exists so somebody can review
+code they did not write, and solo that is ceremony with no reviewer on the far
+end. Branches with nothing user-visible (server refactors, test additions) may
+merge once tests are green and a live boot is verified. Anything a user can see
+or click waits for the maintainer.
+
+**Outside contributions arrive as pull requests** — same principle, other
+situation: a PR is the only way to review a change nobody here controls.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) is the contract with them; keep it and this
+file in step. Two consequences for CI. It must trigger on **both**
+`push: branches: ['**']` (the maintainer's branches, which never raise a PR) and
+`pull_request` (fork branches, whose pushes fire in the fork, not here) — a
+workflow with only one of those silently tests half the work that reaches main.
+Publishing stays gated on
+`github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')`,
+which on a `pull_request` event is `refs/pull/N/merge` and so never publishes.
+Treat a fork PR as untrusted: it gets no secrets and a read-only token, so any
+job needing either must degrade rather than fail.
+
+When taking work from a fork, **cherry-pick with `-x`** rather than reimplementing
+it. That preserves the original `Author` and records the source commit, which is
+both the attribution and the audit trail for where a device workaround came
+from. Code carrying an insight from a third-party project needs its provenance
+established before it lands, because MIT inbound-equals-outbound covers what a
+contributor wrote and nothing else.
 
 **main is the integration branch; tags are the deployment channel.** Trunk-based
 — there is no `develop` or `nightly`, because a second long-lived branch exists
