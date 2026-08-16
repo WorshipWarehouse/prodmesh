@@ -7,6 +7,7 @@ import { PersonPicker } from '../components/PersonPicker';
 import { SelectField } from '../components/SelectField';
 import { ColorInput } from '../components/form/ColorInput';
 import { EditorSection } from '../components/form/EditorSection';
+import { IntegrationBrand, IntegrationTitle, type IntegrationId } from '../components/IntegrationBrand';
 import { Field } from '../components/form/Field';
 import { FormRow } from '../components/form/FormRow';
 import { useDraft } from '../components/form/useDraft';
@@ -42,6 +43,7 @@ import {
   getRoomConnectivityStatus,
   savePcServiceTypes,
   saveAnalysis,
+  testAnalysisConnection,
   saveYouTube,
   saveCaptions,
   downloadBackup,
@@ -72,6 +74,8 @@ import {
   getSecrets,
   saveSecrets,
   checkIntegrations,
+  connectRestream,
+  getRestreamConfig,
   type SecretGroup,
   type Version,
 } from '../api';
@@ -763,6 +767,10 @@ function SecurityPanel() {
   );
 }
 
+const secretGroupIntegration = (id: string): IntegrationId => ({
+  planningCenter: 'planning-center', slack: 'slack', youtube: 'youtube', restream: 'restream',
+}[id] as IntegrationId | undefined) ?? 'prodmesh';
+
 // Credentials for Planning Center and Slack. WRITE-ONLY on purpose: the server
 // never returns a stored credential, so this shows WHETHER one is set (as a
 // row of dots) and never what it is. Editing opens a modal per integration, so
@@ -771,9 +779,14 @@ function SecurityPanel() {
 function SecretsPanel() {
   const [groups, setGroups] = useState<SecretGroup[] | null>(null);
   const [editing, setEditing] = useState<SecretGroup | null>(null);
+  const [connectingRestream, setConnectingRestream] = useState(false);
+  const [restreamError, setRestreamError] = useState<string | null>(null);
+  const [restreamRedirectUrl, setRestreamRedirectUrl] = useState('');
+  const [copiedRestreamUrl, setCopiedRestreamUrl] = useState(false);
 
   const load = useCallback(() => {
     getSecrets().then((r) => setGroups(r.secrets)).catch(() => setGroups([]));
+    getRestreamConfig().then((r) => setRestreamRedirectUrl(r.redirectUrl)).catch(() => {});
   }, []);
   useEffect(load, [load]);
 
@@ -791,7 +804,7 @@ function SecretsPanel() {
         {groups.map((group) => (
           <div key={group.id} className="integration">
             <div className="integration__head">
-              <span className="integration__name">{group.label}</span>
+              <span className="integration__name"><IntegrationBrand integration={secretGroupIntegration(group.id)} />{group.label}</span>
               <span className={`integration__state integration__state--${group.configured ? 'on' : 'off'}`}>
                 {group.configured ? 'Configured' : 'Not configured'}
               </span>
@@ -814,7 +827,30 @@ function SecretsPanel() {
                 </div>
               ))}
             </dl>
-            <button className="btn btn--sm" onClick={() => setEditing(group)}>Edit</button>
+            {group.id === 'restream' && (
+              <>
+                <p className="settings__muted integration__redirect">
+                  Redirect URL: <code>{restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`}</code>
+                  <button className="btn btn--sm" type="button" onClick={() => {
+                    const url = restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`;
+                    navigator.clipboard.writeText(url).then(() => { setCopiedRestreamUrl(true); window.setTimeout(() => setCopiedRestreamUrl(false), 1800); }).catch(() => setRestreamError('Could not copy the Redirect URL. Please select and copy it manually.'));
+                  }}>{copiedRestreamUrl ? 'Copied' : 'Copy'}</button>
+                </p>
+                <p className="settings__muted">After saving the credentials and registering that exact URL in Restream, connect the Restream account that owns your broadcasts.</p>
+                {restreamError && <p className="settings__msg settings__msg--bad">{restreamError}</p>}
+              </>
+            )}
+            <div className="integration__actions">
+              <button className="btn btn--sm" onClick={() => setEditing(group)}>Edit</button>
+              {group.id === 'restream' && (
+                <button className="btn btn--sm" disabled={!group.configured || connectingRestream} onClick={() => {
+                  setRestreamError(null); setConnectingRestream(true);
+                  connectRestream().catch((err) => { setRestreamError(err instanceof Error ? err.message : String(err)); setConnectingRestream(false); });
+                }}>
+                  {connectingRestream ? 'Connecting…' : 'Connect account'}
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -1297,7 +1333,7 @@ function AuditTrail() {
 
 const TILE_TYPE_LABELS: Record<Tile['type'], string> = {
   route: 'Room Status link',
-  companion: 'Companion',
+  companion: 'Bitfocus Companion',
   screenshare: 'Screen Sharing (Mac)',
   link: 'Web link',
   placeholder: 'Placeholder',
@@ -1916,7 +1952,7 @@ function PcServiceTypesEditor({ roomId, initial, status }: { roomId: string; ini
 
   return (
     <EditorSection
-      title="Planning Center service types"
+      title={<IntegrationTitle integration="planning-center">Planning Center service types</IntegrationTitle>}
       status={status}
       help="The event types this room hosts. The ID is in the Planning Center Services URL for that service type."
       saveLabel="Save service types"
@@ -1997,7 +2033,7 @@ function CaptionsEditor({ roomId, initial }: { roomId: string; initial: Captions
 
   return (
     <EditorSection
-      title="Comms captions"
+      title="Captions"
       help="Live transcript of the production comms channels, so the band can read what the music director and monitor engineer are saying. Shown by the Comms widget on a dashboard or display; nothing else surfaces it. prodmesh reads only — it never renames a channel or clears a transcript."
       saveLabel="Save captions"
       form={f}
@@ -2075,7 +2111,7 @@ function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeCo
 
   return (
     <EditorSection
-      title="YouTube Live"
+      title={<IntegrationTitle integration="youtube">YouTube Live</IntegrationTitle>}
       help="Records how many people watched the stream, for the show report. Needs a YouTube API key under Admin → General → Integrations. Viewer counts are only available while a broadcast is live — YouTube does not report them afterwards, so nothing is recorded for services that ran before this was set up. Find the channel ID in YouTube Studio → Settings → Channel → Advanced."
       saveLabel="Save YouTube"
       form={f}
@@ -2102,12 +2138,9 @@ function YouTubeEditor({ roomId, initial }: { roomId: string; initial: YouTubeCo
 // Draft form state for the analysis source — everything as strings so the
 // inputs stay controlled; the server normalizes numbers on save.
 interface AnalysisDraft {
-  source: 'none' | 'smaart' | 'rta';
+  source: 'none' | 'smaart' | 'rta' | 'open-sound-meter';
   host: string;
   port: string;
-  target: string;
-  limit: string;
-  metric: string;
   password: string;
   logControl: boolean;
 }
@@ -2117,37 +2150,44 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
     source: cfg ? cfg.source : 'none',
     host: cfg?.host ?? '',
     port: cfg?.port != null ? String(cfg.port) : '',
-    target: cfg?.target != null ? String(cfg.target) : '',
-    limit: cfg?.limit != null ? String(cfg.limit) : '',
-    metric: cfg?.metric ?? '',
     password: '',
     logControl: Boolean(cfg?.logControl),
   };
 }
 
+function analysisFromDraft(d: AnalysisDraft): AnalysisConfig | null {
+  if (d.source === 'none') return null;
+  return {
+    source: d.source,
+    host: d.host || undefined,
+    port: d.port === '' ? undefined : Number(d.port),
+    logControl: d.source === 'smaart' && d.logControl ? true : undefined,
+    ...(d.password ? { password: d.password } : {}),
+  };
+}
+
 function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: AnalysisConfig | null; status?: ReactNode }) {
   const [hasPassword, setHasPassword] = useState(Boolean(initial?.hasPassword));
+  const [testState, setTestState] = useState<{ busy: boolean; ok?: boolean; detail?: string }>({ busy: false });
   const f = useDraft(toDraft(initial), async (d) => {
     const stored = await saveAnalysis(
       roomId,
-      d.source === 'none'
-        ? null
-        : {
-            source: d.source,
-            host: d.host,
-            port: d.port === '' ? undefined : Number(d.port),
-            target: d.target === '' ? undefined : Number(d.target),
-            limit: d.limit === '' ? undefined : Number(d.limit),
-            metric: d.metric || undefined,
-            logControl: d.source === 'smaart' && d.logControl ? true : undefined,
-            // Omit password unless typed — omitted keeps the stored one.
-            ...(d.password ? { password: d.password } : {}),
-          },
+      analysisFromDraft(d),
     );
     setHasPassword(Boolean(stored?.hasPassword));
     return toDraft(stored);
   });
   const { draft } = f;
+  const runTest = async () => {
+    const analysis = analysisFromDraft(draft);
+    if (!analysis) return;
+    setTestState({ busy: true });
+    try {
+      setTestState({ busy: false, ...(await testAnalysisConnection(roomId, analysis)) });
+    } catch (err) {
+      setTestState({ busy: false, ok: false, detail: err instanceof Error ? err.message : String(err) });
+    }
+  };
 
   if (initial?.mock) {
     return (
@@ -2165,7 +2205,7 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
     <EditorSection
       title="Analysis source"
       status={status}
-      help="Where this room's SPL numbers come from — a Smaart rig or the free ProdMesh Remote RTA app. Target and limit set the dB goals on the live meter and show reports."
+      help="Where this room's SPL numbers come from — a Smaart rig, ProdMesh Remote RTA, or Open Sound Meter. Target and limit set the dB goals on the live meter and show reports."
       saveLabel="Save analysis source"
       form={f}
     >
@@ -2176,44 +2216,31 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
             <option value="none">None</option>
             <option value="smaart">Smaart</option>
             <option value="rta">ProdMesh Remote RTA</option>
+            <option value="open-sound-meter">Open Sound Meter</option>
           </SelectField>
         </Field>
         {draft.source !== 'none' && (
           <>
-            <Field label="Host" width="grow">
+            {draft.source !== 'open-sound-meter' && <Field label="Host" width="grow">
               <input className="field" placeholder="e.g. 192.168.1.120" value={draft.host}
                 onChange={(e) => f.patch({ host: e.target.value })} />
-            </Field>
-            <Field label="Port" width="sm">
+            </Field>}
+            {draft.source !== 'open-sound-meter' && <Field label="Port" width="sm">
               <input className="field" inputMode="numeric"
                 placeholder={draft.source === 'smaart' ? '26000' : '8517'} value={draft.port}
                 onChange={(e) => f.patch({ port: e.target.value })} />
-            </Field>
+            </Field>}
           </>
         )}
       </FormRow>
 
-      {draft.source !== 'none' && (
+      {draft.source === 'smaart' && (
         <FormRow>
-          <Field label="Target dB" width="sm">
-            <input className="field" inputMode="numeric" placeholder="e.g. 90"
-              value={draft.target} onChange={(e) => f.patch({ target: e.target.value })} />
-          </Field>
-          <Field label="Limit dB" width="sm">
-            <input className="field" inputMode="numeric" placeholder="e.g. 95"
-              value={draft.limit} onChange={(e) => f.patch({ limit: e.target.value })} />
-          </Field>
-          <Field label="Metric" width="grow">
-            <input className="field" placeholder={draft.source === 'smaart' ? 'SPL A Slow' : 'slow_db'}
-              value={draft.metric} onChange={(e) => f.patch({ metric: e.target.value })} />
-          </Field>
-          {draft.source === 'smaart' && (
             <Field label="API password">
               <input className="field" type="password" autoComplete="off"
                 placeholder={hasPassword ? 'unchanged' : 'none'} value={draft.password}
                 onChange={(e) => f.patch({ password: e.target.value })} />
             </Field>
-          )}
         </FormRow>
       )}
 
@@ -2227,6 +2254,21 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
             onChange={(e) => f.patch({ logControl: e.target.checked })}
           />
         </FormRow>
+      )}
+      {draft.source === 'open-sound-meter' && (
+        <p className="settings__muted">
+          In Open Sound Meter, enable the Wi‑Fi icon’s <strong>Remote API Server</strong>.
+          ProdMesh listens for multicast level packets at 239.255.42.42:49007; both
+          computers must be on the same multicast-enabled network.
+        </p>
+      )}
+      {draft.source !== 'none' && (
+        <div className="fsection__actions">
+          <button type="button" className="btn btn--secondary" onClick={runTest} disabled={testState.busy || f.busy}>
+            {testState.busy ? 'Testing connection…' : 'Test connection'}
+          </button>
+          {testState.detail && <span className={testState.ok ? 'fsection__ok' : 'fsection__error'}>{testState.detail}</span>}
+        </div>
       )}
     </EditorSection>
   );
@@ -2309,10 +2351,10 @@ function CompanionEditor({ roomId, initial, status }: { roomId: string; initial:
 
   return (
     <EditorSection
-      title="Companion & modes"
+      title={<IntegrationTitle integration="companion">Bitfocus Companion &amp; modes</IntegrationTitle>}
       status={status}
-      help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches its value. Every Companion lays its buttons out differently — set each mode's location to match this room's."
-      saveLabel="Save Companion"
+      help="The room's Bitfocus Companion install. Each mode presses a Bitfocus Companion button (page/row/column) and shows as active when the state variable matches its value. Every Bitfocus Companion lays its buttons out differently — set each mode's location to match this room's."
+      saveLabel="Save Bitfocus Companion"
       form={f}
     >
       <FormRow>
@@ -2424,7 +2466,7 @@ function ProPresenterEditor({ roomId, initial, status }: { roomId: string; initi
 
   return (
     <EditorSection
-      title="ProPresenter"
+      title={<IntegrationTitle integration="propresenter">ProPresenter</IntegrationTitle>}
       status={status}
       help="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter."
       saveLabel="Save ProPresenter"

@@ -5,6 +5,18 @@ change — it's the fastest way for a cold context to know where the project sta
 The long-term destination lives in [VISION.md](./VISION.md).
 Last updated: 2026-08-10 (v1.2.0 released).
 
+## In progress — ProPresenter production console
+
+`feat/propresenter-production-console` adds an opt-in dashboard widget set:
+Slides, Playlist, Controls, Slide Notes and Timers. The backend keeps the
+focused playlist (what an operator is browsing) distinct from the active
+playlist/item (what is live), expands active arrangements, and sends a full
+playlist only when it changes; slide/timer/video updates are compact SSE frames.
+Controls require both `propresenter.control` and an explicitly enabled stored
+dashboard widget. It is **not live-verified yet**: playlist response shapes,
+the thumbnail URL and PCO cue-trigger fallback need testing against the local
+ProPresenter build before release.
+
 ## v1.2.0 at a glance
 
 The dashboards release. A room now owns as many **Views** as it wants — a

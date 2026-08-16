@@ -1037,7 +1037,7 @@
   width: 100%;
 }
 
-.integration__name { font-weight: 600; }
+.integration__name { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
 
 .integration__state {
   margin-left: auto;
@@ -1050,6 +1050,54 @@
 .integration__state--off { color: var(--text-faint); background: rgba(127, 127, 127, 0.14); }
 
 .integration__fields { margin: 0; display: grid; gap: 8px; width: 100%; }
+.integration__redirect { width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.integration__redirect code { white-space: normal; }
+
+/* Small, resilient in-app marks instead of remote logo images. They keep the
+   picker and Settings identifiable even in an offline production booth. */
+.integration-brand { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.integration-brand__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 5px;
+  color: #fff;
+  background: #58708b;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  overflow: hidden;
+}
+.integration-brand__mark img { display: block; width: 100%; height: 100%; object-fit: contain; padding: 1px; }
+.integration-brand__mark--image {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0;
+  overflow: visible;
+}
+.integration-brand__mark--image img {
+  padding: 0;
+  border: 0 !important;
+  outline: 0;
+  box-shadow: none !important;
+  background: transparent;
+}
+.integration-brand--propresenter .integration-brand__mark { background: #3169b5; }
+.integration-brand--planning-center .integration-brand__mark { background: #ef6b3e; }
+.integration-brand--restream .integration-brand__mark { background: #5968f2; }
+.integration-brand--youtube .integration-brand__mark { background: #f03a36; font-size: 0.68rem; }
+.integration-brand--slack .integration-brand__mark { background: #4a154b; }
+.integration-brand--companion .integration-brand__mark { background: #1474b6; }
+.integration-brand--analysis .integration-brand__mark { background: #678c45; }
+.integration-brand--prodmesh-rta .integration-brand__mark { background: #131b24; }
+.integration-brand--smaart .integration-brand__mark { background: #fff; }
+.integration-brand--open-sound-meter .integration-brand__mark { background: #fff; }
+.integration-brand--captions .integration-brand__mark { background: #8a5eb4; font-size: 0.5rem; }
+.integration-title { display: inline-flex; align-items: center; gap: 7px; }
 
 .integration__field dt {
   font-size: 0.72rem;

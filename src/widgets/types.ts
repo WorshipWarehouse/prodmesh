@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { ViewKind } from '../lib/gridLayout';
+import type { IntegrationId } from '../components/IntegrationBrand';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Widget contract.
@@ -31,6 +32,21 @@ export interface WidgetConfig {
   planId?: string;
   /** Which service time within that plan. Omitted = the plan's first service. */
   timeId?: string;
+  slideControls?: boolean;
+  keyboardControls?: boolean;
+  followActive?: boolean;
+  slideMode?: 'image' | 'text';
+  slideSize?: number;
+  /** Per-meter thresholds and selected analyzer reading. */
+  target?: number;
+  limit?: number;
+  metric?: string;
+  weighting?: 'A' | 'B' | 'C' | 'Z';
+  response?: 'Fast' | 'Slow';
+  slides?: 'current' | 'next' | 'both';
+  /** Runtime-only identity injected by ViewCanvas; never persisted. */
+  viewId?: string;
+  widgetId?: string;
 }
 
 export interface WidgetProps {
@@ -70,23 +86,19 @@ export interface WidgetDef {
   title: string;
   /** One line on what it shows — the picker's subtitle. */
   description: string;
+  /** The system that supplies the widget's primary live data. */
+  integration?: IntegrationId;
   component: ComponentType<WidgetProps>;
 
   /** Size in grid units on a View canvas (6 wide on a dashboard, 3 on a
    *  display) — what it gets when first placed. */
   size: WidgetSize;
 
-  /**
-   * How far it may be stretched, if at all. Both default to `size`, i.e. one
-   * authored size and no handle.
-   *
-   * Most widgets stay fixed on purpose: a 1×1 loudness meter and a 6×5 one are
-   * two designs, not one design scaled, and a resize handle would only produce
-   * the bad version of both. A range is for a widget whose content genuinely
-   * continues past its edge — Run of Show, whose order of service SCROLLS, so
-   * more height is more list rather than more whitespace.
-   */
+  /** Optional minimum size. A widget always starts at `size`, but every
+   * widget can be made larger in either direction by the layout editor. */
   minSize?: WidgetSize;
+  /** Retained for compatibility with existing layouts. The shared layout
+   * maximum below is now used so every widget has the same resize freedom. */
   maxSize?: WidgetSize;
 
   /**
@@ -120,6 +132,7 @@ export type WidgetType =
   | 'loudness'
   | 'loudness-trend'
   | 'viewers'
+  | 'restream'
   | 'run-of-show'
   | 'now-next'
   | 'room-mode'
@@ -127,14 +140,29 @@ export type WidgetType =
   | 'captions'
   | 'lyrics'
   | 'slides-left'
-  | 'clock';
+  | 'clock'
+  | 'propresenter-slides'
+  | 'propresenter-playlist'
+  | 'propresenter-controls'
+  | 'slide-notes'
+  | 'propresenter-timers'
+  | 'planning-center-service'
+  | 'planning-center-timers'
+  | 'planning-center-schedule'
+  | 'planning-center-teams';
 
 /** May this widget go on a view of this kind? */
 export const widgetAllowedOn = (def: WidgetDef, kind: ViewKind): boolean =>
   (def.kinds ?? ['dashboard', 'display']).includes(kind);
 
-export const widgetMin = (def: WidgetDef): WidgetSize => def.minSize ?? def.size;
-export const widgetMax = (def: WidgetDef): WidgetSize => def.maxSize ?? def.size;
+export const MAX_WIDGET_SIZE: WidgetSize = { w: 6, h: 5 };
+
+// Widgets keep their authored starting size, but users may resize every one
+// down to a single cell. Their content then scales with the chosen cell.
+export const widgetMin = (_def: WidgetDef): WidgetSize => ({ w: 1, h: 1 });
+// A dashboard is six columns wide. Displays are smaller, and their grid
+// validation naturally limits a resize to what fits on that display.
+export const widgetMax = (_def: WidgetDef): WidgetSize => MAX_WIDGET_SIZE;
 
 /** Can this widget be stretched at all, on either axis? */
 export const widgetResizable = (def: WidgetDef): boolean => {

@@ -67,6 +67,7 @@ function showState(roomId) {
     startedAt: show.startedAt,
     follow: show.follow,
     ppConnected: show.ppConnected,
+    servicesLive: show.servicesLive ?? null,
     current: show.current,
   };
 }
@@ -416,6 +417,7 @@ function onSpl(roomId, sample) {
     peak,
     target: cfg.target ?? null,
     limit: cfg.limit ?? null,
+    readings: sample.readings ?? null,
     // C-A ratio rides along when the analysis source provides it (RTA).
     // Its target band comes from the analyzer app's own config.
     ca:
@@ -495,10 +497,12 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
   timeline.ensure(`${planId}__${timeId}`, { roomId, planId, timeId });
 
   let items = [];
+  let serviceType = null;
   try {
     const plan = await findPlan(room, planId);
     if (plan) {
       const st = { id: plan.serviceTypeId, name: plan.serviceTypeName };
+      serviceType = st;
       items = await pco.getPlanItems(st, plan.id);
       // Label the timeline now, while the plan is easy to resolve — the
       // history page reads these long after the plan has left "upcoming".
@@ -536,11 +540,13 @@ async function beginShow(roomId, planId, timeId, startedAt, { startedLogging = f
     timeId,
     startedAt,
     items,
+    serviceType,
     itemById: new Map(items.map((i) => [i.id, i])),
-    current: { itemId: null, itemIndex: null, itemName: null, slideIndex: null, slideCount: null },
+    current: { itemId: null, itemIndex: null, itemName: null, startedAt: null, slideIndex: null, slideCount: null },
     follow: true,
     ppConnected: null,
     config: showConfig.getConfig(roomId, planId), // per-event automation settings
+    servicesLive: null,
     startedLogging, // true when the dashboard turned Smaart's SPL logging on
     abort: new AbortController(),
   };
@@ -586,6 +592,17 @@ export function endShow(roomId) {
   }
   show.abort.abort();
   timeline.finalize(instanceId(show));
+  // Freeze a loudness summary for each item before raw SPL retention can prune
+  // the samples. This is intentionally independent of which live widget was
+  // on screen: service reporting follows the show, not a browser tab.
+  const finished = timeline.get(instanceId(show));
+  if (finished?.items?.length) {
+    timeline.setItemSpl(instanceId(show), finished.items.map((item) => (
+      item.startedAt != null && item.endedAt != null
+        ? splStore.aggregateRange(instanceId(show), item.startedAt, item.endedAt)
+        : null
+    )));
+  }
   summaries.refresh(instanceId(show)); // the summary row is stamped at show end
   shows.delete(roomId);
   removeShowFile(roomId);
@@ -665,6 +682,8 @@ function onPoll(show, s) {
 function applyCurrent(show, itemId, fallbackName, index) {
   const pc = show.itemById.get(itemId);
   const name = pc?.title ?? fallbackName ?? null;
+  const changed = show.current.itemId !== itemId;
+  if (changed) show.current.startedAt = Date.now();
   show.current.itemId = itemId;
   show.current.itemIndex = index ?? null;
   show.current.itemName = name;
@@ -673,6 +692,30 @@ function applyCurrent(show, itemId, fallbackName, index) {
     { roomId: show.roomId, planId: show.planId, timeId: show.timeId },
     { itemId, itemName: name, itemIndex: index, plannedLength: pc?.length ?? null },
   );
+  if (changed) syncServicesLive(show, itemId);
+}
+
+// ProPresenter is the source of truth when this explicit event option is on.
+// One item transition creates one serialized Services LIVE sync; no dashboard
+// being open is required, and a PP poll can never create competing requests.
+function syncServicesLive(show, itemId) {
+  if (!show.config?.servicesLiveFromProPresenter || !show.serviceType || !itemId) return;
+  const key = `${show.planId}:${itemId}`;
+  if (show.servicesLive?.key === key) return;
+  show.servicesLive = { key, state: 'syncing', itemId, error: null };
+  pco.syncServicesLive(show.serviceType, show.planId, itemId)
+    .then((result) => {
+      if (!shows.has(show.roomId)) return;
+      show.servicesLive = { key, ...result, error: null };
+      publishShow(show.roomId);
+    })
+    .catch((err) => {
+      if (!shows.has(show.roomId)) return;
+      // Allow a later PP transition to retry. The error is observable in the
+      // show state instead of silently pretending Services LIVE advanced.
+      show.servicesLive = { key: '', state: 'error', itemId, error: String(err.message ?? err) };
+      publishShow(show.roomId);
+    });
 }
 
 /** A live show picks up config edits made on the Event Detail page. */
@@ -680,6 +723,7 @@ export function refreshConfig(roomId, planId) {
   const show = shows.get(roomId);
   if (show && show.planId === planId) {
     show.config = showConfig.getConfig(roomId, planId);
+    if (show.current.itemId) syncServicesLive(show, show.current.itemId);
     // A pin edited mid-service takes effect now, not at the next show.
     restartStreamWatcher(roomId);
     publishShow(roomId);
@@ -718,7 +762,14 @@ export async function nextArmedEvent(room, now) {
   plans.sort((a, b) => String(a.sortDate ?? '').localeCompare(String(b.sortDate ?? '')));
   for (const plan of plans) {
     const config = showConfig.getConfig(room.id, plan.id);
-    if (!config?.startItemId) continue;
+    const liveTrigger = config?.servicesLiveFromProPresenter && (
+      (config.servicesLiveStartMode === 'service-time' && config.servicesLiveStartTimeId) ||
+      (config.servicesLiveStartMode !== 'service-time' && (config.servicesLiveStartItemId || config.startItemId))
+    );
+    // This watcher serves both dashboard-show autostart and the independent
+    // Services LIVE bridge. The latter deliberately does not need a Run of
+    // Show start item at all.
+    if (!config?.startItemId && !liveTrigger) continue;
     const st = { id: plan.serviceTypeId, name: plan.serviceTypeName };
     const times = await pco.getPlanTimes(st, plan.id).catch(() => []);
     const window = armWindow(times);
@@ -733,6 +784,7 @@ export async function nextArmedEvent(room, now) {
 async function autostartLoop(roomId, signal) {
   let prevItemId = null; // last mapped PC item; null = no baseline (never trigger)
   let armedPlanId = null; // for state-change logging only
+  let servicesLiveRunning = false;
   while (!signal.aborted) {
     // Connectivity AND the room itself are edited live, so eligibility is
     // per-cycle, not per-boot: a room gains (or loses) autostart within a
@@ -754,6 +806,7 @@ async function autostartLoop(roomId, signal) {
     }
     if ((armed?.plan.id ?? null) !== armedPlanId) {
       armedPlanId = armed?.plan.id ?? null;
+      servicesLiveRunning = false;
       console.log(`[autostart] ${roomId}: ${armedPlanId ? `armed for plan ${armedPlanId}` : 'disarmed'}`);
     }
     if (!armed) {
@@ -788,6 +841,34 @@ async function autostartLoop(roomId, signal) {
             /* conflict — someone started it manually first */
           }
         }
+      }
+      // Services LIVE has its own start condition. It is intentionally
+      // independent of startShow(): a room can run without the Run of Show
+      // widget open, or without Run of Show at all. Once started, every
+      // forward ProPresenter presentation change advances Services LIVE.
+      const liveEnabled = Boolean(armed.config.servicesLiveFromProPresenter);
+      const mode = armed.config.servicesLiveStartMode ?? 'item';
+      const triggerItemId = armed.config.servicesLiveStartItemId ?? armed.config.startItemId;
+      const triggerTime = armed.times.find((t) => t.id === armed.config.servicesLiveStartTimeId);
+      const startsAtTime = mode === 'service-time' && triggerTime?.startsAt &&
+        Date.now() >= new Date(triggerTime.startsAt).getTime();
+      const startsAtItem = mode !== 'service-time' && triggerItemId &&
+        itemId === triggerItemId && prevItemId !== null && prevItemId !== itemId;
+      const startsServicesLive = liveEnabled && !servicesLiveRunning && (startsAtTime || startsAtItem);
+      if (startsServicesLive) {
+        servicesLiveRunning = true;
+        console.log(`[services-live] ${roomId}: bridge started for ${armed.plan.id} (${mode})`);
+      }
+      if (liveEnabled && servicesLiveRunning && itemId && (startsServicesLive || itemId !== prevItemId) && !shows.has(roomId)) {
+        pco.syncServicesLive(
+          { id: armed.plan.serviceTypeId, name: armed.plan.serviceTypeName },
+          armed.plan.id,
+          itemId,
+        ).catch((err) => {
+          // Keep watching after a transient PCO failure. A later PP change
+          // retries automatically, rather than requiring a page refresh.
+          console.warn(`[services-live] ${roomId}: ${err?.message ?? err}`);
+        });
       }
       // PP quirk (verified live): playlist_item reads null for a beat right
       // after an item trigger, until the next slide action. Only a MAPPED item

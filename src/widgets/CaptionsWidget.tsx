@@ -44,7 +44,7 @@ export function CaptionsWidget({ roomId }: WidgetProps) {
     <div className="wgt wgt--captions">
       <div className="wgt__head">
         <span className="wgt__icon"><MessagesSquare size={16} /></span>
-        <span className="wgt__title">Comms</span>
+        <span className="wgt__title">Captions</span>
         {!captions.up && (
           <span className="wgt__status wgt__status--down">Not connected</span>
         )}

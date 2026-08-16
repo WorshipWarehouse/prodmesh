@@ -1,5 +1,22 @@
 /* Analytics — show-report history table. */
 
+.hist__overall {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--ok);
+}
+.hist__overall > div { display: grid; gap: 2px; }
+.hist__overall span, .hist__overall > small { color: var(--text-dim); font-size: .78rem; }
+.hist__overall strong { color: var(--text); font-size: 1.45rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.hist__overall strong small { color: var(--text-dim); font-size: .72rem; }
+.hist__overall > small { margin-left: auto; }
+
 .hist__table {
   display: flex;
   flex-direction: column;

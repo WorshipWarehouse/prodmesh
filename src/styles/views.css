@@ -82,12 +82,134 @@
   gap: 10px;
 }
 
+/* Every placed widget identifies both the information it shows and the
+   integration responsible for it. The editor uses its drag header instead. */
+.viewcell__widget-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  line-height: 1;
+}
+
+.viewcell__widget-head .integration-brand__mark {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+  border-radius: 5px;
+}
+
+/* Keep the supplied square source artwork centered in the fixed integration
+   mark instead of cropping the edges when a logo has its own safe area. */
+.viewcell__widget-head .integration-brand__mark img {
+  object-fit: contain;
+}
+
+.viewcell__widget-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Connection states belong to the same information plane as the branded
+   widget title. Reserve room for the badge before placing it on that row. */
+.viewcell:not(.viewcell--editing):has(.wgt__status) .viewcell__widget-head {
+  padding-right: 76px;
+}
+
+.viewcell:not(.viewcell--editing) .wgt__status {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 1;
+}
+
+/* The canvas header is the one consistent, branded title for a widget. A few
+   older widgets also render their own icon + name inside the card, which
+   produces "Comms / Comms" and "Planning Center Service / Planning Center
+   service". Flatten those legacy headers so their meaningful status remains
+   visible, but the duplicate icon and label do not take a second line. Data
+   headers such as Clock's date and Lyrics' current song are intentionally not
+   included: they are content, not a repeated widget title. */
+.viewcell[data-widget="captions"] .wgt__head,
+.viewcell[data-widget="countdown"] .wgt__head,
+.viewcell[data-widget="loudness"] .wgt__head,
+.viewcell[data-widget="loudness-trend"] .wgt__head,
+.viewcell[data-widget="room-health"] .wgt__head,
+.viewcell[data-widget="restream"] .wgt__head,
+.viewcell[data-widget="slides-left"] .wgt__head,
+.viewcell[data-widget="planning-center-service"] .wgt__head,
+.viewcell[data-widget="planning-center-timers"] .wgt__head,
+.viewcell[data-widget="planning-center-schedule"] .wgt__head,
+.viewcell[data-widget="planning-center-teams"] .wgt__head {
+  display: contents;
+}
+
+.viewcell[data-widget="captions"] .wgt__head .wgt__icon,
+.viewcell[data-widget="captions"] .wgt__head .wgt__title,
+.viewcell[data-widget="countdown"] .wgt__head .wgt__icon,
+.viewcell[data-widget="countdown"] .wgt__head .wgt__title,
+.viewcell[data-widget="loudness"] .wgt__head .wgt__icon,
+.viewcell[data-widget="loudness"] .wgt__head .wgt__title,
+.viewcell[data-widget="loudness-trend"] .wgt__head .wgt__icon,
+.viewcell[data-widget="loudness-trend"] .wgt__head .wgt__title,
+.viewcell[data-widget="room-health"] .wgt__head .wgt__icon,
+.viewcell[data-widget="room-health"] .wgt__head .wgt__title,
+.viewcell[data-widget="restream"] .wgt__head .wgt__icon,
+.viewcell[data-widget="restream"] .wgt__head .wgt__title,
+.viewcell[data-widget="slides-left"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-service"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-service"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-timers"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-timers"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-schedule"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-schedule"] .wgt__head .wgt__title,
+.viewcell[data-widget="planning-center-teams"] .wgt__head .wgt__icon,
+.viewcell[data-widget="planning-center-teams"] .wgt__head .wgt__title {
+  display: none;
+}
+
+.viewcell .wgt__head .wgt__status {
+  align-self: flex-end;
+  margin-left: 0;
+}
+
+/* The branded card header already identifies the integration. Do not repeat
+   a second product/utility icon inside a widget's own header; icons within
+   real content (for example, song rows in Run of Show) are not affected. */
+.viewcell__body .wgt__head > svg,
+.viewcell__body .wgt__head .wgt__icon,
+.viewcell__body .wgt__head .wgt__brand {
+  display: none;
+}
+
 /* No box inside a box. A widget that draws its own card is right in the flow
    grid, where it IS the card; inside a cell that already has a border and a
-   background it reads as a nested panel. The cell owns the frame here. */
-.viewcell__body > .wgt {
-  flex: 1;
+   background it reads as a nested panel. The cell owns the frame here.
+
+   This must cover every widget root, not just `.wgt`: Run of Show and Now &
+   Next use purpose-built roots. A placement can be resized in either
+   direction, so every root receives the entire usable cell and can grow its
+   own flexible content (lists, charts, and text) into that space. */
+.viewcell__body > * {
+  flex: 1 1 0;
   min-height: 0;
+  height: 100%;
+}
+
+/* A compact Now & Next cell used to hide the end of an item title with an
+   ellipsis. The canvas gives every widget its actual selected dimensions, so
+   use available lines rather than discarding content. */
+.viewcell__body .nownext__title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
 }
 
 /* A widget with nothing to show renders null, so its body is genuinely empty.
@@ -424,7 +546,7 @@
 
 .vieweditor {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr) 240px;
   gap: 16px;
   align-items: start;
 }
@@ -446,6 +568,27 @@
   text-align: center;
 }
 
+/* A deliberate inspector, matching the palette's visual language. Settings
+   need space to be read; putting them inside a 1×1 preview makes both the
+   settings and the preview worse. */
+.widgetinspector {
+  position: sticky;
+  top: 74px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  color: var(--text-dim);
+  font-size: .86rem;
+}
+.widgetinspector h2 { margin: 0 0 10px; color: var(--text); font-size: .9rem; }
+.widgetinspector p { margin: 0; line-height: 1.4; }
+.widgetinspector__name { color: var(--text); font-weight: 650; margin-bottom: 12px !important; }
+.widgetinspector label { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; color: var(--text-dim); }
+.widgetinspector small { display: block; color: var(--text-dim); line-height: 1.35; }
+.widgetinspector .widgetinspector__check { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--text); }
+.widgetinspector select { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+
 /* ── Palette ─────────────────────────────────────────────────────────────── */
 
 .palette {
@@ -463,14 +606,42 @@
   color: var(--text-dim);
 }
 
+.palette__group + .palette__group { margin-top: 8px; }
+.palette__group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.palette__group-title:hover,
+.palette__group-title:focus-visible { background: var(--bg-tile); color: var(--text); }
+.palette__group-title .integration-brand__mark { flex: none; }
+.palette__group-count { margin-left: auto; color: var(--text-faint); font-size: 0.72rem; }
+.palette__group-chevron { flex: none; transition: transform .16s ease; }
+.palette__group--open .palette__group-chevron { transform: rotate(180deg); }
+
 .palette__list {
   list-style: none;
-  margin: 0;
+  margin: 7px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+.palette__list[hidden] { display: none; }
 
 .palette__item {
   display: flex;
@@ -542,8 +713,10 @@
    staying narrow is why a layout can be data at all. */
 .viewgrid--editing .viewcell__body {
   pointer-events: none;
-  padding: 0 14px 14px;
-  opacity: 0.9;
+  /* Match a live cell's content inset. The edit chrome is the only extra
+     furniture, so the preview remains a truthful layout decision. */
+  padding: 16px 18px;
+  opacity: 1;
 }
 
 .viewcell__chrome {
@@ -571,6 +744,14 @@
   text-align: left;
   cursor: grab;
   touch-action: none;
+}
+
+/* Match the widget palette's 20px integration marks in the editor. */
+.viewcell__grip .integration-brand__mark {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+  border-radius: 5px;
 }
 
 .viewcell__grip:active {

@@ -29,27 +29,30 @@ const HISTORY = 180; // × EVERY_MS = 15 minutes
 // widget whose job is "has this been creeping up" must not manufacture creep.
 const WINDOW = { min: 70, max: 100 };
 
-export function LoudnessTrendWidget({ roomId }: WidgetProps) {
+export function LoudnessTrendWidget({ roomId, config }: WidgetProps) {
   const spl = useTopic<SplState | null>(roomTopic.spl(roomId));
   // The topic publishes null when no analyzer is configured or it has stopped
   // answering, which is exactly when the curve should be dropped rather than
   // left standing as though it were still current.
-  const history = useSeries(spl?.current, spl != null, { limit: HISTORY, everyMs: EVERY_MS });
+  const measurement = `SPL ${config.weighting ?? 'A'} ${config.response ?? 'Slow'}`;
+  const selected = spl ? spl.readings?.[measurement] ?? spl.current : undefined;
+  const history = useSeries(selected, spl != null, { limit: HISTORY, everyMs: EVERY_MS });
 
   if (!spl) return null;
 
+  const configured = { ...spl, current: selected ?? spl.current, target: config.target ?? spl.target, limit: config.limit ?? spl.limit };
   const minutes = Math.round((history.length * EVERY_MS) / 60_000);
   const span = `last ${minutes < 1 ? 'minute' : `${minutes} min`}`;
 
   return (
-    <div className={`wgt wgt--spl-trend ros-spl--${splZone(spl)}`}>
+    <div className={`wgt wgt--spl-trend ros-spl--${splZone(configured)}`}>
       <div className="wgt__head">
         <span className="wgt__icon"><Activity size={16} /></span>
         <span className="wgt__title">Loudness trend</span>
       </div>
 
       <p className="wgt__value">
-        {spl.current.toFixed(1)} <small>dB</small>
+        {configured.current.toFixed(1)} <small>dB</small>
       </p>
 
       {/* "on this screen" is not hedging — the curve is what this browser has
@@ -67,8 +70,8 @@ export function LoudnessTrendWidget({ roomId }: WidgetProps) {
         points={history}
         bounds={WINDOW}
         bands={[
-          spl.target != null ? { from: spl.target, tone: 'warn' as const } : null,
-          spl.limit != null ? { from: spl.limit, tone: 'over' as const } : null,
+          configured.target != null ? { from: configured.target, tone: 'warn' as const } : null,
+          configured.limit != null ? { from: configured.limit, tone: 'over' as const } : null,
         ].filter(Boolean) as SparkBand[]}
         label={`Loudness over the ${span}`}
       />

@@ -146,6 +146,13 @@
   font-size: 0.9rem;
 }
 
+.fsection__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* "+ Add" buttons under a section hug the left edge instead of stretching. */
 .fsection > .btn {
   align-self: flex-start;

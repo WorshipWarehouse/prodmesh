@@ -11,7 +11,7 @@
 import type { ReactNode } from 'react';
 import { ExternalLink, LayoutDashboard, Plus, ScreenShare } from 'lucide-react';
 import type { Tile } from '../types';
-import companionIcon from '../assets/companion.webp';
+import companionIcon from '../assets/integrations/companion.png';
 
 export interface TileBehavior {
   /** Default icon (a Lucide element; a per-tile `icon` emoji overrides it). */

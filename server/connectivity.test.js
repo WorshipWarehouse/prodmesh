@@ -40,14 +40,19 @@ test('first boot seeds the analysis source from rooms.config.js', () => {
 
 test('setAnalysis validates, persists, and applies to the live rooms map', () => {
   const clean = conn.setAnalysis('north-youth', {
-    source: 'rta', host: '192.0.2.17', port: '8517', target: '88', limit: '', metric: 'leqS',
+    source: 'rta', host: '192.0.2.17', port: '8517',
   });
-  assert.deepEqual(clean, { source: 'rta', host: '192.0.2.17', port: 8517, target: 88, metric: 'leqS' });
+  assert.deepEqual(clean, { source: 'rta', host: '192.0.2.17', port: 8517 });
   assert.deepEqual(rooms['north-youth'].analysis, clean);
   // Clearing removes it from the database AND the live room object…
   conn.setAnalysis('north-youth', null);
   assert.equal(conn.getAnalysis('north-youth'), null);
   assert.equal(rooms['north-youth'].analysis, undefined);
+});
+
+test('Open Sound Meter uses its multicast Remote API without a host', () => {
+  const clean = conn.validateAnalysis({ source: 'open-sound-meter' });
+  assert.deepEqual(clean, { source: 'open-sound-meter' });
 });
 
 test('a cleared analysis source stays cleared across applyConnectivity', () => {
@@ -65,8 +70,6 @@ test('setAnalysis rejects bad input without changing anything', () => {
   assert.throws(() => conn.setAnalysis('north-main', { source: 'loudness-o-matic', host: 'x' }), /Unknown analysis source/);
   assert.throws(() => conn.setAnalysis('north-main', { source: 'rta' }), /needs a host/);
   assert.throws(() => conn.setAnalysis('north-main', { source: 'rta', host: 'x', port: 99999 }), /Port must be/);
-  assert.throws(() => conn.setAnalysis('north-main', { source: 'rta', host: 'x', target: 20 }), /must be 40–130/);
-  assert.throws(() => conn.setAnalysis('north-main', { source: 'rta', host: 'x', target: 95, limit: 90 }), /at or above target/);
   assert.throws(() => conn.setAnalysis('nope', null), /Unknown room/);
   assert.deepEqual(conn.getAnalysis('north-main'), before);
 });

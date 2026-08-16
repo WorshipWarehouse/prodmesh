@@ -14,6 +14,7 @@ export interface RoomMeta {
   name: string;
   site: string | null;
   hasCompanion: boolean;
+  analysisSource?: AnalysisSource | null;
   modes: RoomMode[];
 }
 
@@ -46,6 +47,15 @@ export const getRooms = () => getJson<RoomMeta[]>('/api/rooms');
 
 export const getRoomState = (id: string) =>
   getJson<RoomState>(`/api/rooms/${encodeURIComponent(id)}/state`);
+
+export interface ProPresenterCue { index: number; number: number; thumbnailIndex?: number; text: string; note: string | null; section: string; color: string | null; }
+export interface ProPresenterItem { index: number; title: string; presentationTitle?: string | null; presentationUuid: string | null; triggerable: boolean; placeholder: boolean; isPco: boolean; slides: ProPresenterCue[]; }
+export interface ProPresenterState { full?: boolean; connected?: boolean; focusedPlaylist?: { name: string | null; items: ProPresenterItem[] }; runtime: { activePresentationUuid: string | null; activePlaylistIndex: number | null; activeCueIndex: number | null; activeCueNumber: number | null; totalCues: number | null; timers: Array<{ uuid: string | null; name: string; state: string; remainingSeconds: number | null }>; video: { name: string | null; seconds: number | null; duration: number } | null } | null; }
+
+export async function proPresenterControl(roomId: string, input: { viewId?: string; widgetId?: string; action: 'previous' | 'next' | 'previous-item' | 'next-item' | 'presentation' | 'cue'; playlistIndex?: number; cueIndex?: number; presentationUuid?: string | null; isPco?: boolean }) {
+  const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/propresenter/control`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify(input) });
+  await requireOk(res);
+}
 
 /** Thrown when a mode change is locked and the override PIN was missing/wrong. */
 export class OverrideRequiredError extends Error {
@@ -143,6 +153,17 @@ async function requireOk(res: Response) {
   }
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`);
 }
+
+/** Begin OAuth in an authenticated fetch, then hand the browser to Restream. */
+export async function connectRestream() {
+  const res = await fetch('/api/integrations/restream/connect', { method: 'POST', headers: requestHeaders() });
+  await requireOk(res);
+  const body = await res.json() as { url?: string };
+  if (!body.url) throw new Error('ProdMesh did not receive a Restream authorization URL.');
+  window.location.assign(body.url);
+}
+
+export const getRestreamConfig = () => getJson<{ redirectUrl: string }>('/api/integrations/restream/config');
 
 export interface Station {
   id: string;
@@ -551,17 +572,14 @@ export interface PcServiceType {
   name: string;
 }
 
-export type AnalysisSource = 'smaart' | 'rta';
+export type AnalysisSource = 'smaart' | 'rta' | 'open-sound-meter';
 
 // The room's SPL source. `password` is write-only (send to change, omit to
 // keep); reads report hasPassword instead. `mock` marks the dev fixture.
 export interface AnalysisConfig {
   source: AnalysisSource;
-  host: string;
+  host?: string;
   port?: number;
-  target?: number;
-  limit?: number;
-  metric?: string;
   password?: string;
   hasPassword?: boolean;
   logControl?: boolean;
@@ -666,6 +684,16 @@ export async function saveAnalysis(
   await requireOk(res);
   return (await res.json()).analysis;
 }
+
+export const testAnalysisConnection = (roomId: string, analysis: AnalysisConfig) =>
+  fetch(`/api/config/rooms/${roomId}/connectivity/analysis/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...requestHeaders() },
+    body: JSON.stringify({ analysis }),
+  }).then(async (res) => {
+    await requireOk(res);
+    return res.json() as Promise<{ ok: boolean; detail: string }>;
+  });
 
 /** Save a room's caption source. Omitting `key` keeps the stored one — the
  *  editor never receives it, so it cannot send it back. */
@@ -774,6 +802,8 @@ export interface PlanItem {
   description: string | null;
 }
 
+export interface PlanTeamMember { id: string; name: string; position: string; teamId: string | null; teamName: string; status: string | null; photoUrl: string | null; }
+
 export interface ServicePlan {
   id: string;
   serviceTypeId: string;
@@ -784,6 +814,7 @@ export interface ServicePlan {
   sortDate: string | null;
   times: PlanTime[];
   items: PlanItem[];
+  teamMembers?: PlanTeamMember[];
   _mock?: boolean;
 }
 
@@ -831,12 +862,17 @@ export interface ChecklistItem {
 export interface ShowConfig {
   startItemId: string | null; // PP lands on this PC item → show autostarts
   endItemId: string | null; // last slide of this PC item → show auto-completes
-  map: Record<string, { ppIndex: number; ppName: string | null } | null>;
+  map: Record<string, { ppIndex: number; ppName: string | null } | { disabled: true } | null>;
   /** YouTube broadcast per SERVICE TIME, tri-state. Key ABSENT = auto (record
    *  whatever is live); `null` = not streamed (record nothing, don't look);
    *  a string = pinned to that broadcast. A channel pre-creates one broadcast
    *  per service, so 8:00 and 9:30 are different videos on one plan. */
   videos: Record<string, string | null>;
+  servicesLiveFromProPresenter?: boolean;
+  /** The condition that gives this event's Services LIVE bridge permission to run. */
+  servicesLiveStartMode?: 'item' | 'service-time';
+  servicesLiveStartItemId?: string | null;
+  servicesLiveStartTimeId?: string | null;
 }
 
 /** A live or scheduled broadcast on the room's channel, for the pin picker. */
@@ -910,6 +946,8 @@ export interface ReportItem {
   actualSeconds: number;
   delta: number | null;
   ongoing: boolean;
+  /** Loudness during this individual Planning Center item. */
+  spl?: SplReport | null;
 }
 
 export interface SplReport {
@@ -958,6 +996,7 @@ export interface ShowCurrent {
   itemId: string | null;
   itemIndex: number | null;
   itemName: string | null;
+  startedAt?: number | null;
   slideIndex: number | null;
   slideCount: number | null;
 }
@@ -988,6 +1027,7 @@ export interface SplState {
   peak: number | null; // show peak — only while a show is live
   target: number | null;
   limit: number | null;
+  readings?: Record<string, number> | null;
   ca?: CaState | null;
 }
 
@@ -1102,6 +1142,7 @@ export interface ShowState {
   startedAt?: number;
   follow?: boolean;
   ppConnected?: boolean | null;
+  servicesLive?: { state: string; itemId?: string | null; error?: string | null } | null;
   current?: ShowCurrent;
   timer?: PpTimer | null;
   spl?: SplState | null;
@@ -1205,6 +1246,17 @@ export interface ViewPlacement {
 export interface WidgetConfigJson {
   planId?: string;
   timeId?: string;
+  slideControls?: boolean;
+  keyboardControls?: boolean;
+  followActive?: boolean;
+  slideMode?: 'image' | 'text';
+  slideSize?: number;
+  slides?: 'current' | 'next' | 'both';
+  target?: number;
+  limit?: number;
+  metric?: string;
+  weighting?: 'A' | 'B' | 'C' | 'Z';
+  response?: 'Fast' | 'Slow';
 }
 
 export interface ViewSummary {

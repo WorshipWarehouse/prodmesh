@@ -98,6 +98,54 @@ export function AppShell() {
     return () => window.removeEventListener('prodmesh:config-changed', load);
   }, []);
 
+  // The browser tab is part of the product's visible identity too. Verify the
+  // optional church logo before assigning it as the favicon, because a missing
+  // override returns 404 and should keep the bundled ProdMesh mark instead.
+  // `logoStamp` changes after Admin → General saves an upload, so the browser
+  // sees a fresh URL rather than reusing the previous icon from its cache.
+  useEffect(() => {
+    let cancelled = false;
+    // WebKit commonly holds on to the first favicon it sees even if that
+    // link's `href` is later changed. Replace the element instead; that makes
+    // Safari, Chromium, and kiosk displays all re-read the current logo.
+    const setFavicon = (href: string, type: string) => {
+      document.querySelectorAll('link[rel~="icon"]').forEach((link) => link.remove());
+      const next = document.createElement('link');
+      next.id = 'app-favicon';
+      next.rel = 'icon';
+      next.type = type;
+      next.href = href;
+      document.head.append(next);
+      // Safari recognizes this older relation more reliably for dynamically
+      // swapped site icons, particularly when a previous favicon.ico exists
+      // in its per-host cache.
+      const shortcut = document.createElement('link');
+      shortcut.rel = 'shortcut icon';
+      shortcut.type = type;
+      shortcut.href = href;
+      document.head.append(shortcut);
+    };
+
+    const setFallback = () => setFavicon('/prodmesh-icon.svg', 'image/svg+xml');
+
+    fetch(logoSrc(logoStamp), { cache: 'no-store' })
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          setFallback();
+          return;
+        }
+        // This is a real ICO response for PNG uploads, which Safari's tab
+        // engine accepts more consistently than a PNG served at an .ico URL.
+        setFavicon(`/favicon.ico?v=${logoStamp ?? Date.now()}`, 'image/x-icon');
+      })
+      .catch(() => {
+        if (!cancelled) setFallback();
+      });
+
+    return () => { cancelled = true; };
+  }, [logoStamp]);
+
   useEffect(() => {
     if (!accountOpen && !helpOpen) return;
     const dismiss = (event: PointerEvent) => {

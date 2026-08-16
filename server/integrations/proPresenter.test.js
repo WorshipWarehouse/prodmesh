@@ -9,6 +9,10 @@ import {
   parseHms,
   parseTimers,
   pickTimer,
+  normalizePlaylist,
+  normalizePlaylistItem,
+  adjacentPlayable,
+  runtimeFrom,
 } from './proPresenter.js';
 
 test('isConfigured needs a host', () => {
@@ -41,6 +45,36 @@ test('parseActive pulls the active playlist item (fields nested under .id)', () 
   // Nothing triggered → playlist_item is null.
   assert.deepEqual(parseActive({ presentation: { playlist: null, playlist_item: null } }), {
     index: null, name: null, uuid: null, arrangementUuid: null, arrangementName: null, playlistName: null,
+  });
+});
+
+test('playlist normalization preserves PP indexes and treats headers as non-playable', () => {
+  const playlist = normalizePlaylist({ playlist: { name: 'Sunday' }, items: [
+    { id: { index: 0, name: 'Walk-in' }, type: 'header' },
+    { id: { index: 1, name: 'Song' }, type: 'presentation', presentation_info: { presentation_uuid: '11111111-1111-1111-1111-111111111111' } },
+    { id: { index: 3, name: 'Message' }, is_pco: true, presentation_info: { presentation_uuid: '22222222-2222-2222-2222-222222222222', name: 'John 1' } },
+  ] });
+  assert.equal(playlist.name, 'Sunday');
+  assert.deepEqual(playlist.items.map((x) => [x.index, x.triggerable, x.isPco]), [[0, false, false], [1, true, false], [3, true, true]]);
+  assert.equal(playlist.items[2].presentationTitle, 'John 1');
+});
+
+test('adjacent playable skips headers and raw index gaps', () => {
+  const rows = [
+    normalizePlaylistItem({ id: { index: 0, name: 'Header' }, type: 'header' }),
+    normalizePlaylistItem({ id: { index: 2, name: 'Song' }, presentation_info: { presentation_uuid: '11111111-1111-1111-1111-111111111111' } }),
+    normalizePlaylistItem({ id: { index: 4, name: 'Folder' }, type: 'folder' }),
+    normalizePlaylistItem({ id: { index: 5, name: 'Message' }, is_pco: true }),
+  ];
+  assert.equal(adjacentPlayable(rows, 0, 1)?.index, 2);
+  assert.equal(adjacentPlayable(rows, 4, -1)?.index, 2);
+  assert.equal(adjacentPlayable(rows, 2, 1)?.index, 5);
+});
+
+test('runtime separates zero-based API indexes from one-based operator labels', () => {
+  assert.deepEqual(runtimeFrom({ presUuid: 'p', slideIndex: 0, totalCues: 5 }, { index: 3 }, [], null), {
+    activePresentationUuid: 'p', activePlaylistIndex: 3, activeCueIndex: 0,
+    activeCueNumber: 1, totalCues: 5, timers: [], video: null,
   });
 });
 

@@ -4,7 +4,7 @@
 //
 //  Migrated so far:
 //    planningCenter — which PC service types feed the room
-//    analysis       — SPL source (Smaart or ProdMesh Remote RTA) + dB goals
+//    analysis       — SPL source (Smaart, ProdMesh Remote RTA, or OSM) + dB goals
 //    proPresenter   — the room's ProPresenter API (host/port, optional timer)
 //    companion      — Companion host/port + state variable + the room's MODES
 //                     (stored as one blob; applied onto the legacy room keys
@@ -91,26 +91,14 @@ export function validateAnalysis(input) {
   if (typeof input !== 'object' || Array.isArray(input)) throw new Error('analysis must be an object');
   const source = String(input.source ?? 'smaart');
   if (!SOURCES.includes(source)) throw new Error(`Unknown analysis source "${source}"`);
-  const host = validateHost(input.host, 'Analysis source needs a host');
-  const out = { source, host };
+  const out = { source };
+  if (source !== 'open-sound-meter') out.host = validateHost(input.host, 'Analysis source needs a host');
   const port = input.port === '' || input.port == null ? null : Number(input.port);
   if (port != null) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
     out.port = port;
   }
-  for (const key of ['target', 'limit']) {
-    const v = input[key] === '' || input[key] == null ? null : Number(input[key]);
-    if (v == null) continue;
-    if (!Number.isFinite(v) || v < 40 || v > 130) throw new Error(`${key} must be 40–130 dB`);
-    out[key] = v;
-  }
-  if (out.target != null && out.limit != null && out.limit < out.target) {
-    throw new Error('limit must be at or above target');
-  }
-  const metric = String(input.metric ?? '').trim();
-  if (metric) {
-    if (metric.length > 60) throw new Error('metric must be at most 60 characters');
-    out.metric = metric;
+  if (source === 'open-sound-meter') {
   }
   if (source === 'smaart') {
     const password = String(input.password ?? '');

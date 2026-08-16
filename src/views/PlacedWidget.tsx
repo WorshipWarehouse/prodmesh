@@ -1,8 +1,12 @@
 import type { ReactNode } from 'react';
 import { PackageOpen } from 'lucide-react';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
-import type { WidgetConfig } from '../widgets/types';
-import type { ViewPlacement } from '../api';
+import type { WidgetConfig, WidgetType } from '../widgets/types';
+import { IntegrationBrand } from '../components/IntegrationBrand';
+import { getRoom, getRoomConnectivity, type ViewPlacement } from '../api';
+import { useQuery } from '../lib/useQuery';
+import { analysisIntegration, analysisWidgetTitle } from '../lib/analysisSource';
+import { captionIntegration, captionWidgetTitle } from '../lib/captionSource';
 
 // One cell of a View's grid.
 //
@@ -49,10 +53,18 @@ export function PlacedWidget({
 }) {
   const def = isWidgetType(placement.type) ? widgetRegistry[placement.type] : null;
   const Component = def?.component;
-
+  const room = useQuery(`room:${roomId}`, () => getRoom(roomId), { staleMs: 60_000 }).data;
+  const connectivity = useQuery(`room-connectivity:${roomId}`, () => getRoomConnectivity(roomId), { staleMs: 15_000 }).data;
+  const source = room?.analysisSource;
+  const captionSource = connectivity?.captions?.source;
+  const title = def ? analysisWidgetTitle(placement.type as WidgetType, source) ?? (placement.type === 'captions' ? captionWidgetTitle(captionSource) : null) ?? def.title : placement.type;
+  const integration = def && (placement.type === 'loudness' || placement.type === 'loudness-trend')
+    ? analysisIntegration(source)
+    : placement.type === 'captions' ? captionIntegration(captionSource)
+      : def?.integration ?? 'prodmesh';
   return (
     <div
-      className={`viewcell${def ? '' : ' viewcell--unknown'}${className ? ` ${className}` : ''}`}
+      className={`viewcell${def ? '' : ' viewcell--unknown'}${chrome ? ' viewcell--editing' : ''}${className ? ` ${className}` : ''}`}
       style={{
         gridColumn: `${placement.x + 1} / span ${placement.w}`,
         gridRow: `${placement.y + 1} / span ${placement.h}`,
@@ -60,12 +72,21 @@ export function PlacedWidget({
       data-widget={placement.type}
     >
       {chrome}
+      {!chrome && def && (
+        <header className="viewcell__widget-head">
+          <IntegrationBrand integration={integration} />
+          <span>{title}</span>
+        </header>
+      )}
       {/* A widget with nothing to say renders null — LoudnessWidget with no
           SPL, ViewersWidget off-air. In a flow grid that card simply vanishes;
           on a fixed canvas its cell stays, and a blank rectangle reads as a
           fault. `data-title` + `:empty` in CSS labels it instead, with no way
           for the widget to have to know it is on a canvas. */}
-      <div className="viewcell__body" data-title={def?.title ?? placement.type}>
+      <div
+        className="viewcell__body"
+        data-title={title}
+      >
         {Component ? (
           <Component roomId={roomId} config={config} />
         ) : (

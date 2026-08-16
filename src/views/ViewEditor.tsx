@@ -6,7 +6,11 @@ import { useGridDrag, type Cell } from './useGridDrag';
 import { findFirstFit, isFree, occupancy, rowCount, type Grid } from '../lib/gridLayout';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
 import { widgetMax, widgetMin, widgetResizable, type WidgetSize } from '../widgets/types';
-import type { View, ViewPlacement } from '../api';
+import { IntegrationBrand } from '../components/IntegrationBrand';
+import { getRoom, getRoomConnectivity, type View, type ViewPlacement } from '../api';
+import { useQuery } from '../lib/useQuery';
+import { analysisIntegration, analysisWidgetTitle } from '../lib/analysisSource';
+import { captionIntegration, captionWidgetTitle } from '../lib/captionSource';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Arranging a view.
@@ -42,8 +46,13 @@ export function ViewEditor({
   // Which card is in keyboard "grab" mode, and what the last move announced.
   const [grabbed, setGrabbed] = useState<string | null>(null);
   const [announcement, setAnnounce] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
 
   const placements = view.widgets;
+  const room = useQuery(`room:${view.roomId}`, () => getRoom(view.roomId), { staleMs: 60_000 }).data;
+  const connectivity = useQuery(`room-connectivity:${view.roomId}`, () => getRoomConnectivity(view.roomId), { staleMs: 15_000 }).data;
+  const analysisSource = room?.analysisSource;
+  const captionSource = connectivity?.captions?.source;
 
   // ONE row count for the canvas and the pointer maths. A dashboard normally
   // sizes to its content, which would leave the editor dividing by rows the
@@ -52,7 +61,7 @@ export function ViewEditor({
   // widget is what lets a dashboard be extended by dropping below it.
   const rows =
     grid.maxRows ?? Math.max(rowCount(grid, placements) + 1, grid.defaultRows ?? 1);
-  const palette = useMemo(() => paletteFor(view.kind, grid, placements), [view.kind, grid, placements]);
+  const palette = useMemo(() => paletteFor(view.kind, grid, placements, analysisSource, captionSource), [view.kind, grid, placements, analysisSource, captionSource]);
 
   const place = (type: string, at: Cell) => {
     const def = isWidgetType(type) ? widgetRegistry[type] : null;
@@ -73,6 +82,9 @@ export function ViewEditor({
 
   const resizeTo = (id: string, size: WidgetSize) =>
     onChange(placements.map((p) => (p.id === id ? { ...p, ...size } : p)));
+
+  const setConfig = (id: string, patch: Record<string, unknown>) =>
+    onChange(placements.map((p) => (p.id === id ? { ...p, config: { ...p.config, ...patch } } : p)));
 
   /** How far a widget may be stretched — the server enforces the same bounds. */
   const boundsFor = (type: string) => {
@@ -100,7 +112,13 @@ export function ViewEditor({
   };
 
   const titleOf = (type: string) =>
-    isWidgetType(type) ? widgetRegistry[type].title : type;
+    isWidgetType(type) ? analysisWidgetTitle(type, analysisSource) ?? (type === 'captions' ? captionWidgetTitle(captionSource) : null) ?? widgetRegistry[type].title : type;
+
+  const integrationOf = (type: string) =>
+    isWidgetType(type) && analysisWidgetTitle(type, analysisSource)
+      ? analysisIntegration(analysisSource)
+    : type === 'captions' ? captionIntegration(captionSource)
+      : isWidgetType(type) ? widgetRegistry[type].integration ?? 'prodmesh' : 'prodmesh';
 
   /** Arrow-key movement for the grabbed card. Refuses rather than shoves. */
   const nudge = (placement: ViewPlacement, delta: Cell) => {
@@ -156,6 +174,7 @@ export function ViewEditor({
               : 'Drag to move, or press Enter and use the arrow keys'
           }
           {...moveHandlers(placement)}
+          onClick={() => setSelected(placement.id)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -172,6 +191,7 @@ export function ViewEditor({
           }}
         >
           <GripVertical size={14} aria-hidden />
+          {def && <IntegrationBrand integration={integrationOf(placement.type)} />}
           <span className="viewcell__name">{title}</span>
         </button>
         <button
@@ -183,12 +203,12 @@ export function ViewEditor({
           <X size={14} />
         </button>
 
-        {/* Only where the widget declares a range. Most stay one size, so a
-            handle on them would only offer the bad version of two designs. */}
+        {/* Every widget can grow in both directions within the shared layout
+            range; the server applies the exact same bounds on save. */}
         {resizable && (
           <span
             className="viewcell__resize"
-            title={`Drag to resize (${widgetMin(def!).h}–${widgetMax(def!).h} rows)`}
+            title={`Drag to resize (${widgetMin(def!).w}–${widgetMax(def!).w} columns, ${widgetMin(def!).h}–${widgetMax(def!).h} rows)`}
             aria-hidden
             {...resizeHandlers(placement, boundsFor(placement.type))}
           />
@@ -245,8 +265,17 @@ export function ViewEditor({
         )}
       </div>
 
+      <WidgetInspector placement={placements.find((p) => p.id === selected) ?? null} onChange={setConfig} />
+
       {/* Every keyboard move says where it landed, or that it refused. */}
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
     </div>
   );
+}
+
+/** Settings live beside the canvas, never inside a small widget cell. */
+function WidgetInspector({ placement, onChange }: { placement: ViewPlacement | null; onChange: (id: string, patch: Record<string, unknown>) => void }) {
+  const pp = placement && (placement.type === 'propresenter-playlist' || placement.type === 'propresenter-controls');
+  const loudness = placement && (placement.type === 'loudness' || placement.type === 'loudness-trend');
+  return <aside className="widgetinspector"><h2>Widget settings</h2>{!placement ? <p>Select a widget to configure it.</p> : loudness ? <><p className="widgetinspector__name">Decibel Meter</p><label>Target dB<input type="number" min="40" max="130" placeholder="Optional" value={placement.config.target ?? ''} onChange={(e) => onChange(placement.id, { target: e.target.value === '' ? undefined : Number(e.target.value) })} /></label><label>Limit dB<input type="number" min="40" max="130" placeholder="Optional" value={placement.config.limit ?? ''} onChange={(e) => onChange(placement.id, { limit: e.target.value === '' ? undefined : Number(e.target.value) })} /></label><label>Weighting<select value={placement.config.weighting ?? 'A'} onChange={(e) => onChange(placement.id, { weighting: e.target.value })}><option value="A">A-weighted</option><option value="B">B-weighted</option><option value="C">C-weighted</option><option value="Z">Z-weighted</option></select></label><label>Response<select value={placement.config.response ?? 'Slow'} onChange={(e) => onChange(placement.id, { response: e.target.value })}><option value="Fast">Fast</option><option value="Slow">Slow</option></select></label></> : !pp ? <p><strong>{placement.type}</strong><br />This widget has no settings.</p> : <><p className="widgetinspector__name">{placement.type === 'propresenter-playlist' ? 'ProPresenter Playlist' : 'ProPresenter Controls'}</p><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.slideControls)} onChange={(event) => onChange(placement.id, { slideControls: event.target.checked })} /> Enable slide controls</label>{placement.type === 'propresenter-playlist' && <><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.keyboardControls)} onChange={(event) => onChange(placement.id, { keyboardControls: event.target.checked })} /> Enable arrow keys and spacebar</label><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.followActive)} onChange={(event) => onChange(placement.id, { followActive: event.target.checked })} /> Follow active cue</label><label>Slide display<select value={placement.config.slideMode ?? 'image'} onChange={(event) => onChange(placement.id, { slideMode: event.target.value })}><option value="image">Rendered previews</option><option value="text">Slide text</option></select></label><label>Slide width (px)<input type="number" min="0" max="200" step="1" value={placement.config.slideSize ?? 60} onChange={(event) => onChange(placement.id, { slideSize: Number(event.target.value) })} /><small>0–200 px. Lower values fit more cues across; 0 uses a safe 32 px rendering floor.</small></label></>}</>}</aside>;
 }

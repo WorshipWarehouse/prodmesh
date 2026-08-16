@@ -125,6 +125,15 @@ export function finalize(instanceId, nowMs = Date.now()) {
   persist(instanceId, tl);
 }
 
+/** Persist report-only SPL summaries beside their Planning Center items.
+ * Raw SPL samples expire under retention; these summaries are the durable
+ * per-item facts that make a completed service report useful months later. */
+export function setItemSpl(instanceId, itemSpl) {
+  const tl = load(instanceId);
+  for (let i = 0; i < tl.items.length; i += 1) tl.items[i].spl = itemSpl[i] ?? null;
+  persist(instanceId, tl);
+}
+
 /** Erase a recorded timeline (accidental/invalid run). Irreversible. */
 export function remove(instanceId) {
   cache.delete(instanceId);
@@ -157,6 +166,7 @@ export function getReport(instanceId, nowMs = Date.now()) {
       actualSeconds: actual,
       delta,
       ongoing,
+      spl: it.spl ?? null,
     };
   });
   const planned = items.reduce((s, i) => s + (i.plannedLength || 0), 0);

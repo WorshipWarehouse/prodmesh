@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
-import { getReport, getRoomPlan, type ServicePlan, type TimingReport } from '../api';
+import { deleteHistoryShow, getReport, getRoomPlan, type ServicePlan, type TimingReport } from '../api';
 import { useQuery } from '../lib/useQuery';
 import { reportKey } from '../lib/keys';
 import { Sparkline } from '../components/Sparkline';
@@ -25,8 +25,12 @@ function splZone(value: number | null, spl: { limit: number | null }) {
 export function ServiceReport() {
   const { roomId = '', planId = '' } = useParams();
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const timeId = params.get('time');
   const [plan, setPlan] = useState<ServicePlan | null>(null);
+  const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetErr, setResetErr] = useState<string | null>(null);
 
   useEffect(() => {
     getRoomPlan(roomId, planId).then((r) => setPlan(r.plan)).catch(() => {});
@@ -42,6 +46,20 @@ export function ServiceReport() {
   const load = reportQ.refetch;
 
   const backToRun = `/room/${roomId}/run/${planId}${timeId ? `?time=${timeId}` : ''}`;
+  const instanceId = `${planId}__${timeId ?? 'default'}`;
+
+  const resetThisService = async () => {
+    setResetBusy(true);
+    setResetErr(null);
+    try {
+      await deleteHistoryShow(instanceId);
+      navigate('/analytics');
+    } catch (e) {
+      setResetErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setResetBusy(false);
+    }
+  };
 
   // "Youth Service · Getting Over Yourself · July 6 · 9:30 AM" — which service
   // instance this report is for.
@@ -170,6 +188,7 @@ export function ServiceReport() {
                 <th>Planned</th>
                 <th>Actual</th>
                 <th>+/−</th>
+                <th>Avg loudness</th>
               </tr>
             </thead>
             <tbody>
@@ -185,12 +204,49 @@ export function ServiceReport() {
                   <td className={`report__num ${it.delta == null ? '' : it.delta > 0 ? 'report__over' : 'report__under'}`}>
                     {it.delta == null ? '—' : signed(it.delta)}
                   </td>
+                  <td className="report__num">{db(it.spl?.leq ?? null)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           )}
+
+          <div className="report__reset">
+            <button type="button" className="btn btn--ghost" onClick={() => { setResetErr(null); setResetStep(1); }}>
+              Reset data
+            </button>
+            <small>Remove analytics data for this service only.</small>
+          </div>
         </>
+      )}
+
+      {resetStep > 0 && (
+        <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="reset-service-title">
+          <div className="confirm__card">
+            {resetStep === 1 ? (
+              <>
+                <p id="reset-service-title" className="confirm__text">
+                  Reset data for this service? Its timing report, item loudness, and viewer data will be permanently removed.
+                </p>
+                <div className="confirm__buttons">
+                  <button type="button" className="confirm__cancel" onClick={() => setResetStep(0)}>Cancel</button>
+                  <button type="button" className="confirm__ok confirm__ok--danger" onClick={() => setResetStep(2)}>Yes, continue</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p id="reset-service-title" className="confirm__text">Final confirmation: reset this service’s data now?</p>
+                {resetErr && <p className="confirm__error">{resetErr}</p>}
+                <div className="confirm__buttons">
+                  <button type="button" className="confirm__cancel" onClick={() => setResetStep(0)} disabled={resetBusy}>Cancel</button>
+                  <button type="button" className="confirm__ok confirm__ok--danger" onClick={resetThisService} disabled={resetBusy}>
+                    {resetBusy ? 'Resetting…' : 'Yes, reset data'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

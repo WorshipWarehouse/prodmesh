@@ -31,7 +31,11 @@ function broadcastLabel(b: YouTubeBroadcast) {
 const AUTO = '';
 const NONE = '\u0000none';
 
-const EMPTY: ShowConfig = { startItemId: null, endItemId: null, map: {}, videos: {} };
+const EMPTY: ShowConfig = {
+  startItemId: null, endItemId: null, map: {}, videos: {},
+  servicesLiveFromProPresenter: false, servicesLiveStartMode: 'item',
+  servicesLiveStartItemId: null, servicesLiveStartTimeId: null,
+};
 
 // Per-event show automation (one config per event, shared by all its service
 // times): which PC item autostarts the show, which one auto-completes it at
@@ -132,24 +136,57 @@ export function ShowConfigWidget({
     <Widget
       title="Show Automation"
       meta={
-        persisted?.startItemId || persisted?.endItemId ? (
+        persisted?.startItemId || persisted?.endItemId || persisted?.servicesLiveFromProPresenter ? (
           <span className="svc__badge svc__badge--live">● armed</span>
         ) : (
           <span className="svc__badge svc__badge--mock">○ manual</span>
         )
       }
     >
-      <p className="widget__hint">
-        The show follows the ProPresenter operator — pre-service slides can loop between services
-        without tripping anything. Applies to every service time of this event.
-      </p>
-
-      <div className="showcfg__row">
-        <span className="showcfg__label">
-          <Play size={13} /> Start when PP lands on
-        </span>
-        {itemSelect(draft.startItemId, (v) => setDraft((d) => ({ ...d, startItemId: v })), 'Never (start manually)')}
-      </div>
+      <label className="showcfg__row">
+        <span className="showcfg__label"><Radio size={13} /> ProPresenter controls Services LIVE</span>
+        <input type="checkbox" checked={Boolean(draft.servicesLiveFromProPresenter)} onChange={(e) => setDraft((d) => ({ ...d, servicesLiveFromProPresenter: e.target.checked }))} />
+      </label>
+      {draft.servicesLiveFromProPresenter && (
+        <>
+          <p className="widget__hint">ProdMesh takes Planning Center Services LIVE control and advances it as ProPresenter changes presentations. It never moves Services LIVE backward automatically, and does not require Run of Show to be started.</p>
+          <div className="showcfg__row">
+            <span className="showcfg__label"><Radio size={12} /> Start Services LIVE</span>
+            <SelectField
+              className="showcfg__select"
+              value={draft.servicesLiveStartMode ?? 'item'}
+              onChange={(e) => setDraft((d) => ({ ...d, servicesLiveStartMode: e.target.value as 'item' | 'service-time' }))}
+            >
+              <option value="item">When PP lands on an item</option>
+              <option value="service-time">At a service time</option>
+            </SelectField>
+          </div>
+          {(draft.servicesLiveStartMode ?? 'item') === 'item' ? (
+            <div className="showcfg__row">
+              <span className="showcfg__label"><Play size={12} /> Services LIVE trigger</span>
+              {itemSelect(
+                draft.servicesLiveStartItemId ?? draft.startItemId,
+                (v) => setDraft((d) => ({ ...d, servicesLiveStartItemId: v })),
+                'Choose a ProPresenter-mapped item',
+              )}
+            </div>
+          ) : (
+            <div className="showcfg__row">
+              <span className="showcfg__label"><Radio size={12} /> Service time</span>
+              <SelectField
+                className="showcfg__select"
+                value={draft.servicesLiveStartTimeId ?? ''}
+                onChange={(e) => setDraft((d) => ({ ...d, servicesLiveStartTimeId: e.target.value || null }))}
+              >
+                <option value="">Choose a service time</option>
+                {serviceTimes.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}{t.startsAt ? ` — ${new Date(t.startsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}</option>
+                ))}
+              </SelectField>
+            </div>
+          )}
+        </>
+      )}
 
       <div className="showcfg__row">
         <span className="showcfg__label">
@@ -267,18 +304,27 @@ export function ShowConfigWidget({
                 plan from Planning Center first, or map with care.
               </p>
             )}
-            {trackable.map((it) => (
+            {trackable.map((it) => {
+              const mapping = draft.map[it.id];
+              const mappingValue = mapping && 'disabled' in mapping
+                ? NONE
+                : mapping && 'ppIndex' in mapping
+                  ? mapping.ppIndex
+                  : '';
+              return (
               <div key={it.id} className="showcfg__maprow">
                 <span className="showcfg__pcitem">{it.title}</span>
                 <SelectField
                   className="showcfg__select"
-                  value={draft.map[it.id]?.ppIndex ?? ''}
+                  value={mappingValue}
                   onChange={(e) =>
                     setDraft((d) => ({
                       ...d,
                       map: {
                         ...d.map,
-                        [it.id]: e.target.value
+                        [it.id]: e.target.value === NONE
+                          ? { disabled: true }
+                          : e.target.value
                           ? {
                               ppIndex: Number(e.target.value),
                               ppName: ppItems.find((p) => p.index === Number(e.target.value))?.name ?? null,
@@ -289,6 +335,7 @@ export function ShowConfigWidget({
                   }
                 >
                   <option value="">Auto</option>
+                  <option value={NONE}>None — no ProPresenter presentation</option>
                   {ppItems.map((p) => (
                     <option key={p.index} value={p.index}>
                       {p.name}
@@ -296,7 +343,8 @@ export function ShowConfigWidget({
                   ))}
                 </SelectField>
               </div>
-            ))}
+              );
+            })}
           </div>
         ))}
 
@@ -304,7 +352,7 @@ export function ShowConfigWidget({
         <button className="btn btn--primary btn--sm" onClick={save}>
           Save automation
         </button>
-        {(persisted?.startItemId || persisted?.endItemId || overrideCount > 0) && (
+        {(persisted?.startItemId || persisted?.endItemId || persisted?.servicesLiveFromProPresenter || overrideCount > 0) && (
           <button className="btn btn--ghost btn--sm" onClick={clear}>
             Clear
           </button>

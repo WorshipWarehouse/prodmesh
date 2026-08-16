@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { widgetRegistry, widgetTypes, isWidgetType } from './registry';
 import {
-  spanColumns, widgetAllowedOn, widgetIsUnique, widgetMax, widgetMin, type WidgetSpan,
+  MAX_WIDGET_SIZE, spanColumns, widgetAllowedOn, widgetIsUnique, widgetMax, widgetMin, type WidgetSpan,
 } from './types';
 import { GRID, fits } from '../lib/gridLayout';
 // The backend is plain JS with no declarations, and turning on allowJs to
@@ -90,13 +90,12 @@ describe('the registry contract', () => {
   });
 
   it('is one-per-view unless a widget opts out', () => {
-    // The flag exists for widgets that will eventually be multi-instance (two
-    // Smaart engines in one room). Nothing opts out yet, and the default is
-    // what the server enforces.
+    // Loudness deliberately opts out: an operator may place A-slow and C-slow
+    // meters beside each other from the same analysis source.
     for (const type of widgetTypes) {
-      expect(widgetIsUnique(widgetRegistry[type]), `${type}`).toBe(true);
+      expect(widgetIsUnique(widgetRegistry[type]), `${type}`).toBe(type !== 'loudness');
     }
-    expect(widgetIsUnique({ ...widgetRegistry.loudness, unique: false })).toBe(false);
+    expect(widgetIsUnique(widgetRegistry.loudness)).toBe(false);
   });
 
   it('recognises its own type names and rejects others', () => {
@@ -119,10 +118,10 @@ describe('the registry contract', () => {
       expect(server.size, `${type} size`).toEqual(def.size);
       expect(server.unique, `${type} unique`).toBe(widgetIsUnique(def));
       expect(server.display, `${type} display`).toBe(widgetAllowedOn(def, 'display'));
-      // min/max are absent server-side when a widget is one fixed size, which
-      // is what widgetMin/widgetMax fall back to.
-      expect(server.min ?? def.size, `${type} min`).toEqual(widgetMin(def));
-      expect(server.max ?? def.size, `${type} max`).toEqual(widgetMax(def));
+      // Widgets start at their authored size, but the layout lets the user
+      // choose any fitting size from one cell upward.
+      expect({ w: 1, h: 1 }, `${type} min`).toEqual(widgetMin(def));
+      expect(MAX_WIDGET_SIZE, `${type} max`).toEqual(widgetMax(def));
     }
   });
 });

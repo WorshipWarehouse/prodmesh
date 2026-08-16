@@ -218,9 +218,10 @@ const VIEW_KINDS = new Set(['dashboard', 'display']);
 // fixed size — see WidgetDef in src/widgets/types.ts for why most stay fixed.
 export const WIDGET_TYPES = new Map([
   ['countdown', { unique: true, display: true, size: { w: 2, h: 1 } }],
-  ['loudness', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['loudness', { unique: false, display: true, size: { w: 2, h: 1 } }],
   ['loudness-trend', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['viewers', { unique: true, display: true, size: { w: 1, h: 1 } }],
+  ['restream', { unique: true, display: true, size: { w: 2, h: 2 } }],
   ['run-of-show', {
     unique: true, display: false,
     size: { w: 2, h: 3 }, min: { w: 2, h: 3 }, max: { w: 2, h: 5 },
@@ -241,9 +242,21 @@ export const WIDGET_TYPES = new Map([
     unique: true, display: true,
     size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 3 },
   }],
+  ['propresenter-slides', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 3 } }],
+  // A playlist needs useful room by default, but operators choose its height
+  // for the dashboard layout just like its width.
+  ['propresenter-playlist', { unique: true, display: false, size: { w: 4, h: 4 }, min: { w: 2, h: 2 }, max: { w: 4, h: 5 } }],
+  ['propresenter-controls', { unique: true, display: false, size: { w: 2, h: 1 } }],
+  ['slide-notes', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['propresenter-timers', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 1 }, max: { w: 3, h: 3 } }],
+  ['planning-center-service', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['planning-center-timers', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 4 } }],
+  ['planning-center-schedule', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  ['planning-center-teams', { unique: true, display: true, size: { w: 2, h: 2 }, min: { w: 2, h: 2 }, max: { w: 3, h: 4 } }],
 ]);
 
 const MAX_WIDGETS_PER_VIEW = 40; // same cap as tiles-per-room
+const MAX_WIDGET_SIZE = { w: 6, h: 5 }; // dashboard width × practical height
 
 // A short list, not a free number: this is "how far away is the screen", and
 // a slider inviting 1.37 would only ever produce blurry half-pixel type.
@@ -303,8 +316,10 @@ export function validateView(input) {
     // A placement may only be the size its widget allows. The editor already
     // refuses out-of-range handles; this is the door that matters, because a
     // stored layout is data and data arrives from anywhere.
-    const min = def.min ?? def.size;
-    const max = def.max ?? def.size;
+    const min = { w: 1, h: 1 };
+    // Widgets may expand up to the dashboard's full width and five rows tall.
+    // The display grid still rejects anything that cannot fit its 3×3 canvas.
+    const max = MAX_WIDGET_SIZE;
     if (box.w < min.w || box.h < min.h || box.w > max.w || box.h > max.h) {
       throw new Error(
         `Widget "${type}" must be ${sizeRange(min, max)} — got ${box.w}×${box.h}`,
@@ -354,5 +369,31 @@ function viewWidgetConfig(config) {
     if (value.length > 120) throw new Error(`Widget ${key} is too long`);
     out[key] = value;
   }
+  // ProPresenter controls are opt-in per stored placement. This is security
+  // configuration, not presentation preference: routes resolve it from SQLite
+  // before forwarding any command to the device.
+  for (const key of ['slideControls', 'keyboardControls', 'followActive']) {
+    if (typeof config[key] === 'boolean') out[key] = config[key];
+  }
+  if (['image', 'text'].includes(config.slideMode)) out.slideMode = config.slideMode;
+  if (config.slideSize != null) {
+    const size = Number(config.slideSize);
+    if (!Number.isInteger(size) || size < 0 || size > 200) throw new Error('Slide size must be 0–200 pixels');
+    out.slideSize = size;
+  }
+  for (const key of ['target', 'limit']) {
+    if (config[key] == null || config[key] === '') continue;
+    const value = Number(config[key]);
+    if (!Number.isFinite(value) || value < 40 || value > 130) throw new Error(`Widget ${key} must be 40–130 dB`);
+    out[key] = value;
+  }
+  if (out.target != null && out.limit != null && out.limit < out.target) throw new Error('Widget limit must be at or above target');
+  if (config.metric != null && config.metric !== '') {
+    if (typeof config.metric !== 'string' || config.metric.length > 60) throw new Error('Widget metric must be at most 60 characters');
+    out.metric = config.metric;
+  }
+  if (['A', 'B', 'C', 'Z'].includes(config.weighting)) out.weighting = config.weighting;
+  if (['Fast', 'Slow'].includes(config.response)) out.response = config.response;
+  if (['current', 'next', 'both'].includes(config.slides)) out.slides = config.slides;
   return out;
 }

@@ -1,4 +1,4 @@
-import { Lock, Radio } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { getRoom, type RoomMeta, type RoomState } from '../api';
 import { useQuery } from '../lib/useQuery';
 import { roomKey } from '../lib/keys';
@@ -59,15 +59,11 @@ export function RoomModeWidget({ roomId }: WidgetProps) {
 
   return (
     <div className={`wgt wgt--mode${offline ? ' wgt--fault' : ''}`}>
-      <div className="wgt__head">
-        <span className="wgt__icon"><Radio size={16} /></span>
-        <span className="wgt__title">Room mode</span>
-        {protection?.active && (
-          <span className="wgt__status" title={protection.label ?? 'Schedule protection'}>
-            <Lock size={13} /> Locked
-          </span>
-        )}
-      </div>
+      {protection?.active && (
+        <span className="wgt__status" title={protection.label ?? 'Schedule protection'}>
+          <Lock size={13} /> Locked
+        </span>
+      )}
 
       <p className="wgt__value" style={mode ? { color: mode.color } : undefined}>
         {label}

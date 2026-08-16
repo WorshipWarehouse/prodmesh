@@ -11,6 +11,7 @@ import * as ppro from './integrations/proPresenter.js';
 import * as pco from './integrations/planningCenter.js';
 import * as smaart from './integrations/smaart.js';
 import * as rta from './integrations/rta.js';
+import * as openSoundMeter from './integrations/openSoundMeter.js';
 import * as companion from './companion.js';
 import { snapshot } from './health.js';
 
@@ -54,6 +55,12 @@ async function companionStatus(cfg) {
 async function analysisStatus(cfg) {
   if (cfg?.mock) return { ok: null, mock: true, detail: 'Simulated meter (dev room)' };
   if (!cfg?.source) return null;
+  if (cfg.source === 'open-sound-meter') {
+    const snap = snapshot()[openSoundMeter.healthKey(cfg)];
+    if (!snap || snap.ok == null) return { ok: null, detail: 'Waiting for Open Sound Meter multicast levels' };
+    if (!snap.ok) return { ok: false, detail: snap.lastError?.message ?? 'Open Sound Meter listener error' };
+    return { ok: true, detail: 'Connected' };
+  }
   const label = cfg.source === 'rta' ? 'RTA app' : 'Smaart';
   const key = (cfg.source === 'rta' ? rta : smaart).healthKey(cfg);
   const reach = await tcpReachable(cfg.host, key.split(':').pop());

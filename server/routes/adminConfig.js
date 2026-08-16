@@ -13,10 +13,42 @@ import * as branding from '../branding.js';
 import * as secrets from '../secrets.js';
 import * as setup from '../setup.js';
 import * as pco from '../integrations/planningCenter.js';
+import * as restream from '../integrations/restream.js';
+import * as analysis from '../integrations/analysis.js';
 import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, permissionRequired, auditSuccess } from '../httpAuth.js';
 
 const router = express.Router();
+const restreamStates = new Map();
+const restreamCallback = (req) => `${req.protocol}://${req.get('host')}/api/integrations/restream/callback`;
+
+function beginRestreamConnection(req, res) {
+  try {
+    const state = crypto.randomUUID();
+    restreamStates.set(state, Date.now());
+    res.json({ url: restream.authorizeUrl(restreamCallback(req), state) });
+  }
+  catch (err) { res.status(400).json({ error: String(err.message ?? err) }); }
+}
+// This is POST rather than a normal link because admin authentication is held
+// in a bearer token. The browser fetches this URL, then navigates to Restream.
+router.post('/api/integrations/restream/connect', requirePermission('*'), beginRestreamConnection);
+// The browser can be served through a development proxy, so return the URL
+// from the same request path that starts OAuth. This guarantees the address
+// shown in Settings is byte-for-byte the redirect_uri sent to Restream.
+router.get('/api/integrations/restream/config', requirePermission('*'), (req, res) => {
+  res.json({ redirectUrl: restreamCallback(req) });
+});
+router.get('/api/integrations/restream/callback', async (req, res) => {
+  const state = String(req.query.state ?? ''); const issued = restreamStates.get(state); restreamStates.delete(state);
+  if (!issued || Date.now() - issued > 10 * 60_000 || !req.query.code) return res.status(400).send('Invalid or expired Restream authorization. Please connect again from ProdMesh Settings.');
+  try { await restream.exchangeCode(String(req.query.code), restreamCallback(req)); res.redirect('/settings?restream=connected'); }
+  catch (err) { res.status(502).send(`Restream authorization failed: ${String(err.message ?? err)}`); }
+});
+router.get('/api/integrations/restream/status', async (_req, res) => {
+  try { res.json(await restream.status()); }
+  catch (err) { res.status(502).json({ connected: false, status: 'offline', error: String(err.message ?? err) }); }
+});
 
 // ── First-run setup ───────────────────────────────────────────────────────────
 
@@ -83,21 +115,40 @@ router.get('/api/secrets/check', requirePermission('*'), async (_req, res) => {
 
 // ── Branding (institution logo) ───────────────────────────────────────────────
 
-// Public read: every page renders it, including anonymous booth screens.
-// 404 means "no override" and the client falls back to the bundled default.
 // The Content-Type is the type SNIFFED at upload, never anything the uploader
 // claimed, and nosniff stops the browser second-guessing it.
-router.get('/api/branding/logo', (_req, res) => {
-  const logo = branding.readLogo();
-  if (!logo) return res.status(404).end();
+function sendLogo(res, logo, asIco = false) {
+  const ico = asIco && logo.type === 'image/png' ? branding.pngAsIco(logo.buffer) : null;
   res.set({
-    'Content-Type': logo.type,
+    'Content-Type': ico ? 'image/x-icon' : logo.type,
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
     'Cache-Control': 'no-cache',
     ETag: `"${logo.updatedAt}"`,
   });
-  res.end(logo.buffer);
+  res.end(ico ?? logo.buffer);
+}
+
+// Public read: every page renders it, including anonymous booth screens.
+// 404 means "no override" and the client falls back to the bundled default.
+router.get('/api/branding/logo', (_req, res) => {
+  const logo = branding.readLogo();
+  if (!logo) return res.status(404).end();
+  sendLogo(res, logo);
+});
+
+// Safari (and some kiosk browsers) request /favicon.ico before they honour an
+// HTML <link rel="icon">. Serve the church override at that canonical URL too,
+// so its tab badge is the same logo on the very first page load.
+router.get('/favicon.ico', (_req, res, next) => {
+  const logo = branding.readLogo();
+  if (!logo) return next();
+  sendLogo(res, logo, true);
+});
+router.get('/favicon.png', (_req, res, next) => {
+  const logo = branding.readLogo();
+  if (!logo) return next();
+  sendLogo(res, logo);
 });
 
 // Raw body, capped, no multipart parser: this is one file, and every parser is
@@ -272,6 +323,21 @@ router.get('/api/config/rooms/:roomId/connectivity/status', requirePermission('c
   const room = rooms[req.params.roomId];
   if (!room) return res.status(404).json({ error: 'unknown room' });
   res.json(await roomStatus(room));
+});
+
+// Tests the same data path the Loudness widgets consume. The draft is accepted
+// without saving it, so an operator can verify an address/source before making
+// it the room's production configuration.
+router.post('/api/config/rooms/:roomId/connectivity/analysis/test', requirePermission('config.manage'), async (req, res) => {
+  if (!rooms[req.params.roomId]) return res.status(404).json({ error: 'unknown room' });
+  try {
+    const cfg = connectivity.validateAnalysis(req.body?.analysis);
+    if (!cfg) throw new Error('Choose an analysis source first');
+    const result = await analysis.testConnection(cfg);
+    res.json({ ok: true, detail: result.detail });
+  } catch (err) {
+    res.json({ ok: false, detail: String(err?.message ?? err) });
+  }
 });
 
 router.put('/api/config/rooms/:roomId/connectivity/planning-center', requirePermission('config.manage'), (req, res) => {

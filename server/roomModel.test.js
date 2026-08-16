@@ -7,6 +7,7 @@ const room = {
   name: 'Room One',
   mock: false,
   companion: { host: '10.0.0.5', port: 8000 },
+  analysis: { source: 'open-sound-meter' },
   state: { variable: 'roomState' },
   modes: [
     { id: 'sunday', label: 'Sunday', color: '#0f0', match: 'SUNDAY', press: { page: 1, row: 0, column: 1 } },
@@ -31,6 +32,7 @@ test('publicRoom hides button locations and match values', () => {
   const pub = publicRoom(room);
   assert.equal(pub.id, 'r1');
   assert.equal(pub.hasCompanion, true);
+  assert.equal(pub.analysisSource, 'open-sound-meter');
   assert.equal(pub.modes.length, 3);
   assert.deepEqual(Object.keys(pub.modes[0]).sort(), ['color', 'id', 'isStandby', 'label']);
   assert.equal(pub.modes[2].isStandby, true);

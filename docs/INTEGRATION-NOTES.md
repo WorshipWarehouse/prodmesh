@@ -190,6 +190,19 @@ playing.
 Trigger endpoints: `GET /v1/playlist/focused/{index}/trigger`,
 `GET /v1/trigger/next`, `GET /v1/presentation/active/{i}/trigger`.
 
+### Production-console assumptions — not yet live-verified
+
+The production-console branch uses the existing focused playlist route for
+browser data and does not let a focused selection alter the active-item mapping.
+It reads presentation details through `/v1/presentation/{uuid}` and requests a
+rendered cue from `/v1/presentation/{uuid}/{index}/thumbnail`; both are guarded
+as optional because those paths have not yet been probed on the building's PP
+21.1/21.4 installs. It always activates the playlist item before triggering a
+cue — particularly important for Planning Center-linked items, whose exposed
+presentation UUID can be valid for reads yet be rejected for direct activation.
+Probe and update this section before marking any production-console control or
+thumbnail feature verified.
+
 ---
 
 ## Captions (ProdMesh Caption / ProdCom)

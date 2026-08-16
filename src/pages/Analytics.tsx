@@ -28,6 +28,16 @@ function DeltaChip({ delta }: { delta: number }) {
   );
 }
 
+/** Combine per-service Leq values by their sample counts, not a misleading
+ * arithmetic average of decibels. This is the overall service loudness KPI. */
+function overallLeq(shows: HistoryShow[]) {
+  const samples = shows.filter((show) => show.spl?.leq != null && (show.spl.count ?? 0) > 0);
+  if (!samples.length) return null;
+  const energy = samples.reduce((sum, show) => sum + 10 ** ((show.spl!.leq ?? 0) / 10) * show.spl!.count, 0);
+  const count = samples.reduce((sum, show) => sum + show.spl!.count, 0);
+  return { leq: 10 * Math.log10(energy / count), services: samples.length };
+}
+
 // Show-report history from SQLite + recorded timelines: every show ever run,
 // newest first, linking into its full report. Trend charts come later, once
 // real SPL data has accumulated (VISION: 30/60/90-day trends).
@@ -64,6 +74,7 @@ export function Analytics() {
   };
 
   const visible = (shows ?? []).filter((s) => inCampus(campusId, s.site));
+  const overall = overallLeq(visible);
 
   return (
     <div className="hist">
@@ -72,6 +83,17 @@ export function Analytics() {
           <h1 className="pagehead__title">Analytics</h1>
         </div>
       </div>
+
+      {overall && (
+        <section className="hist__overall" aria-label="Overall loudness">
+          <Volume2 size={18} aria-hidden />
+          <div>
+            <span>Overall service loudness</span>
+            <strong>{overall.leq.toFixed(1)} <small>dB Leq</small></strong>
+          </div>
+          <small>{overall.services} recorded service{overall.services === 1 ? '' : 's'}</small>
+        </section>
+      )}
 
       {error === 'permission' ? (
         <p className="pagemsg">
@@ -201,6 +223,7 @@ export function Analytics() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

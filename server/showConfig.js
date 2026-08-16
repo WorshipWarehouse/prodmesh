@@ -73,6 +73,12 @@ function validate(config) {
     if (typeof config.map !== 'object') throw new Error('map must be an object');
     for (const [pcId, pp] of Object.entries(config.map)) {
       if (pp == null) continue; // "Auto" — no override
+      // Explicitly un-mapped: this Planning Center item has no corresponding
+      // ProPresenter presentation, so it must not fall back to order matching.
+      if (pp.disabled === true) {
+        map[pcId] = { disabled: true };
+        continue;
+      }
       if (!Number.isInteger(pp.ppIndex) || pp.ppIndex < 0) {
         throw new Error('map values need an integer ppIndex');
       }
@@ -104,5 +110,11 @@ function validate(config) {
     endItemId: id(config.endItemId, 'endItemId'),
     map,
     videos,
+    servicesLiveFromProPresenter: Boolean(config.servicesLiveFromProPresenter),
+    // Kept separate from Run of Show's start item: Services LIVE is useful
+    // without a dashboard show, and can instead begin at a service time.
+    servicesLiveStartMode: config.servicesLiveStartMode === 'service-time' ? 'service-time' : 'item',
+    servicesLiveStartItemId: id(config.servicesLiveStartItemId, 'servicesLiveStartItemId'),
+    servicesLiveStartTimeId: id(config.servicesLiveStartTimeId, 'servicesLiveStartTimeId'),
   };
 }

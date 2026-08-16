@@ -67,6 +67,32 @@ export function aggregate(instanceId) {
   };
 }
 
+/**
+ * Aggregate the SPL captured while one Planning Center item was live.
+ *
+ * `to` is exclusive so a sample exactly on an item transition belongs to the
+ * newly-active item, never both. The last item uses the show end as its bound.
+ */
+export function aggregateRange(instanceId, from, to) {
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
+  const rows = getDb()
+    .prepare('SELECT ts, spl, ca FROM spl_samples WHERE instance_id = ? AND ts >= ? AND ts < ? ORDER BY ts')
+    .all(instanceId, from, to);
+  if (rows.length === 0) return null;
+  const values = rows.map((r) => r.spl);
+  const cas = rows.map((r) => r.ca).filter((v) => v != null);
+  return {
+    count: rows.length,
+    leq: round1(leq(values)),
+    peak: round1(maxOf(values)),
+    from: rows[0].ts,
+    to: rows[rows.length - 1].ts,
+    ca: cas.length
+      ? { avg: round1(cas.reduce((s, v) => s + v, 0) / cas.length), max: round1(maxOf(cas)) }
+      : null,
+  };
+}
+
 /** Running stats seed for a (re)starting show — continues where it left off. */
 export function runningStats(instanceId) {
   const rows = getDb()

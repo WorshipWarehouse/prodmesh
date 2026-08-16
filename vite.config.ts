@@ -19,6 +19,9 @@ export default defineConfig({
     // Forward API calls to the Express backend during development.
     proxy: {
       '/api': 'http://localhost:3001',
+      // Browsers often request this before React can replace the favicon.
+      '/favicon.ico': 'http://localhost:3001',
+      '/favicon.png': 'http://localhost:3001',
     },
   },
 })

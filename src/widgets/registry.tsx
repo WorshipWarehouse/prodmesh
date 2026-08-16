@@ -20,12 +20,16 @@ import { SlidesLeftWidget } from './SlidesLeftWidget';
 import { LoudnessWidget } from './LoudnessWidget';
 import { LoudnessTrendWidget } from './LoudnessTrendWidget';
 import { ViewersWidget } from './ViewersWidget';
+import { RestreamWidget } from './RestreamWidget';
+import { ProPresenterControls, ProPresenterPlaylist, ProPresenterSlides, ProPresenterTimers, SlideNotes } from './ProPresenterWidgets';
+import { PlanningCenterSchedule, PlanningCenterService, PlanningCenterTeams, PlanningCenterTimers } from './PlanningCenterWidgets';
 import type { WidgetDef, WidgetType } from './types';
 
 export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   countdown: {
     title: 'Countdown',
     description: 'Time until the service starts, following the room’s ProPresenter timer.',
+    integration: 'propresenter',
     component: CountdownWidget,
     size: { w: 2, h: 1 },
     defaultSpan: 'third',
@@ -34,22 +38,26 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   loudness: {
     title: 'Loudness',
     description: 'Live SPL against the room’s target and limit, with C-A when available.',
+    integration: 'analysis',
     component: LoudnessWidget,
     size: { w: 2, h: 1 },
     defaultSpan: 'third',
+    unique: false,
   },
 
   'loudness-trend': {
     title: 'Loudness trend',
     description: 'The shape of the last quarter hour, for a mix that creeps up.',
+    integration: 'analysis',
     component: LoudnessTrendWidget,
     size: { w: 2, h: 1 },
     defaultSpan: 'third',
   },
 
   viewers: {
-    title: 'Live viewers',
+    title: 'YouTube Live Viewers',
     description: 'Concurrent YouTube viewers while the room is streaming.',
+    integration: 'youtube',
     component: ViewersWidget,
     // One number and a label — the only one of the three narrow enough for a
     // single cell. Countdown carries three lines of text and loudness a meter
@@ -57,10 +65,12 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     size: { w: 1, h: 1 },
     defaultSpan: 'third',
   },
+  restream: { title: 'Restream', description: 'Restream broadcast state and connected destinations.', integration: 'restream', component: RestreamWidget, size: { w: 2, h: 2 }, defaultSpan: 'third' },
 
   'run-of-show': {
     title: 'Run of Show',
     description: 'The order of service, what is live now, and the controls to move it.',
+    integration: 'planning-center',
     component: RunOfShowWidget,
     size: { w: 2, h: 3 },
     // The only widget with a range, and the reason the range exists: its list
@@ -76,6 +86,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   'now-next': {
     title: 'Now & Next',
     description: 'The current item and the one after it, large enough to read across a room.',
+    integration: 'planning-center',
     component: NowNextWidget,
     size: { w: 3, h: 1 },
     defaultSpan: 'two-thirds',
@@ -84,6 +95,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   'room-mode': {
     title: 'Room mode',
     description: 'What mode the room is in, in its own colour. Read-only.',
+    integration: 'companion',
     component: RoomModeWidget,
     // Two columns because this one shows WORDS. "Sunday Service" in a single
     // cell is either three characters wide or clipped.
@@ -94,6 +106,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   'room-health': {
     title: 'Integrations',
     description: 'A dot per integration this room has configured, and whether it answers.',
+    integration: 'prodmesh',
     component: RoomHealthWidget,
     size: { w: 1, h: 1 },
     // The first range that is genuinely 2D, and the reason is that BOTH axes
@@ -110,8 +123,11 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   },
 
   captions: {
-    title: 'Comms',
+    title: 'Captions',
     description: 'Live transcript of the production comms channels, colour-coded by speaker.',
+    // ProdMesh Caption is supplied by ProdMesh itself, and belongs alongside
+    // Clock and Integrations in the editor's one ProdMesh dropdown.
+    integration: 'prodmesh',
     component: CaptionsWidget,
     size: { w: 2, h: 1 },
     // Two columns is the narrowest that fits a speaker name and a line of
@@ -125,6 +141,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   'slides-left': {
     title: 'Slides left',
     description: 'How many slides — or how much video — until the current item ends.',
+    integration: 'propresenter',
     component: SlidesLeftWidget,
     // One number and a label, so it fits where nothing else does. That is the
     // point: a control room wall has room for this next to a multiview, and
@@ -136,6 +153,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   lyrics: {
     title: 'Lyrics',
     description: 'The song ProPresenter has open, scrolled to the line that is up.',
+    integration: 'propresenter',
     component: LyricsWidget,
     // Two rows is the floor because the whole idea is seeing PAST the current
     // line: at one row this is Now & Next with extra steps. Width buys line
@@ -149,6 +167,7 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
   clock: {
     title: 'Clock',
     description: 'The time of day, with seconds.',
+    integration: 'prodmesh',
     component: ClockWidget,
     // Also two: "10:42:07" at the size that makes a clock worth putting on a
     // wall does not fit one column, and dropping the seconds to make it fit
@@ -156,6 +175,15 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     size: { w: 2, h: 1 },
     defaultSpan: 'third',
   },
+  'propresenter-slides': { title: 'ProPresenter Slides', description: 'Current ProPresenter cue, notes and foreground video status.', integration: 'propresenter', component: ProPresenterSlides, size: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 3, h: 3 }, defaultSpan: 'third' },
+  'propresenter-playlist': { title: 'ProPresenter Playlist', description: 'Focused playlist with every available cue and optional slide controls.', integration: 'propresenter', component: ProPresenterPlaylist, size: { w: 4, h: 4 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 5 }, kinds: ['dashboard'], defaultSpan: 'two-thirds' },
+  'propresenter-controls': { title: 'ProPresenter Controls', description: 'Large previous and next slide controls.', integration: 'propresenter', component: ProPresenterControls, size: { w: 2, h: 1 }, kinds: ['dashboard'], defaultSpan: 'third' },
+  'slide-notes': { title: 'Slide Notes', description: 'Operator notes for the active ProPresenter cue.', integration: 'propresenter', component: SlideNotes, size: { w: 2, h: 1 }, defaultSpan: 'third' },
+  'propresenter-timers': { title: 'ProPresenter Timers', description: 'All configured ProPresenter timers, read-only.', integration: 'propresenter', component: ProPresenterTimers, size: { w: 2, h: 2 }, minSize: { w: 2, h: 1 }, maxSize: { w: 3, h: 3 }, defaultSpan: 'third' },
+  'planning-center-service': { title: 'Planning Center Service', description: 'The service title, date, and selected service time.', integration: 'planning-center', component: PlanningCenterService, size: { w: 2, h: 1 }, defaultSpan: 'third' },
+  'planning-center-timers': { title: 'Planning Center Timers', description: 'Scheduled item start times and lengths from the service plan.', integration: 'planning-center', component: PlanningCenterTimers, size: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 3, h: 4 }, defaultSpan: 'third' },
+  'planning-center-schedule': { title: 'Planning Center Schedule', description: 'How far ahead or behind the active service is.', integration: 'planning-center', component: PlanningCenterSchedule, size: { w: 2, h: 1 }, defaultSpan: 'third' },
+  'planning-center-teams': { title: 'Planning Center Teams', description: 'Scheduled people grouped by their Planning Center team.', integration: 'planning-center', component: PlanningCenterTeams, size: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 3, h: 4 }, defaultSpan: 'third' },
 };
 
 export const widgetTypes = Object.keys(widgetRegistry) as WidgetType[];
