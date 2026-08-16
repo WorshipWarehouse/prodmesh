@@ -584,6 +584,13 @@ export interface AnalysisConfig {
   hasPassword?: boolean;
   logControl?: boolean;
   mock?: boolean;
+  /** Room-level dB goals. Edited per widget, but stored on the room: the show
+   *  engine stamps them onto every SPL sample whether or not a dashboard is
+   *  open. Carried through this editor untouched so saving a host cannot
+   *  silently blank them. */
+  target?: number;
+  limit?: number;
+  metric?: string;
 }
 
 export interface ProPresenterConfig {

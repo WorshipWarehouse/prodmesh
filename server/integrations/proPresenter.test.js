@@ -13,6 +13,7 @@ import {
   normalizePlaylistItem,
   adjacentPlayable,
   runtimeFrom,
+  readConsoleState,
 } from './proPresenter.js';
 
 test('isConfigured needs a host', () => {
@@ -198,4 +199,15 @@ test('pickTimer prefers the configured name, then count-down-to-time', () => {
   assert.equal(pickTimer(timers).name, 'Service Start Timer'); // no config → countdown
   assert.equal(pickTimer([{ name: 'Only', countsDownToTime: false }]).name, 'Only');
   assert.equal(pickTimer([]), null);
+});
+
+test('an unreachable ProPresenter is an error, not an empty console', () => {
+  // Every read inside readConsoleState swallows its own failure so one bad
+  // endpoint cannot erase the rest. That made a dead machine look identical to
+  // a live one showing nothing, and the watcher reported `connected: true`
+  // right through an outage. TEST-NET-1 is guaranteed unroutable.
+  return assert.rejects(
+    () => readConsoleState({ host: '192.0.2.99', port: 1025 }),
+    /unreachable/i,
+  );
 });

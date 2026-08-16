@@ -98,7 +98,23 @@ export function validateAnalysis(input) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
     out.port = port;
   }
-  if (source === 'open-sound-meter') {
+  // Room-level dB goals. Widgets may override these per placement, but the
+  // room keeps its own: showManager stamps target/limit onto every published
+  // SPL sample, and a service report is written whether or not any dashboard
+  // was on screen. Dropping them here silently blanked both.
+  for (const key of ['target', 'limit']) {
+    const v = input[key] === '' || input[key] == null ? null : Number(input[key]);
+    if (v == null) continue;
+    if (!Number.isFinite(v) || v < 40 || v > 130) throw new Error(`${key} must be 40–130 dB`);
+    out[key] = v;
+  }
+  if (out.target != null && out.limit != null && out.limit < out.target) {
+    throw new Error('limit must be at or above target');
+  }
+  const metric = String(input.metric ?? '').trim();
+  if (metric) {
+    if (metric.length > 60) throw new Error('metric must be at most 60 characters');
+    out.metric = metric;
   }
   if (source === 'smaart') {
     const password = String(input.password ?? '');

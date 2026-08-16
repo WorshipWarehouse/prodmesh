@@ -22,9 +22,16 @@ const router = express.Router();
 const restreamStates = new Map();
 const restreamCallback = (req) => `${req.protocol}://${req.get('host')}/api/integrations/restream/callback`;
 
+const RESTREAM_STATE_TTL_MS = 10 * 60_000;
+
 function beginRestreamConnection(req, res) {
   try {
     const state = crypto.randomUUID();
+    // An abandoned connect attempt never reaches the callback that would
+    // delete its nonce, so sweep on the way in: the callback already refuses
+    // anything older than the TTL, and nothing should outlive that check.
+    const cutoff = Date.now() - RESTREAM_STATE_TTL_MS;
+    for (const [key, issued] of restreamStates) if (issued < cutoff) restreamStates.delete(key);
     restreamStates.set(state, Date.now());
     res.json({ url: restream.authorizeUrl(restreamCallback(req), state) });
   }
@@ -41,7 +48,7 @@ router.get('/api/integrations/restream/config', requirePermission('*'), (req, re
 });
 router.get('/api/integrations/restream/callback', async (req, res) => {
   const state = String(req.query.state ?? ''); const issued = restreamStates.get(state); restreamStates.delete(state);
-  if (!issued || Date.now() - issued > 10 * 60_000 || !req.query.code) return res.status(400).send('Invalid or expired Restream authorization. Please connect again from ProdMesh Settings.');
+  if (!issued || Date.now() - issued > RESTREAM_STATE_TTL_MS || !req.query.code) return res.status(400).send('Invalid or expired Restream authorization. Please connect again from ProdMesh Settings.');
   try { await restream.exchangeCode(String(req.query.code), restreamCallback(req)); res.redirect('/settings?restream=connected'); }
   catch (err) { res.status(502).send(`Restream authorization failed: ${String(err.message ?? err)}`); }
 });

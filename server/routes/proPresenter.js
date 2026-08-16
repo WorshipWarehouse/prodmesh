@@ -15,7 +15,13 @@ function room(req, res) {
   return value;
 }
 
-router.get('/api/rooms/:id/propresenter', async (req, res) => {
+// Widgets read console state over SSE (room:<id>:propresenter), never here, so
+// this is a maintenance route rather than a hot path. It is gated because one
+// call fans out five-plus requests to the ProPresenter machine and forces a
+// cache-bypassing read of the active presentation — an unauthenticated
+// amplifier aimed at the box running the service. Same payload and permission
+// as /diagnostics below.
+router.get('/api/rooms/:id/propresenter', requirePermission('config.manage'), async (req, res) => {
   const value = room(req, res); if (!value) return;
   try { res.json(await pp.readConsoleState(value.proPresenter)); }
   catch { res.status(502).json({ error: 'ProPresenter unavailable' }); }
