@@ -90,13 +90,12 @@ describe('the registry contract', () => {
   });
 
   it('is one-per-view unless a widget opts out', () => {
-    // The flag exists for widgets that will eventually be multi-instance (two
-    // Smaart engines in one room). Nothing opts out yet, and the default is
-    // what the server enforces.
+    // Loudness deliberately opts out: an operator may place A-slow and C-slow
+    // meters beside each other from the same analysis source.
     for (const type of widgetTypes) {
-      expect(widgetIsUnique(widgetRegistry[type]), `${type}`).toBe(true);
+      expect(widgetIsUnique(widgetRegistry[type]), `${type}`).toBe(type !== 'loudness');
     }
-    expect(widgetIsUnique({ ...widgetRegistry.loudness, unique: false })).toBe(false);
+    expect(widgetIsUnique(widgetRegistry.loudness)).toBe(false);
   });
 
   it('recognises its own type names and rejects others', () => {

@@ -221,7 +221,7 @@ describe('Campuses', () => {
     api.getRoomConnectivity.mockResolvedValue({
       hasServerRoom: true,
       planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] },
-      analysis: { source: 'smaart', host: '192.0.2.40', port: 26000, target: 90, limit: 95, hasPassword: false },
+      analysis: { source: 'smaart', host: '192.0.2.40', port: 26000, hasPassword: false },
       proPresenter: { host: '192.0.2.15', port: 62202 },
       companion: {
         mock: false, host: '192.0.2.51', port: 8000, variable: 'roomState',
@@ -333,7 +333,7 @@ describe('Campuses', () => {
     await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
 
     await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
-      source: 'rta', host: '192.0.2.52', port: 26000, target: 90, limit: 95, metric: undefined,
+      source: 'rta', host: '192.0.2.52', port: 26000, logControl: undefined,
     }));
     expect(api.saveConfig).not.toHaveBeenCalled();
   });
@@ -353,8 +353,7 @@ describe('Campuses', () => {
     await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
 
     await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
-      source: 'smaart', host: '192.0.2.40', port: 26000, target: 90, limit: 95,
-      metric: undefined, logControl: true,
+      source: 'smaart', host: '192.0.2.40', port: 26000, logControl: true,
     }));
   });
 
@@ -392,7 +391,7 @@ describe('Campuses', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Companion & modes')).toBeInTheDocument();
+    expect(await screen.findByText('Bitfocus Companion & modes')).toBeInTheDocument();
     // Re-point the Sunday mode's button (first mode row) to page 3, row 0.
     const [page] = screen.getAllByLabelText('Page');
     const [row] = screen.getAllByLabelText('Row');
@@ -409,7 +408,7 @@ describe('Campuses', () => {
     await user.type(ids[ids.length - 1], 'second');
     await user.type(matches[matches.length - 1], 'SECOND');
 
-    await user.click(screen.getByRole('button', { name: 'Save Companion' }));
+    await user.click(screen.getByRole('button', { name: 'Save Bitfocus Companion' }));
     await waitFor(() => expect(api.saveCompanion).toHaveBeenCalledWith('north-main', {
       mock: false, host: '192.0.2.51', port: 8000, variable: 'roomState',
       modes: [

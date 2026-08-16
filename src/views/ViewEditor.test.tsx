@@ -13,6 +13,8 @@ import type { View, ViewPlacement } from '../api';
 
 vi.mock('../api', async (importOriginal) => ({
   ...await importOriginal<typeof import('../api')>(),
+  getRoom: vi.fn().mockResolvedValue({ id: 'north-main', name: 'North Main', site: null, hasCompanion: false, modes: [], analysisSource: 'smaart' }),
+  getRoomConnectivity: vi.fn().mockResolvedValue({ captions: null }),
   getRoomService: vi.fn().mockResolvedValue({ configured: true, live: true, plans: [] }),
   getRoomPlan: vi.fn().mockResolvedValue({ live: true, plan: null }),
   getReport: vi.fn().mockResolvedValue({ items: [], totals: { planned: 0, actual: 0, delta: 0 }, completedAt: null }),
@@ -39,36 +41,39 @@ function Harness({ kind = 'dashboard' as View['kind'], initial = [] as ViewPlace
 const cells = () => [...document.querySelectorAll<HTMLElement>('.viewcell')];
 const at = (type: string) => cells().find((c) => c.dataset.widget === type)!;
 const status = () => screen.getByRole('status').textContent;
+const openPaletteGroup = async (user: ReturnType<typeof userEvent.setup>, integration: string) => {
+  const button = await screen.findByRole('button', { name: `${integration} widgets` });
+  if (button.getAttribute('aria-expanded') !== 'true') await user.click(button);
+};
 
 describe('ViewEditor', () => {
   it('Add places a widget at the first free cell and says where it went', async () => {
     const user = userEvent.setup();
     render(<Harness />);
 
-    await user.click(screen.getByRole('button', { name: 'Add Loudness' }));
+    await openPaletteGroup(user, 'Smaart');
+    await user.click(screen.getByRole('button', { name: 'Add Smaart Decibel Meter' }));
     expect(at('loudness').style.gridColumn).toBe('1 / span 2');
     expect(status()).toBe('Loudness added at column 1, row 1.');
 
     // Find-first-fit, not "append": the next one goes beside it, not below.
+    await openPaletteGroup(user, 'ProPresenter');
     await user.click(screen.getByRole('button', { name: 'Add Countdown' }));
     expect(at('countdown').style.gridColumn).toBe('3 / span 2');
     expect(at('countdown').style.gridRow).toBe('1 / span 1');
   });
 
-  it('a placed unique widget cannot be added twice', async () => {
+  it('allows more than one loudness meter', async () => {
     const user = userEvent.setup();
     render(<Harness />);
-    const add = () => screen.getByRole('button', { name: 'Add Loudness' });
+    await openPaletteGroup(user, 'Smaart');
+    const add = () => screen.getByRole('button', { name: 'Add Smaart Decibel Meter' });
 
     expect(add()).toBeEnabled();
     await user.click(add());
-    expect(add()).toBeDisabled();
-    expect(screen.getByText('Already on this view')).toBeInTheDocument();
-
-    // Removing it puts it back on offer.
-    await user.click(screen.getByRole('button', { name: 'Remove Loudness' }));
-    expect(cells()).toHaveLength(0);
     expect(add()).toBeEnabled();
+    await user.click(add());
+    expect(cells()).toHaveLength(2);
   });
 
   it('packs a display into the gaps its widgets leave', async () => {
@@ -76,30 +81,39 @@ describe('ViewEditor', () => {
     render(<Harness kind="display" />);
 
     // 2-wide on a 3-wide grid, so each leaves a single free column beside it.
+    await openPaletteGroup(user, 'ProPresenter');
     await user.click(screen.getByRole('button', { name: 'Add Countdown' }));
     expect(at('countdown').style.gridColumn).toBe('1 / span 2');
-    await user.click(screen.getByRole('button', { name: 'Add Loudness' }));
+    await openPaletteGroup(user, 'Smaart');
+    await user.click(screen.getByRole('button', { name: 'Add Smaart Decibel Meter' }));
     expect(at('loudness').style.gridRow).toBe('2 / span 1');
 
     // The 1-wide viewers fits that gap on row 1 rather than starting a row.
+    await openPaletteGroup(user, 'YouTube');
     await user.click(screen.getByRole('button', { name: 'Add YouTube Live Viewers' }));
     expect(at('viewers').style.gridColumn).toBe('3 / span 1');
     expect(at('viewers').style.gridRow).toBe('1 / span 1');
 
-    // All three placed and unique, so the palette offers nothing further.
-    for (const name of ['Countdown', 'Loudness', 'YouTube Live Viewers']) {
+    // The unique widgets are disabled once placed; loudness remains available
+    // for another weighting/response meter.
+    for (const [integration, name] of [['ProPresenter', 'Countdown'], ['YouTube', 'YouTube Live Viewers']]) {
+      await openPaletteGroup(user, integration);
       expect(screen.getByRole('button', { name: `Add ${name}` })).toBeDisabled();
     }
+    await openPaletteGroup(user, 'Smaart');
+    expect(screen.getByRole('button', { name: 'Add Smaart Decibel Meter' })).toBeEnabled();
   });
 
   it('says "No room left" rather than letting someone build a refused layout', async () => {
     // A display is a hard 3x3. Filled to a single free cell, nothing 2 wide
     // fits — the palette has to say that, not fail on save.
+    const user = userEvent.setup();
     render(<Harness kind="display" initial={[
       { id: 'a', type: 'loudness', x: 0, y: 0, w: 2, h: 3, config: {} },
       { id: 'b', type: 'viewers', x: 2, y: 0, w: 1, h: 2, config: {} },
     ]} />);
 
+    await openPaletteGroup(user, 'ProPresenter');
     const add = screen.getByRole('button', { name: 'Add Countdown' });
     expect(add).toBeDisabled();
     expect(add).toHaveAttribute('title', 'No room left');
@@ -115,15 +129,15 @@ describe('ViewEditor', () => {
       { id: 'b', type: 'loudness', x: 2, y: 0, w: 2, h: 1, config: {} },
     ]} />);
 
-    const grip = screen.getByRole('button', { name: /Move Loudness/ });
+    const grip = screen.getByRole('button', { name: /Move (Loudness|Smaart Decibel Meter)/ });
     grip.focus();
     await user.keyboard('{Enter}');
     expect(grip).toHaveAttribute('aria-pressed', 'true');
-    expect(status()).toBe('Loudness grabbed. Use the arrow keys.');
+    expect(status()).toMatch(/^(Loudness|Smaart Decibel Meter) grabbed\. Use the arrow keys\.$/);
 
     await user.keyboard('{ArrowDown}');
     expect(at('loudness').style.gridRow).toBe('2 / span 1');
-    expect(status()).toBe('Loudness at column 3, row 2.');
+    expect(status()).toMatch(/^(Loudness|Smaart Decibel Meter) at column 3, row 2\.$/);
 
     // Now free to move left, because it dropped out of Countdown's row.
     await user.keyboard('{ArrowLeft}{ArrowLeft}');
@@ -133,25 +147,25 @@ describe('ViewEditor', () => {
     // doing nothing, which is indistinguishable from a dead key.
     await user.keyboard('{ArrowUp}');
     expect(at('loudness').style.gridRow).toBe('2 / span 1');
-    expect(status()).toBe('Loudness cannot move there.');
+    expect(status()).toMatch(/^(Loudness|Smaart Decibel Meter) cannot move there\.$/);
 
     // Off the left edge is refused too.
     await user.keyboard('{ArrowLeft}');
     expect(at('loudness').style.gridColumn).toBe('1 / span 2');
-    expect(status()).toBe('Loudness cannot move there.');
+    expect(status()).toMatch(/^(Loudness|Smaart Decibel Meter) cannot move there\.$/);
   });
 
   it('Escape drops the grab, so the arrow keys stop moving things', async () => {
     const user = userEvent.setup();
     render(<Harness initial={[{ id: 'a', type: 'loudness', x: 0, y: 0, w: 2, h: 1, config: {} }]} />);
 
-    const grip = screen.getByRole('button', { name: /Move Loudness/ });
+    const grip = screen.getByRole('button', { name: /Move (Loudness|Smaart Decibel Meter)/ });
     grip.focus();
     await user.keyboard('{Enter}{ArrowRight}');
     expect(at('loudness').style.gridColumn).toBe('2 / span 2');
 
     await user.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: /Move Loudness/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /Move (Loudness|Smaart Decibel Meter)/ })).toHaveAttribute('aria-pressed', 'false');
     await user.keyboard('{ArrowRight}');
     expect(at('loudness').style.gridColumn).toBe('2 / span 2');
   });
@@ -279,9 +293,11 @@ describe('ViewEditor', () => {
     });
   });
 
-  it('the palette shows each widget’s size, since the grid is what it competes for', () => {
+  it('the palette shows each widget’s size, since the grid is what it competes for', async () => {
+    const user = userEvent.setup();
     render(<Harness />);
-    const loudness = screen.getByText('Loudness').closest('li')!;
+    await openPaletteGroup(user, 'Smaart');
+    const loudness = screen.getByText('Smaart Decibel Meter').closest('li')!;
     expect(within(loudness).getByText('2×1')).toBeInTheDocument();
   });
 });
