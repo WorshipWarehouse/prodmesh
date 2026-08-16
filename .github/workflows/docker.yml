@@ -4,8 +4,15 @@ name: Docker image
 # that no longer works fails here rather than on a church's server. Branches
 # build and test only; publishing is gated on main and version tags below.
 #
-# Not `pull_request`-only: work here lands by merging a verified feature branch
-# locally, so that event never fires and nothing would run until after a merge.
+# Both `push` and `pull_request`, because work reaches main two ways: the
+# maintainer's branches are merged locally and never raise a PR, while a fork's
+# pushes fire in the fork rather than here. Either trigger alone would leave
+# half of what lands on main unbuilt.
+#
+# A fork's PR gets a read-only token and no secrets. That is safe here because
+# the publish steps are gated on the ref, and on a `pull_request` that ref is
+# `refs/pull/N/merge` — so an outside PR builds and boots the image, and cannot
+# push it. See CONTRIBUTING.md.
 on:
   push:
     branches: ['**']

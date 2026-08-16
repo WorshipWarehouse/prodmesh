@@ -5,7 +5,12 @@ name: Docs site
 #
 # Every branch builds with --strict so a broken link or a bad reference fails
 # here rather than going live. Only main deploys, matching the rule that
-# publishing steps are gated.
+# publishing steps are gated — on a `pull_request` the ref is `refs/pull/N/merge`,
+# so the deploy job below is skipped without needing a second condition.
+#
+# `pull_request` as well as `push` because a fork's pushes fire in the fork:
+# a docs PR is one of the likelier outside contributions, and an unbuilt one
+# would land its broken links straight on main. See CONTRIBUTING.md.
 #
 # ONE-TIME SETUP: Settings → Pages → Source: "GitHub Actions". Until that is
 # done the deploy job fails with a 404 and the build job still passes, which
@@ -14,6 +19,14 @@ name: Docs site
 on:
   push:
     branches: ['**']
+    paths:
+      - 'docs/wiki/**'
+      - 'mkdocs.yml'
+      - 'docs/requirements.txt'
+      - '.github/workflows/docs.yml'
+  # Duplicated rather than a YAML anchor: the Actions parser does not support
+  # anchors. Keep the two lists in step.
+  pull_request:
     paths:
       - 'docs/wiki/**'
       - 'mkdocs.yml'

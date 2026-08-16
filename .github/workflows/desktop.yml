@@ -6,8 +6,12 @@ name: Desktop launcher
 # day — but only a `v*` tag publishes installers, matching the rule that tags,
 # not main, are the deployment channel.
 #
-# Not `pull_request`-only: work lands by merging a verified branch locally, so
-# that event never fires.
+# `push` only, and deliberately no `pull_request` — the one workflow that skips
+# outside PRs. A macOS + Windows matrix on every external contribution is real
+# runner minutes for a launcher most PRs never touch, and a fork gets no signing
+# secrets, so the build it produced would be unsigned and prove less than it
+# appears to. The maintainer's own push after merge is where this gets caught.
+# If a PR does touch the launcher, run it by hand with workflow_dispatch.
 on:
   push:
     branches: ['**']

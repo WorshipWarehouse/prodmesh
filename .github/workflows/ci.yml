@@ -1,8 +1,12 @@
 name: CI
 
-# Every branch, not just main. Work here lands by merging a verified feature
-# branch locally rather than through a pull request, so `pull_request` never
-# fires — which meant CI only ever tested code that had already shipped.
+# Both triggers are load-bearing, because work reaches main two ways.
+#
+# `push` on every branch covers the maintainer's own branches, which are merged
+# locally and never raise a PR — without it CI would only ever test code that
+# had already shipped. `pull_request` covers outside contributions, whose pushes
+# fire in the contributor's fork rather than here; without it a fork's PR would
+# arrive untested. See CONTRIBUTING.md.
 on:
   push:
     branches: ['**']
