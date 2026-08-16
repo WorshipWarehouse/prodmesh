@@ -31,3 +31,11 @@ desktop/.build/
 desktop/release/
 desktop/node_modules/
 site/
+
+# Design-sync working output. The converter writes these wherever it is run,
+# which is not necessarily a design branch — 49 MB and ~670k lines appearing as
+# untracked on an unrelated feature branch is alarming enough to be worth two
+# lines here. The inputs it reads (.design-sync/) live on chore/design-sync and
+# are deliberately kept off main, along with the ignores specific to them.
+.ds-sync/
+ds-bundle/
