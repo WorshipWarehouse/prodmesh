@@ -60,3 +60,11 @@ test('sessions validate and expire on destroy', () => {
   settings.destroySession(token);
   assert.equal(settings.checkSession(token), false);
 });
+
+test('integrations are enabled by default and can be disabled individually', () => {
+  assert.equal(settings.getIntegrationSettings().resi, true);
+  const updated = settings.setIntegrationEnabled('resi', false);
+  assert.equal(updated.resi, false);
+  assert.equal(settings.getPublicSettings().integrations.resi, false);
+  assert.throws(() => settings.setIntegrationEnabled('not-an-integration', false), /Unknown integration/);
+});

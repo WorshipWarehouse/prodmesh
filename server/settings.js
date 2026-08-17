@@ -46,7 +46,15 @@ const DEFAULTS = {
   // When the wizard finished, or null while this install is unclaimed.
   setupCompletedAt: null,
   schedules: {},
+  // Integrations start enabled so upgrading an existing install never hides a
+  // working widget. A false entry is the only persisted override.
+  integrations: {},
 };
+
+export const INTEGRATION_IDS = [
+  'planning-center', 'propresenter', 'restream', 'resi', 'youtube', 'slack',
+  'companion', 'prodmesh-rta', 'smaart', 'open-sound-meter', 'captions', 'prodcom',
+];
 
 let settings = null;
 
@@ -146,12 +154,27 @@ export function setSchedules(schedules) {
   persist();
 }
 
+export function setIntegrationEnabled(id, enabled) {
+  if (!INTEGRATION_IDS.includes(id)) throw new Error(`Unknown integration "${id}"`);
+  if (typeof enabled !== 'boolean') throw new Error('Integration enabled must be true or false');
+  const s = load();
+  s.integrations = { ...(s.integrations ?? {}), [id]: enabled };
+  persist();
+  return getIntegrationSettings();
+}
+
+export function getIntegrationSettings() {
+  const overrides = load().integrations ?? {};
+  return Object.fromEntries(INTEGRATION_IDS.map((id) => [id, overrides[id] !== false]));
+}
+
 // ── Public (safe) view for the Settings UI — never exposes hashes ─────────────
 export function getPublicSettings() {
   const s = load();
   return {
     pins: { adminSet: s.pins.admin != null, overrideSet: s.pins.override != null },
     schedules: s.schedules,
+    integrations: getIntegrationSettings(),
   };
 }
 

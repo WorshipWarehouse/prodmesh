@@ -163,6 +163,29 @@ span.ros-track__status {
   font-variant-numeric: tabular-nums;
 }
 
+/* Resi monitoring widgets. The player remains an official Resi embed; only
+   compact state/telemetry is rendered by ProdMesh. */
+.resi { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.resi__status { text-transform: uppercase; }
+.resi__status--healthy, .resi__health--healthy { color: var(--ok); }
+.resi__status--warning, .resi__health--warning { color: var(--warn); }
+.resi__status--critical, .resi__status--connection-lost, .resi__health--critical { color: var(--danger); }
+.resi__offline { flex: 1; min-height: 100px; display: grid; place-content: center; justify-items: center; gap: 7px; text-align: center; color: var(--text-dim); }
+.resi__offline strong { color: var(--text); }
+.resi__offline span { max-width: 34ch; font-size: .82rem; }
+.resi__player { width: 100%; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: #000; }
+.resi__player iframe { display: block; width: 100%; height: 100%; border: 0; }
+.resi__health { font-size: clamp(1.2rem, 4vw, 2rem); line-height: 1; }
+.resi__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 7px; margin: 0; }
+.resi__facts > div { min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-tile); }
+.resi__facts dt { color: var(--text-dim); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
+.resi__facts dd { margin: 2px 0 0; font-size: .88rem; font-weight: 700; overflow-wrap: anywhere; }
+.resi__notice { margin: 0; color: var(--warn); font-size: .8rem; }
+.resi__notice--error { color: var(--danger); }
+.resi__summary { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; color: var(--text-dim); }
+.resi__summary strong { color: var(--text); font-size: 1.05rem; }
+.resi__summary span { font-size: .82rem; text-align: right; }
+
 /* Live SPL meter. The card, the header row and the big number all come from
    .wgt now; what is left here is the meter itself. */
 .ros-spl__bar {

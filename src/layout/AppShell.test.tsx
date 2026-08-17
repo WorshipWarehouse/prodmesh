@@ -50,6 +50,7 @@ function renderShell(path = '/admin/users') {
         <Route element={<AppShell />}>
           <Route path="/admin/users" element={<div>Users page content</div>} />
           <Route path="/admin/general" element={<div>General page content</div>} />
+          <Route path="/admin/integrations" element={<div>Integrations page content</div>} />
           <Route path="/admin/checklists" element={<div>Checklists page content</div>} />
           <Route path="/room/:roomId" element={<div>Room page content</div>} />
         </Route>
@@ -74,6 +75,7 @@ describe('AppShell identity and Admin navigation', () => {
 
     expect(await screen.findByRole('link', { name: 'Users & access' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'General' })).toHaveAttribute('href', '/admin/general');
+    expect(screen.getByRole('link', { name: 'Integrations' })).toHaveAttribute('href', '/admin/integrations');
     expect(screen.getByRole('link', { name: 'Stations' })).toHaveAttribute('href', '/admin/stations');
     expect(screen.getByRole('link', { name: 'Checklists' })).toHaveAttribute('href', '/admin/checklists');
     expect(screen.getByRole('button', { name: /Sam Rivera/ }).querySelector('img')).toHaveAttribute(

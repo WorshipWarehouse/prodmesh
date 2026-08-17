@@ -5,6 +5,7 @@ import {
   getRoom,
   getRoomPlan,
   getRoomState,
+  getEnabledIntegrations,
   setRoomMode,
   OverrideRequiredError,
   type RoomMeta,
@@ -97,6 +98,8 @@ export function RoomStatus() {
     staleMs: 30_000,
   }).data;
   const state = pushed ?? initial ?? null;
+  const enabledIntegrations = useQuery('enabled-integrations', getEnabledIntegrations, { staleMs: 60_000 }).data?.enabled;
+  const companionEnabled = enabledIntegrations?.companion !== false;
 
   const protection = state?.protection;
   const isLocked = useCallback(
@@ -184,7 +187,7 @@ export function RoomStatus() {
         </div>
       )}
 
-      {/* Room Mode changes once at call time and then stays put, so it only
+      {companionEnabled && <>{/* Room Mode changes once at call time and then stays put, so it only
           claims the page while the room is in Standby. Out of Standby it
           collapses to its own answer — the current mode — leaving the console
           to the things used all day. */}
@@ -243,6 +246,7 @@ export function RoomStatus() {
           })}
         </div>
       </Accordion>
+      </>}
 
       {/* Full width: it is the widest content on the page and has no
           neighbour to sit beside now that Room Mode is a full-width panel. */}

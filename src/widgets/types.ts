@@ -43,6 +43,10 @@ export interface WidgetConfig {
   metric?: string;
   weighting?: 'A' | 'B' | 'C' | 'Z';
   response?: 'Fast' | 'Slow';
+  autoplay?: boolean;
+  muted?: boolean;
+  playerControls?: boolean;
+  aspectRatio?: '16:9' | '4:3' | '1:1';
   slides?: 'current' | 'next' | 'both';
   /** Runtime-only identity injected by ViewCanvas; never persisted. */
   viewId?: string;
@@ -133,6 +137,10 @@ export type WidgetType =
   | 'loudness-trend'
   | 'viewers'
   | 'restream'
+  | 'resi-stream'
+  | 'resi-health'
+  | 'resi-viewers'
+  | 'resi-broadcast'
   | 'run-of-show'
   | 'now-next'
   | 'room-mode'

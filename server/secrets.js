@@ -106,6 +106,19 @@ export const SECRET_GROUPS = [
   { id: 'restream', label: 'Restream', hint: 'OAuth app credentials from Restream Developers. ProdMesh stores and refreshes account tokens automatically after you connect.', fields: [
     { path: 'restream.clientId', label: 'Client ID' }, { path: 'restream.clientSecret', label: 'Client Secret' },
   ] },
+  {
+    id: 'resi',
+    label: 'Resi',
+    hint: 'A Resi API token and the monitoring endpoint enabled for your organization. The player URL is embedded directly in dashboards; the API token never leaves this server.',
+    fields: [
+      { path: 'resi.apiToken', label: 'API token' },
+      { path: 'resi.statusUrl', label: 'Monitoring API URL', secret: false, note: 'The Resi API endpoint that returns the selected broadcast or encoder status.' },
+      { path: 'resi.playerUrl', label: 'Player / embed URL', secret: false, optional: true, note: 'Official Resi player URL for the selected event or destination.' },
+      { path: 'resi.organizationId', label: 'Organization ID', secret: false, optional: true },
+      { path: 'resi.encoderId', label: 'Encoder ID', secret: false, optional: true },
+      { path: 'resi.destinationId', label: 'Destination or event ID', secret: false, optional: true },
+    ],
+  },
 ];
 
 export const SECRET_KEYS = SECRET_GROUPS.flatMap((g) => g.fields.map((f) => ({ ...f, group: g.id })));

@@ -222,6 +222,10 @@ export const WIDGET_TYPES = new Map([
   ['loudness-trend', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['viewers', { unique: true, display: true, size: { w: 1, h: 1 } }],
   ['restream', { unique: true, display: true, size: { w: 2, h: 2 } }],
+  ['resi-stream', { unique: true, display: true, size: { w: 3, h: 2 } }],
+  ['resi-health', { unique: true, display: true, size: { w: 2, h: 2 } }],
+  ['resi-viewers', { unique: true, display: true, size: { w: 1, h: 1 } }],
+  ['resi-broadcast', { unique: true, display: true, size: { w: 3, h: 3 } }],
   ['run-of-show', {
     unique: true, display: false,
     size: { w: 2, h: 3 }, min: { w: 2, h: 3 }, max: { w: 2, h: 5 },
@@ -395,5 +399,9 @@ function viewWidgetConfig(config) {
   if (['A', 'B', 'C', 'Z'].includes(config.weighting)) out.weighting = config.weighting;
   if (['Fast', 'Slow'].includes(config.response)) out.response = config.response;
   if (['current', 'next', 'both'].includes(config.slides)) out.slides = config.slides;
+  for (const key of ['autoplay', 'muted', 'playerControls']) {
+    if (typeof config[key] === 'boolean') out[key] = config[key];
+  }
+  if (['16:9', '4:3', '1:1'].includes(config.aspectRatio)) out.aspectRatio = config.aspectRatio;
   return out;
 }

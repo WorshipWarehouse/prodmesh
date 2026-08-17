@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getRooms, type RoomMeta } from '../api';
+import { getEnabledIntegrations, getRooms, type RoomMeta } from '../api';
+import { useQuery } from '../lib/useQuery';
 import { useChurch } from '../layout/church';
 import { inCampus, useCampus, ALL_CAMPUSES } from '../layout/campus';
 import { RoomCard } from '../components/RoomCard';
@@ -12,6 +13,7 @@ export function Home() {
   const { campusId } = useCampus();
   const church = useChurch();
   const [rooms, setRooms] = useState<RoomMeta[]>([]);
+  const enabledIntegrations = useQuery('enabled-integrations', getEnabledIntegrations, { staleMs: 60_000 }).data?.enabled;
 
   useEffect(() => {
     getRooms().then(setRooms).catch(() => {});
@@ -46,7 +48,7 @@ export function Home() {
         </div>
         <div className="home__rooms">
           {visibleRooms.map((r) => (
-            <RoomCard key={r.id} room={r} />
+            <RoomCard key={r.id} room={r} showRoomMode={enabledIntegrations?.companion !== false} />
           ))}
           {rooms.length > 0 && visibleRooms.length === 0 && (
             <p className="svc__muted">No rooms at this campus yet.</p>

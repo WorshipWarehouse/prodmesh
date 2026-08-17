@@ -4,6 +4,7 @@ import planningCenterLogo from '../assets/integrations/planning-center.png';
 import slackLogo from '../assets/integrations/slack.png';
 import youTubeLogo from '../assets/integrations/youtube.png';
 import restreamLogo from '../assets/integrations/restream.png';
+import resiLogo from '../assets/integrations/resi.svg';
 import companionLogo from '../assets/integrations/companion.png';
 import prodMeshLogo from '../assets/prodmesh-logo.svg';
 import prodMeshRtaLogo from '../assets/integrations/prodmesh-rta.svg';
@@ -15,7 +16,7 @@ import prodComLogo from '../assets/integrations/prodcom.png';
  * identity here means a widget and its configuration card always use the same
  * label, colour and compact brand mark. */
 export type IntegrationId =
-  | 'prodmesh' | 'propresenter' | 'planning-center' | 'restream'
+  | 'prodmesh' | 'propresenter' | 'planning-center' | 'restream' | 'resi'
   | 'youtube' | 'slack' | 'companion' | 'analysis' | 'captions'
   | 'prodmesh-rta' | 'smaart' | 'open-sound-meter' | 'prodcom';
 
@@ -24,6 +25,7 @@ export const integrationInfo: Record<IntegrationId, { name: string; mark: string
   propresenter: { name: 'ProPresenter', mark: 'P', logo: proPresenterLogo },
   'planning-center': { name: 'Planning Center', mark: 'PC', logo: planningCenterLogo },
   restream: { name: 'Restream', mark: 'R', logo: restreamLogo },
+  resi: { name: 'Resi', mark: 'R', logo: resiLogo },
   youtube: { name: 'YouTube', mark: '▶', logo: youTubeLogo },
   slack: { name: 'Slack', mark: 'S', logo: slackLogo },
   companion: { name: 'Bitfocus Companion', mark: 'C', logo: companionLogo },

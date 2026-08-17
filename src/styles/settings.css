@@ -1049,6 +1049,46 @@
 .integration__state--on { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
 .integration__state--off { color: var(--text-faint); background: rgba(127, 127, 127, 0.14); }
 
+.integration-switches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.integration-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-tile);
+  font-weight: 600;
+}
+
+.integration-switch > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.integration-switch__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.integration-switch__toggle input { accent-color: var(--accent); }
+
 .integration__fields { margin: 0; display: grid; gap: 8px; width: 100%; }
 .integration__redirect { width: 100%; overflow-wrap: anywhere; word-break: break-word; }
 .integration__redirect code { white-space: normal; }
@@ -1089,6 +1129,7 @@
 .integration-brand--propresenter .integration-brand__mark { background: #3169b5; }
 .integration-brand--planning-center .integration-brand__mark { background: #ef6b3e; }
 .integration-brand--restream .integration-brand__mark { background: #5968f2; }
+.integration-brand--resi .integration-brand__mark { background: #18213b; color: #fff; }
 .integration-brand--youtube .integration-brand__mark { background: #f03a36; font-size: 0.68rem; }
 .integration-brand--slack .integration-brand__mark { background: #4a154b; }
 .integration-brand--companion .integration-brand__mark { background: #1474b6; }

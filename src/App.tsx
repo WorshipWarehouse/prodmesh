@@ -36,6 +36,7 @@ export default function App() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/admin" element={<Navigate to="/admin/general" replace />} />
         <Route path="/admin/general" element={<Settings section="general" />} />
+        <Route path="/admin/integrations" element={<Settings section="integrations" />} />
         <Route path="/admin/users" element={<Settings section="users" />} />
         <Route path="/admin/stations" element={<Settings section="stations" />} />
         <Route path="/admin/checklists" element={<Settings section="checklists" />} />
