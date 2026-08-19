@@ -25,6 +25,9 @@ function storeTokenPair(value) {
     'restream.accessToken': value.access_token ?? '',
     'restream.refreshToken': value.refresh_token ?? '',
   });
+  // A newly connected (or refreshed) account must not read as "not connected"
+  // for the rest of the cache window.
+  resetStatusCache();
 }
 
 /** Access tokens last one hour. Refresh only after Restream rejects one, so we
@@ -41,7 +44,35 @@ export function authorizeUrl(redirectUri, state) {
   if (!configured()) throw new Error('Save the Restream Client ID and Client Secret first');
   return `https://api.restream.io/login?${new URLSearchParams({ response_type: 'code', client_id: getSecret('restream.clientId'), redirect_uri: redirectUri, state })}`;
 }
-export async function status() {
+/**
+ * Broadcast state, shared by every caller for a few seconds.
+ *
+ * The widget polls this every 15s and its route is deliberately open — a booth
+ * display has nobody to log it in. Without a cache, N dashboards meant N calls
+ * to Restream's API on the church's own OAuth token, and anyone on the LAN
+ * could multiply that at will. One in-flight request is shared and its result
+ * held briefly, so upstream cost is bounded by time rather than by callers.
+ */
+let cached = null; // { at, value } | { at, error }
+let inFlight = null;
+const TTL_MS = 10_000;
+
+export function status() {
+  if (cached && Date.now() - cached.at < TTL_MS) {
+    return cached.error ? Promise.reject(cached.error) : Promise.resolve(cached.value);
+  }
+  if (inFlight) return inFlight;
+  inFlight = fetchStatus()
+    .then((value) => { cached = { at: Date.now(), value }; return value; })
+    .catch((err) => { cached = { at: Date.now(), error: err }; throw err; })
+    .finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+/** Drop the cache so a freshly connected account is reflected immediately. */
+export function resetStatusCache() { cached = null; }
+
+async function fetchStatus() {
   let accessToken = getSecret('restream.accessToken');
   if (!accessToken) throw new Error('Connect a Restream account first');
   let res = await fetch(`${API}/user/events/in-progress`, { headers: { Authorization: `Bearer ${accessToken}` } });

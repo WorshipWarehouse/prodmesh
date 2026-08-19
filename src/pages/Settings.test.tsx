@@ -221,7 +221,7 @@ describe('Campuses', () => {
     api.getRoomConnectivity.mockResolvedValue({
       hasServerRoom: true,
       planningCenter: { serviceTypes: [{ id: '500001', name: 'Sunday' }] },
-      analysis: { source: 'smaart', host: '192.0.2.40', port: 26000, hasPassword: false },
+      analysis: { source: 'smaart', host: '192.0.2.40', port: 26000, hasPassword: false, target: 90, limit: 95 },
       proPresenter: { host: '192.0.2.15', port: 62202 },
       companion: {
         mock: false, host: '192.0.2.51', port: 8000, variable: 'roomState',
@@ -332,8 +332,11 @@ describe('Campuses', () => {
     await user.type(host, '192.0.2.52');
     await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
 
+    // target/limit are edited on the widgets now, not here — but this form PUTs
+    // a whole analysis object, so they must ride through a host change rather
+    // than being dropped. They were, once, and every save blanked the room.
     await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
-      source: 'rta', host: '192.0.2.52', port: 26000, logControl: undefined,
+      source: 'rta', host: '192.0.2.52', port: 26000, logControl: undefined, target: 90, limit: 95,
     }));
     expect(api.saveConfig).not.toHaveBeenCalled();
   });
@@ -353,7 +356,7 @@ describe('Campuses', () => {
     await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
 
     await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
-      source: 'smaart', host: '192.0.2.40', port: 26000, logControl: true,
+      source: 'smaart', host: '192.0.2.40', port: 26000, logControl: true, target: 90, limit: 95,
     }));
   });
 

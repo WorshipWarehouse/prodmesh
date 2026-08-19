@@ -641,6 +641,13 @@ export async function readConsoleState(pp, signal) {
     readTimers(pp, signal).catch(() => []),
     readTransport(pp, signal).catch(() => null),
   ]);
+  // Every read above swallows its own failure so one bad endpoint cannot erase
+  // the rest. Taken together that made a dead machine indistinguishable from a
+  // live one showing nothing, and the watcher published `connected: true`
+  // through a total outage. A reachable PP answers at least one of these three.
+  if (focusedRaw == null && activeRaw == null && slide == null) {
+    throw new Error('ProPresenter unreachable');
+  }
   const focusedRef = focusedRaw?.playlist ?? null;
   const activeRef = activeRaw?.presentation?.playlist ?? null;
   const focusedBody = focusedRef?.uuid

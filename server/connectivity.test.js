@@ -55,6 +55,29 @@ test('Open Sound Meter uses its multicast Remote API without a host', () => {
   assert.deepEqual(clean, { source: 'open-sound-meter' });
 });
 
+test('a room keeps its own dB goals, whatever a widget overrides', () => {
+  // showManager stamps target/limit onto every published SPL sample and the
+  // service report is written whether or not a dashboard was on screen, so
+  // these cannot live only on a widget. They went missing once: the validator
+  // stopped emitting them while three readers still expected them, and every
+  // save silently blanked the room's thresholds.
+  const cfg = conn.validateAnalysis({ source: 'smaart', host: '192.0.2.40', target: 90, limit: 95, metric: 'LAeq' });
+  assert.equal(cfg.target, 90);
+  assert.equal(cfg.limit, 95);
+  assert.equal(cfg.metric, 'LAeq');
+  // Open Sound Meter has no host but still has goals.
+  assert.equal(conn.validateAnalysis({ source: 'open-sound-meter', target: 88 }).target, 88);
+});
+
+test('dB goals are range-checked and must not invert', () => {
+  assert.throws(() => conn.validateAnalysis({ source: 'smaart', host: 'x', target: 20 }), /40–130 dB/);
+  assert.throws(() => conn.validateAnalysis({ source: 'smaart', host: 'x', limit: 200 }), /40–130 dB/);
+  assert.throws(() => conn.validateAnalysis({ source: 'smaart', host: 'x', target: 95, limit: 90 }),
+    /limit must be at or above target/);
+  assert.throws(() => conn.validateAnalysis({ source: 'smaart', host: 'x', metric: 'm'.repeat(61) }),
+    /at most 60 characters/);
+});
+
 test('a cleared analysis source stays cleared across applyConnectivity', () => {
   // north-main declares an analysis block in rooms.config.js; once cleared,
   // the seeded marker keeps the file entry from resurrecting it.

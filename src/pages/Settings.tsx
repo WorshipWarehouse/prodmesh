@@ -2143,6 +2143,10 @@ interface AnalysisDraft {
   port: string;
   password: string;
   logControl: boolean;
+  // Not edited here — dB goals moved onto the widgets. They still ride through
+  // the draft because this form PUTs a whole analysis object: omitting them
+  // deleted the room's stored thresholds every time somebody saved a host.
+  goals: { target?: number; limit?: number; metric?: string };
 }
 
 function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
@@ -2152,6 +2156,11 @@ function toDraft(cfg: AnalysisConfig | null): AnalysisDraft {
     port: cfg?.port != null ? String(cfg.port) : '',
     password: '',
     logControl: Boolean(cfg?.logControl),
+    goals: {
+      ...(cfg?.target != null ? { target: cfg.target } : {}),
+      ...(cfg?.limit != null ? { limit: cfg.limit } : {}),
+      ...(cfg?.metric ? { metric: cfg.metric } : {}),
+    },
   };
 }
 
@@ -2162,6 +2171,7 @@ function analysisFromDraft(d: AnalysisDraft): AnalysisConfig | null {
     host: d.host || undefined,
     port: d.port === '' ? undefined : Number(d.port),
     logControl: d.source === 'smaart' && d.logControl ? true : undefined,
+    ...d.goals,
     ...(d.password ? { password: d.password } : {}),
   };
 }
