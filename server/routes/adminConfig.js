@@ -14,6 +14,7 @@ import * as secrets from '../secrets.js';
 import * as setup from '../setup.js';
 import * as pco from '../integrations/planningCenter.js';
 import * as restream from '../integrations/restream.js';
+import * as resi from '../integrations/resi.js';
 import * as analysis from '../integrations/analysis.js';
 import { roomStatus } from '../connectivityStatus.js';
 import { requirePermission, permissionRequired, auditSuccess } from '../httpAuth.js';
@@ -92,6 +93,7 @@ router.put('/api/secrets', requirePermission('*'), (req, res) => {
   try {
     const touched = secrets.setSecrets(req.body?.updates ?? {});
     pco.clearCache(); // new credentials must not serve cached results
+    if (touched.some((path) => path.startsWith('resi.'))) resi.clearCache();
     auditSuccess(req, '*', {
       resourceType: 'secrets', resourceId: 'secrets',
       details: { paths: touched }, // WHICH keys changed, never their values
@@ -118,6 +120,14 @@ router.get('/api/secrets/check', requirePermission('*'), async (_req, res) => {
   } catch {
     res.json({ planningCenter: false });
   }
+});
+
+router.get('/api/integrations/resi/status', async (_req, res) => {
+  res.json(await resi.status());
+});
+router.post('/api/integrations/resi/check', requirePermission('*'), async (_req, res) => {
+  const state = await resi.status({ force: true });
+  res.status(state.connected ? 200 : 502).json(state);
 });
 
 // ── Branding (institution logo) ───────────────────────────────────────────────
@@ -244,6 +254,22 @@ router.put('/api/settings/schedules', requirePermission('settings.manage'), (req
     return res.status(400).json({ error: String(err.message ?? err) });
   }
   res.json({ ok: true, schedules: settings.getPublicSettings().schedules });
+});
+
+// Public read: dashboard/display renderers need this to omit widgets for an
+// integration the administrator intentionally disabled. It contains no
+// credentials or connection data.
+router.get('/api/integrations', (_req, res) => {
+  res.json({ enabled: settings.getIntegrationSettings() });
+});
+router.put('/api/settings/integrations/:id', requirePermission('settings.manage'), (req, res) => {
+  try {
+    const enabled = settings.setIntegrationEnabled(req.params.id, req.body?.enabled);
+    auditSuccess(req, 'settings.manage', { resourceType: 'integration', resourceId: req.params.id, details: { enabled: enabled[req.params.id] } });
+    res.json({ enabled });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message ?? err) });
+  }
 });
 
 // ── Institution config (name, sites, Quick Access tiles — ADR 0009) ───────────

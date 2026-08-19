@@ -21,6 +21,7 @@ import { LoudnessWidget } from './LoudnessWidget';
 import { LoudnessTrendWidget } from './LoudnessTrendWidget';
 import { ViewersWidget } from './ViewersWidget';
 import { RestreamWidget } from './RestreamWidget';
+import { ResiBroadcastWidget, ResiHealthWidget, ResiStreamWidget, ResiViewersWidget } from './ResiWidgets';
 import { ProPresenterControls, ProPresenterPlaylist, ProPresenterSlides, ProPresenterTimers, SlideNotes } from './ProPresenterWidgets';
 import { PlanningCenterSchedule, PlanningCenterService, PlanningCenterTeams, PlanningCenterTimers } from './PlanningCenterWidgets';
 import type { WidgetDef, WidgetType } from './types';
@@ -66,6 +67,10 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     defaultSpan: 'third',
   },
   restream: { title: 'Restream', description: 'Restream broadcast state and connected destinations.', integration: 'restream', component: RestreamWidget, size: { w: 2, h: 2 }, defaultSpan: 'third' },
+  'resi-stream': { title: 'Resi Stream', description: 'Official Resi player with live and offline state.', integration: 'resi', component: ResiStreamWidget, size: { w: 3, h: 2 }, defaultSpan: 'third' },
+  'resi-health': { title: 'Resi Stream Health', description: 'Normalized Resi encoder, stream, and destination health.', integration: 'resi', component: ResiHealthWidget, size: { w: 2, h: 2 }, defaultSpan: 'third' },
+  'resi-viewers': { title: 'Resi Viewers', description: 'Live audience count and available Resi analytics.', integration: 'resi', component: ResiViewersWidget, size: { w: 1, h: 1 }, defaultSpan: 'third' },
+  'resi-broadcast': { title: 'Resi Broadcast Monitor', description: 'Livestream preview, health, and audience in one card.', integration: 'resi', component: ResiBroadcastWidget, size: { w: 3, h: 3 }, defaultSpan: 'third' },
 
   'run-of-show': {
     title: 'Run of Show',

@@ -7,7 +7,7 @@ import { PersonPicker } from '../components/PersonPicker';
 import { SelectField } from '../components/SelectField';
 import { ColorInput } from '../components/form/ColorInput';
 import { EditorSection } from '../components/form/EditorSection';
-import { IntegrationBrand, IntegrationTitle, type IntegrationId } from '../components/IntegrationBrand';
+import { IntegrationBrand, IntegrationTitle, integrationInfo, type IntegrationId } from '../components/IntegrationBrand';
 import { Field } from '../components/form/Field';
 import { FormRow } from '../components/form/FormRow';
 import { useDraft } from '../components/form/useDraft';
@@ -76,6 +76,9 @@ import {
   checkIntegrations,
   connectRestream,
   getRestreamConfig,
+  checkResiConnection,
+  getEnabledIntegrations,
+  setIntegrationEnabled,
   type SecretGroup,
   type Version,
 } from '../api';
@@ -84,7 +87,7 @@ import logoUrl from '../assets/prodmesh-logo.svg';
 type Phase = 'loading' | 'setup' | 'login' | 'admin';
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-type AdminSection = 'general' | 'campuses' | 'room' | 'users' | 'stations' | 'checklists' | 'logs';
+type AdminSection = 'general' | 'integrations' | 'campuses' | 'room' | 'users' | 'stations' | 'checklists' | 'logs';
 
 export function Settings({ section = 'general' }: { section?: AdminSection }) {
   const [phase, setPhase] = useState<Phase>('loading');
@@ -102,6 +105,7 @@ export function Settings({ section = 'general' }: { section?: AdminSection }) {
 
   const titles = {
     general: 'General',
+    integrations: 'Integrations',
     users: 'Users & access',
     stations: 'Stations',
     campuses: 'Campuses',
@@ -183,7 +187,8 @@ function LoginForm({ onDone }: { onDone: () => void }) {
 function AdminPanels({ section }: { section: AdminSection }) {
   return (
     <>
-      {section === 'general' && <><BrandingPanel /><SecurityPanel /><SecretsPanel /><SystemPanel /><SchedulesPanel /></>}
+      {section === 'general' && <><BrandingPanel /><SecurityPanel /><SystemPanel /><SchedulesPanel /></>}
+      {section === 'integrations' && <><IntegrationEnablePanel /><SecretsPanel /></>}
       {section === 'campuses' && <CampusesPanel />}
       {section === 'room' && <RoomConfigPanel />}
       {section === 'users' && <UserManagementPanel />}
@@ -768,8 +773,52 @@ function SecurityPanel() {
 }
 
 const secretGroupIntegration = (id: string): IntegrationId => ({
-  planningCenter: 'planning-center', slack: 'slack', youtube: 'youtube', restream: 'restream',
+  planningCenter: 'planning-center', slack: 'slack', youtube: 'youtube', restream: 'restream', resi: 'resi',
 }[id] as IntegrationId | undefined) ?? 'prodmesh';
+
+const MANAGED_INTEGRATIONS: IntegrationId[] = [
+  'planning-center', 'propresenter', 'resi', 'restream', 'youtube', 'slack',
+  'companion', 'prodmesh-rta', 'smaart', 'open-sound-meter', 'captions', 'prodcom',
+];
+
+function IntegrationEnablePanel() {
+  const [enabled, setEnabled] = useState<Record<string, boolean> | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [msg, setMsg] = useState<Feedback>(null);
+  const refresh = useCallback(() => { getEnabledIntegrations().then((state) => setEnabled(state.enabled)).catch((err) => setMsg(fail(err))); }, []);
+  useEffect(refresh, [refresh]);
+
+  const toggle = async (id: IntegrationId) => {
+    if (!enabled) return;
+    const next = !(enabled[id] ?? true);
+    setSaving(id); setMsg(null);
+    try {
+      const state = await setIntegrationEnabled(id, next);
+      setEnabled(state.enabled);
+      // The credential-management cards live in a sibling panel. Tell them
+      // about the saved state so they appear or disappear immediately.
+      window.dispatchEvent(new CustomEvent('prodmesh:integrations-changed', { detail: state.enabled }));
+    } catch (err) { setMsg(fail(err)); }
+    finally { setSaving(null); }
+  };
+
+  return <section className="panel">
+    <p className="section-label">Availability</p>
+    <h2 className="panel__title">Enabled integrations</h2>
+    <p className="settings__muted">Turn off integrations your organization does not use. Their stored credentials remain intact, but their widgets are unavailable on new dashboards until re-enabled.</p>
+    <div className="integration-switches">
+      {MANAGED_INTEGRATIONS.map((id) => <div className="integration-switch" key={id}>
+        <IntegrationBrand integration={id} />
+        <span>{integrationInfo[id].name}</span>
+        <label className="integration-switch__toggle">
+          <input type="checkbox" checked={enabled?.[id] ?? true} disabled={!enabled || saving === id} onChange={() => toggle(id)} />
+          <span>{enabled?.[id] === false ? 'Disabled' : saving === id ? 'Saving…' : 'Enabled'}</span>
+        </label>
+      </div>)}
+    </div>
+    <Msg msg={msg} />
+  </section>;
+}
 
 // Credentials for Planning Center and Slack. WRITE-ONLY on purpose: the server
 // never returns a stored credential, so this shows WHETHER one is set (as a
@@ -778,17 +827,19 @@ const secretGroupIntegration = (id: string): IntegrationId => ({
 // stays a glance rather than a form.
 function SecretsPanel() {
   const [groups, setGroups] = useState<SecretGroup[] | null>(null);
+  const [enabled, setEnabled] = useState<Record<string, boolean> | null>(null);
   const [editing, setEditing] = useState<SecretGroup | null>(null);
-  const [connectingRestream, setConnectingRestream] = useState(false);
-  const [restreamError, setRestreamError] = useState<string | null>(null);
-  const [restreamRedirectUrl, setRestreamRedirectUrl] = useState('');
-  const [copiedRestreamUrl, setCopiedRestreamUrl] = useState(false);
 
   const load = useCallback(() => {
     getSecrets().then((r) => setGroups(r.secrets)).catch(() => setGroups([]));
-    getRestreamConfig().then((r) => setRestreamRedirectUrl(r.redirectUrl)).catch(() => {});
+    getEnabledIntegrations().then((r) => setEnabled(r.enabled)).catch(() => setEnabled(null));
   }, []);
   useEffect(load, [load]);
+  useEffect(() => {
+    const update = (event: Event) => setEnabled((event as CustomEvent<Record<string, boolean>>).detail);
+    window.addEventListener('prodmesh:integrations-changed', update);
+    return () => window.removeEventListener('prodmesh:integrations-changed', update);
+  }, []);
 
   if (!groups) return null;
 
@@ -801,7 +852,7 @@ function SecretsPanel() {
       </h2>
 
       <div className="integrations">
-        {groups.map((group) => (
+        {groups.filter((group) => enabled?.[secretGroupIntegration(group.id)] !== false).map((group) => (
           <div key={group.id} className="integration">
             <div className="integration__head">
               <span className="integration__name"><IntegrationBrand integration={secretGroupIntegration(group.id)} />{group.label}</span>
@@ -809,47 +860,8 @@ function SecretsPanel() {
                 {group.configured ? 'Configured' : 'Not configured'}
               </span>
             </div>
-            <dl className="integration__fields">
-              {group.fields.map((f) => (
-                <div key={f.path} className="integration__field">
-                  <dt>
-                    {f.label}
-                    {f.optional && <span className="integration__opt">optional</span>}
-                  </dt>
-                  <dd className={f.set ? '' : 'integration__unset'}>
-                    {!f.set
-                      ? 'not set'
-                      : f.secret
-                        ? '•'.repeat(Math.min(f.length, 20))
-                        : f.value}
-                    {f.env && <span className="integration__env">from environment</span>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            {group.id === 'restream' && (
-              <>
-                <p className="settings__muted integration__redirect">
-                  Redirect URL: <code>{restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`}</code>
-                  <button className="btn btn--sm" type="button" onClick={() => {
-                    const url = restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`;
-                    navigator.clipboard.writeText(url).then(() => { setCopiedRestreamUrl(true); window.setTimeout(() => setCopiedRestreamUrl(false), 1800); }).catch(() => setRestreamError('Could not copy the Redirect URL. Please select and copy it manually.'));
-                  }}>{copiedRestreamUrl ? 'Copied' : 'Copy'}</button>
-                </p>
-                <p className="settings__muted">After saving the credentials and registering that exact URL in Restream, connect the Restream account that owns your broadcasts.</p>
-                {restreamError && <p className="settings__msg settings__msg--bad">{restreamError}</p>}
-              </>
-            )}
             <div className="integration__actions">
-              <button className="btn btn--sm" onClick={() => setEditing(group)}>Edit</button>
-              {group.id === 'restream' && (
-                <button className="btn btn--sm" disabled={!group.configured || connectingRestream} onClick={() => {
-                  setRestreamError(null); setConnectingRestream(true);
-                  connectRestream().catch((err) => { setRestreamError(err instanceof Error ? err.message : String(err)); setConnectingRestream(false); });
-                }}>
-                  {connectingRestream ? 'Connecting…' : 'Connect account'}
-                </button>
-              )}
+              <button className="btn btn--sm" onClick={() => setEditing(group)}>Manage integration</button>
             </div>
           </div>
         ))}
@@ -878,12 +890,21 @@ function SecretsDialog({
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Feedback>(null);
+  const [restreamRedirectUrl, setRestreamRedirectUrl] = useState('');
+  const [copiedRestreamUrl, setCopiedRestreamUrl] = useState(false);
+  const [connectingRestream, setConnectingRestream] = useState(false);
+  const [checkingResi, setCheckingResi] = useState(false);
+  const [connectionMessage, setConnectionMessage] = useState<Feedback>(null);
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
   }, [onClose]);
+
+  useEffect(() => {
+    if (group.id === 'restream') getRestreamConfig().then((r) => setRestreamRedirectUrl(r.redirectUrl)).catch(() => {});
+  }, [group.id]);
 
   const dirty = Object.values(draft).some((v) => v.trim() !== '');
 
@@ -936,10 +957,34 @@ function SecretsDialog({
           </label>
         ))}
 
+        {group.id === 'restream' && (
+          <>
+            <p className="settings__muted integration__redirect">
+              Redirect URL: <code>{restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`}</code>
+              <button className="btn btn--sm" type="button" onClick={() => {
+                const url = restreamRedirectUrl || `${window.location.origin}/api/integrations/restream/callback`;
+                navigator.clipboard.writeText(url).then(() => { setCopiedRestreamUrl(true); window.setTimeout(() => setCopiedRestreamUrl(false), 1800); }).catch(() => setConnectionMessage(fail('Could not copy the Redirect URL. Please select and copy it manually.')));
+              }}>{copiedRestreamUrl ? 'Copied' : 'Copy'}</button>
+            </p>
+            <p className="settings__muted">Save credentials, register this exact URL in Restream, then connect the account that owns your broadcasts.</p>
+          </>
+        )}
+
+        {group.id === 'resi' && <p className="settings__muted">ProdMesh keeps the Resi token on this server. The optional player URL is embedded directly; dashboard clients receive only normalized broadcast data.</p>}
+
         {msg && <p className={`settings__msg settings__msg--${msg.kind}`}>{msg.text}</p>}
+        {connectionMessage && <p className={`settings__msg settings__msg--${connectionMessage.kind}`}>{connectionMessage.text}</p>}
 
         <div className="confirm__buttons">
           <button className="confirm__cancel" onClick={onClose} disabled={busy}>Cancel</button>
+          {group.id === 'restream' && <button className="btn" disabled={!group.configured || connectingRestream} onClick={() => {
+            setConnectionMessage(null); setConnectingRestream(true);
+            connectRestream().catch((err) => setConnectionMessage(fail(err))).finally(() => setConnectingRestream(false));
+          }}>{connectingRestream ? 'Connecting…' : 'Connect account'}</button>}
+          {group.id === 'resi' && <button className="btn" disabled={!group.configured || checkingResi} onClick={() => {
+            setConnectionMessage(null); setCheckingResi(true);
+            checkResiConnection().then((state) => setConnectionMessage(ok(state.live ? 'Connected — Resi reports a live broadcast.' : 'Connected — Resi reports no active broadcast.'))).catch((err) => setConnectionMessage(fail(err))).finally(() => setCheckingResi(false));
+          }}>{checkingResi ? 'Testing…' : 'Test connection'}</button>}
           <button className="confirm__ok" onClick={save} disabled={!dirty || busy}>
             {busy ? 'Saving…' : 'Save'}
           </button>
@@ -1856,6 +1901,7 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
   const [err, setErr] = useState('');
   const [status, setStatus] = useState<RoomConnectivityStatus | null>(null);
   const [checking, setChecking] = useState(false);
+  const enabledIntegrations = useQuery('enabled-integrations', getEnabledIntegrations, { staleMs: 60_000 }).data?.enabled;
 
   useEffect(() => {
     getRoomConnectivity(roomId)
@@ -1881,6 +1927,8 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
   const chip = (s: IntegrationStatus | null | undefined) => (
     <StatusChip status={s} checking={checking} onRefresh={check} />
   );
+  const enabled = (id: IntegrationId) => enabledIntegrations?.[id] !== false;
+  const analysisEnabled = enabled('prodmesh-rta') || enabled('smaart') || enabled('open-sound-meter');
 
   return (
     <section className="panel campuses">
@@ -1901,12 +1949,12 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
 
       {conn?.hasServerRoom && (
         <>
-          <CompanionEditor roomId={roomId} initial={conn.companion} status={chip(status?.companion)} />
-          <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} status={chip(status?.planningCenter)} />
-          <AnalysisEditor roomId={roomId} initial={conn.analysis} status={chip(status?.analysis)} />
-          <YouTubeEditor roomId={roomId} initial={conn.youtube} />
-          <CaptionsEditor roomId={roomId} initial={conn.captions} />
-          <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} status={chip(status?.proPresenter)} />
+          {enabled('companion') && <CompanionEditor roomId={roomId} initial={conn.companion} status={chip(status?.companion)} />}
+          {enabled('planning-center') && <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} status={chip(status?.planningCenter)} />}
+          {analysisEnabled && <AnalysisEditor roomId={roomId} initial={conn.analysis} status={chip(status?.analysis)} />}
+          {enabled('youtube') && <YouTubeEditor roomId={roomId} initial={conn.youtube} />}
+          {enabled('captions') && <CaptionsEditor roomId={roomId} initial={conn.captions} />}
+          {enabled('propresenter') && <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} status={chip(status?.proPresenter)} />}
         </>
       )}
     </section>

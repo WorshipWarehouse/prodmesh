@@ -165,6 +165,36 @@ export async function connectRestream() {
 
 export const getRestreamConfig = () => getJson<{ redirectUrl: string }>('/api/integrations/restream/config');
 
+export interface ResiStatus {
+  connected: boolean;
+  configured: boolean;
+  live: boolean;
+  health: 'healthy' | 'warning' | 'critical' | 'offline' | 'connection-lost';
+  title: string;
+  error?: string;
+  playerUrl?: string | null;
+  encoder?: { online?: boolean; name?: string };
+  video?: string;
+  audio?: string;
+  destination?: string;
+  startedAt?: string;
+  viewers?: number;
+  peakViewers?: number;
+  totalViews?: number;
+  averageWatchTime?: string;
+  warnings?: string[];
+  errors?: string[];
+  capabilities: { player: boolean; viewers: boolean; telemetry: boolean };
+}
+
+export const getResiStatus = () => getJson<ResiStatus>('/api/integrations/resi/status');
+export async function checkResiConnection() {
+  const res = await fetch('/api/integrations/resi/check', { method: 'POST', headers: requestHeaders() });
+  const body = await res.json().catch(() => null) as ResiStatus | null;
+  if (!res.ok) throw new Error(body?.error ?? 'Resi could not be reached');
+  return body!;
+}
+
 export interface Station {
   id: string;
   name: string;
@@ -524,6 +554,16 @@ export async function saveSecrets(updates: Record<string, string>): Promise<{ se
 /** Do the stored credentials actually work? null = not configured. */
 export const checkIntegrations = () =>
   getJson<{ planningCenter: boolean | null }>('/api/secrets/check');
+
+export type IntegrationEnabled = Record<string, boolean>;
+export const getEnabledIntegrations = () => getJson<{ enabled: IntegrationEnabled }>('/api/integrations');
+export async function setIntegrationEnabled(id: string, enabled: boolean) {
+  const res = await fetch(`/api/settings/integrations/${encodeURIComponent(id)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify({ enabled }),
+  });
+  await requireOk(res);
+  return res.json() as Promise<{ enabled: IntegrationEnabled }>;
+}
 
 // ── Branding ─────────────────────────────────────────────────────────────────
 
@@ -1264,6 +1304,10 @@ export interface WidgetConfigJson {
   metric?: string;
   weighting?: 'A' | 'B' | 'C' | 'Z';
   response?: 'Fast' | 'Slow';
+  autoplay?: boolean;
+  muted?: boolean;
+  playerControls?: boolean;
+  aspectRatio?: '16:9' | '4:3' | '1:1';
 }
 
 export interface ViewSummary {

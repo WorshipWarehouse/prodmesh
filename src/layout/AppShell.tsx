@@ -14,6 +14,7 @@ import {
   LockKeyhole,
   ScrollText,
   Settings2,
+  Plug,
   Users,
   Home as HomeIcon,
   PanelLeftClose,
@@ -43,6 +44,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { to: '/admin/general', label: 'General', icon: Settings2 },
+  { to: '/admin/integrations', label: 'Integrations', icon: Plug },
   { to: '/admin/campuses', label: 'Campuses', icon: Building2 },
   { to: '/admin/users', label: 'Users & access', icon: Users },
   { to: '/admin/stations', label: 'Stations', icon: MonitorCog },

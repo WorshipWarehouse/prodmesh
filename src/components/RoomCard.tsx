@@ -26,7 +26,7 @@ function fmtNextTime(service: RoomService | null) {
 
 // One room on the campus Home: current mode, live-show badge, next event.
 // The whole card clicks into the room's status/operate page.
-export function RoomCard({ room }: { room: RoomMeta }) {
+export function RoomCard({ room, showRoomMode = true }: { room: RoomMeta; showRoomMode?: boolean }) {
   // Mode and show state are pushed: Home showing six rooms used to run six
   // intervals firing three requests each, per browser, and each mode read went
   // all the way to Companion uncached. Now one shared connection carries them,
@@ -47,7 +47,7 @@ export function RoomCard({ room }: { room: RoomMeta }) {
   const nextTime = fmtNextTime(service ?? null);
 
   return (
-    <Link to={`/room/${room.id}`} className="roomcard">
+    <Link to={`/room/${room.id}`} className={`roomcard${showRoomMode ? '' : ' roomcard--compact'}`}>
       <div className="roomcard__head">
         <span>
           <span className="roomcard__id mono">{room.id}</span>
@@ -60,7 +60,7 @@ export function RoomCard({ room }: { room: RoomMeta }) {
         )}
       </div>
 
-      <div className="roomcard__status">
+      {showRoomMode && <div className="roomcard__status">
         <span className="roomcard__metric-label">ROOM MODE</span>
         <div className="roomcard__mode">
           <span
@@ -77,7 +77,7 @@ export function RoomCard({ room }: { room: RoomMeta }) {
         <span className={`roomcard__health${state?.online ? ' roomcard__health--on' : ''}`}>
           {state?.online ? 'COMPANION ONLINE' : state ? 'COMPANION OFFLINE' : 'CONNECTING'}
         </span>
-      </div>
+      </div>}
 
       {next ? (
         <div className="roomcard__next">

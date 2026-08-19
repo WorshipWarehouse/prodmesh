@@ -1,8 +1,12 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { PlacedWidget } from './PlacedWidget';
 import { rowCount, type Grid, type Placement } from '../lib/gridLayout';
+import { isWidgetType, widgetRegistry } from '../widgets/registry';
 import type { WidgetConfig } from '../widgets/types';
-import type { View, ViewPlacement } from '../api';
+import { getEnabledIntegrations, getRoom, getRoomConnectivity, type View, type ViewPlacement } from '../api';
+import { useQuery } from '../lib/useQuery';
+import { analysisIntegration } from '../lib/analysisSource';
+import { captionIntegration } from '../lib/captionSource';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  The grid a View is drawn on.
@@ -48,7 +52,20 @@ export function ViewCanvas({
   canvasRef?: React.Ref<HTMLDivElement>;
   onPointerDown?: React.PointerEventHandler<HTMLDivElement>;
 }) {
-  const rows = rowsOverride ?? rowCount(grid, view.widgets as Placement[]);
+  const enabled = useQuery('enabled-integrations', getEnabledIntegrations, { staleMs: 60_000 }).data?.enabled;
+  const room = useQuery(`room:${view.roomId}`, () => getRoom(view.roomId), { staleMs: 60_000 }).data;
+  const connectivity = useQuery(`room-connectivity:${view.roomId}`, () => getRoomConnectivity(view.roomId), { staleMs: 15_000 }).data;
+  const visibleWidgets = view.widgets.filter((placement) => {
+    // Old layouts can contain a widget introduced by a newer server. Let
+    // PlacedWidget render its safe "not available" placeholder rather than
+    // silently removing the occupied slot.
+    if (!isWidgetType(placement.type)) return true;
+    let integration = widgetRegistry[placement.type].integration ?? 'prodmesh';
+    if (placement.type === 'loudness' || placement.type === 'loudness-trend') integration = analysisIntegration(room?.analysisSource);
+    if (placement.type === 'captions') integration = captionIntegration(connectivity?.captions?.source);
+    return enabled?.[integration] !== false;
+  });
+  const rows = rowsOverride ?? rowCount(grid, visibleWidgets as Placement[]);
   const style = {
     '--view-columns': grid.columns,
     '--view-rows': rows,
@@ -61,7 +78,7 @@ export function ViewCanvas({
       style={style}
       onPointerDown={onPointerDown}
     >
-      {view.widgets.map((placement) => (
+      {visibleWidgets.map((placement) => (
         <PlacedWidget
           key={placement.id}
           roomId={view.roomId}

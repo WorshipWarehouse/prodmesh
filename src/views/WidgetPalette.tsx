@@ -26,8 +26,8 @@ export interface PaletteEntry {
   blocked: string | null;
 }
 
-export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[], analysisSource?: AnalysisSource | null, captionSource?: CaptionsConfig['source'] | null): PaletteEntry[] {
-  return widgetTypes
+export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[], analysisSource?: AnalysisSource | null, captionSource?: CaptionsConfig['source'] | null, enabled?: Record<string, boolean>): PaletteEntry[] {
+  const entries = widgetTypes
     .filter((type) => widgetAllowedOn(widgetRegistry[type], kind))
     // Loudness widgets are supplied by the selected analysis integration, not
     // a generic "audio" bucket. With no source configured there is nothing
@@ -52,6 +52,10 @@ export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement
               : 'No room left',
       };
     });
+
+  // Disabling an integration keeps existing layouts intact, but removes its
+  // widgets from the picker until an administrator enables it again.
+  return entries.filter((entry) => enabled?.[entry.integration] !== false);
 }
 
 export function WidgetPalette({

@@ -64,6 +64,20 @@
   background: var(--bg-tile);
 }
 
+/* With Companion disabled there is no Room Mode or connection state to
+   reserve space for. Keep the useful service information immediately under
+   the room name rather than presenting an empty status card. */
+.roomcard--compact {
+  min-height: 0;
+  gap: 10px;
+}
+
+.roomcard--compact .roomcard__next {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .roomcard:hover .roomcard__arrow {
   color: var(--accent);
   transform: translateX(2px);
