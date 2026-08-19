@@ -47,11 +47,12 @@ export function authorizeUrl(redirectUri, state) {
 /**
  * Broadcast state, shared by every caller for a few seconds.
  *
- * The widget polls this every 15s and its route is deliberately open — a booth
- * display has nobody to log it in. Without a cache, N dashboards meant N calls
- * to Restream's API on the church's own OAuth token, and anyone on the LAN
- * could multiply that at will. One in-flight request is shared and its result
- * held briefly, so upstream cost is bounded by time rather than by callers.
+ * The `integration:restream` producer is now the only routine caller, so the
+ * multiplication this originally defended against — an open route polled by
+ * every dashboard on the church's own OAuth token — is gone. It stays because
+ * the producer, the Settings connection check and the maintenance route can
+ * still coincide, and one shared in-flight request is cheaper than three
+ * identical ones. Bounded by time rather than by callers, either way.
  */
 let cached = null; // { at, value } | { at, error }
 let inFlight = null;

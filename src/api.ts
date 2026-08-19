@@ -187,7 +187,6 @@ export interface ResiStatus {
   capabilities: { player: boolean; viewers: boolean; telemetry: boolean };
 }
 
-export const getResiStatus = () => getJson<ResiStatus>('/api/integrations/resi/status');
 export async function checkResiConnection() {
   const res = await fetch('/api/integrations/resi/check', { method: 'POST', headers: requestHeaders() });
   const body = await res.json().catch(() => null) as ResiStatus | null;

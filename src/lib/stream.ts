@@ -135,6 +135,14 @@ export const roomTopic = {
   proPresenter: (roomId: string) => `room:${roomId}:propresenter`,
 };
 
+/**
+ * Org-level integrations (Restream, Resi) have no room to key a topic on —
+ * their credentials are institution-wide. Same single connection, same
+ * refcounting; the id is not a room id, which is why it is a separate accessor
+ * rather than a `roomTopic` entry taking a misleading argument.
+ */
+export const integrationTopic = (id: 'resi' | 'restream') => `integration:${id}`;
+
 /** Test hook: drop the connection and every cached value. */
 export function resetStream() {
   if (pending) clearTimeout(pending);

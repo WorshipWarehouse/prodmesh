@@ -53,7 +53,8 @@ router.get('/api/integrations/restream/callback', async (req, res) => {
   try { await restream.exchangeCode(String(req.query.code), restreamCallback(req)); res.redirect('/settings?restream=connected'); }
   catch (err) { res.status(502).send(`Restream authorization failed: ${String(err.message ?? err)}`); }
 });
-router.get('/api/integrations/restream/status', async (_req, res) => {
+// Also a maintenance route now — see the Resi note above.
+router.get('/api/integrations/restream/status', requirePermission('config.manage'), async (_req, res) => {
   try { res.json(await restream.status()); }
   catch (err) { res.status(502).json({ connected: false, status: 'offline', error: String(err.message ?? err) }); }
 });
@@ -122,7 +123,11 @@ router.get('/api/secrets/check', requirePermission('*'), async (_req, res) => {
   }
 });
 
-router.get('/api/integrations/resi/status', async (_req, res) => {
+// Widgets read Resi over the `integration:resi` topic now, so this is a
+// maintenance route. Gated for the same reason as the ProPresenter console
+// read: it calls a third-party API on the church's own token, and nothing
+// unauthenticated should be able to drive that.
+router.get('/api/integrations/resi/status', requirePermission('config.manage'), async (_req, res) => {
   res.json(await resi.status());
 });
 router.post('/api/integrations/resi/check', requirePermission('*'), async (_req, res) => {
