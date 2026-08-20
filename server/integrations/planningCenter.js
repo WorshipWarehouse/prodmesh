@@ -339,6 +339,10 @@ export function getPlanTeamMembers(serviceType, planId) {
       const person = included.get(`${personRef.type ?? 'Person'}:${personRef.id}`)?.attributes ?? {};
       return {
         id: row.id,
+        // A person can appear more than once in one plan when they serve in
+        // multiple positions. Keep this stable identity so integrations such
+        // as ProdMesh Wireless can make one assignment per person.
+        personId: personRef.id ?? null,
         name: attrs.name ?? person.full_name ?? person.name ?? 'Unassigned',
         position: attrs.team_position_name ?? 'Team member',
         teamId: teamRef.id ?? null,

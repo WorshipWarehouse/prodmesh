@@ -365,6 +365,83 @@ const MIGRATIONS = [
       addColumn(d, 'views', 'scale', 'REAL NOT NULL DEFAULT 1');
     },
   },
+  {
+    // Wireless prep is deliberately independent from receiver telemetry. A
+    // church can make a clear, printable assignment board before adding any
+    // networked Shure/Sennheiser hardware, and later telemetry can join the
+    // same gear records by id without changing a plan's assignments.
+    name: 'wireless-gear-and-assignments',
+    up(d) {
+      d.exec(`
+        CREATE TABLE IF NOT EXISTS wireless_gear (
+          id         TEXT PRIMARY KEY,
+          room_id    TEXT NOT NULL,
+          kind       TEXT NOT NULL CHECK (kind IN ('microphone', 'pack')),
+          vendor     TEXT NOT NULL DEFAULT 'Generic',
+          model      TEXT NOT NULL,
+          label      TEXT NOT NULL,
+          channel    TEXT,
+          status     TEXT NOT NULL DEFAULT 'ready' CHECK (status IN ('ready', 'service', 'repair', 'retired')),
+          notes      TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS wireless_gear_by_room ON wireless_gear (room_id, kind, label COLLATE NOCASE);
+
+        CREATE TABLE IF NOT EXISTS wireless_assignments (
+          room_id        TEXT NOT NULL,
+          plan_id        TEXT NOT NULL,
+          team_member_id TEXT NOT NULL,
+          slot           TEXT NOT NULL CHECK (slot IN ('microphone', 'pack')),
+          gear_id        TEXT NOT NULL REFERENCES wireless_gear(id) ON DELETE CASCADE,
+          updated_by     TEXT,
+          updated_at     INTEGER NOT NULL,
+          PRIMARY KEY (room_id, plan_id, team_member_id, slot)
+        );
+        CREATE INDEX IF NOT EXISTS wireless_assignments_by_plan ON wireless_assignments (room_id, plan_id);
+      `);
+    },
+  },
+  {
+    name: 'wireless-team-selection',
+    up(d) {
+      addColumn(d, 'site_rooms', 'wireless_teams', "TEXT NOT NULL DEFAULT '[]'");
+    },
+  },
+  {
+    name: 'wireless-receiver-connection',
+    up(d) {
+      addColumn(d, 'wireless_gear', 'connection', "TEXT NOT NULL DEFAULT 'wireless'");
+      addColumn(d, 'wireless_gear', 'receiver_host', 'TEXT');
+      addColumn(d, 'wireless_gear', 'receiver_port', 'INTEGER');
+    },
+  },
+  {
+    // The same physical mic/pack can intentionally be shared by more than
+    // one scheduled person. Keep the per-person/slot primary key, but remove
+    // the old per-plan gear uniqueness constraint.
+    name: 'wireless-shared-gear',
+    up(d) {
+      d.exec(`
+        DROP INDEX IF EXISTS wireless_assignments_by_plan;
+        ALTER TABLE wireless_assignments RENAME TO wireless_assignments_legacy;
+        CREATE TABLE wireless_assignments (
+          room_id        TEXT NOT NULL,
+          plan_id        TEXT NOT NULL,
+          team_member_id TEXT NOT NULL,
+          slot           TEXT NOT NULL CHECK (slot IN ('microphone', 'pack')),
+          gear_id        TEXT NOT NULL REFERENCES wireless_gear(id) ON DELETE CASCADE,
+          updated_by     TEXT,
+          updated_at     INTEGER NOT NULL,
+          PRIMARY KEY (room_id, plan_id, team_member_id, slot)
+        );
+        INSERT INTO wireless_assignments (room_id, plan_id, team_member_id, slot, gear_id, updated_by, updated_at)
+          SELECT room_id, plan_id, team_member_id, slot, gear_id, updated_by, updated_at FROM wireless_assignments_legacy;
+        DROP TABLE wireless_assignments_legacy;
+        CREATE INDEX wireless_assignments_by_plan ON wireless_assignments (room_id, plan_id);
+      `);
+    },
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

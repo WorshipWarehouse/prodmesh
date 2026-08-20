@@ -600,6 +600,12 @@
 .widgetinspector small { display: block; color: var(--text-dim); line-height: 1.35; }
 .widgetinspector .widgetinspector__check { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--text); }
 .widgetinspector select { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+.widgetinspector__help { color: var(--text-dim); font-size: .78rem; }
+.widgetinspector__wireless { display: grid; gap: 8px; max-height: min(56vh, 560px); margin-top: 12px; overflow: auto; }
+.widgetinspector__wireless section { padding: 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); }
+.widgetinspector__wireless section > strong { display: block; color: var(--text); font-size: .82rem; }.widgetinspector__wireless section > small { font-size: .7rem; }
+.widgetinspector__wireless label { margin: 8px 0 0; font-size: .72rem; }
+.widgetinspector__error { margin-top: 10px !important; color: var(--danger); }
 
 /* ── Palette ─────────────────────────────────────────────────────────────── */
 

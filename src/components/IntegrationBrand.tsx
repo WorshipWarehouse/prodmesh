@@ -18,7 +18,7 @@ import prodComLogo from '../assets/integrations/prodcom.png';
 export type IntegrationId =
   | 'prodmesh' | 'propresenter' | 'planning-center' | 'restream' | 'resi'
   | 'youtube' | 'slack' | 'companion' | 'analysis' | 'captions'
-  | 'prodmesh-rta' | 'smaart' | 'open-sound-meter' | 'prodcom';
+  | 'prodmesh-wireless' | 'prodmesh-rta' | 'smaart' | 'open-sound-meter' | 'prodcom';
 
 export const integrationInfo: Record<IntegrationId, { name: string; mark: string; logo?: string }> = {
   prodmesh: { name: 'ProdMesh', mark: 'PM', logo: prodMeshLogo },
@@ -29,6 +29,7 @@ export const integrationInfo: Record<IntegrationId, { name: string; mark: string
   youtube: { name: 'YouTube', mark: '▶', logo: youTubeLogo },
   slack: { name: 'Slack', mark: 'S', logo: slackLogo },
   companion: { name: 'Bitfocus Companion', mark: 'C', logo: companionLogo },
+  'prodmesh-wireless': { name: 'ProdMesh Wireless', mark: 'PM', logo: prodMeshLogo },
   analysis: { name: 'Audio analysis', mark: 'A' },
   'prodmesh-rta': { name: 'ProdMesh RTA', mark: 'R', logo: prodMeshRtaLogo },
   smaart: { name: 'Smaart', mark: 'S', logo: smaartLogo },

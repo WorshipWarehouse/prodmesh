@@ -53,7 +53,7 @@ const DEFAULTS = {
 
 export const INTEGRATION_IDS = [
   'planning-center', 'propresenter', 'restream', 'resi', 'youtube', 'slack',
-  'companion', 'prodmesh-rta', 'smaart', 'open-sound-meter', 'captions', 'prodcom',
+  'companion', 'prodmesh-wireless', 'prodmesh-rta', 'smaart', 'open-sound-meter', 'captions', 'prodcom',
 ];
 
 let settings = null;

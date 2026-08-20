@@ -26,6 +26,7 @@ export interface Site {
 export interface Auditorium {
   id: string;
   name: string;
+  wirelessTeamIds?: string[];
   tiles: Tile[];
 }
 

@@ -37,6 +37,7 @@ import authRouter from './routes/auth.js';
 import adminConfigRouter from './routes/adminConfig.js';
 import systemRouter from './routes/system.js';
 import proPresenterRouter from './routes/proPresenter.js';
+import wirelessRouter from './routes/wireless.js';
 import * as branding from './branding.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +97,7 @@ app.use(authRouter);
 app.use(adminConfigRouter);
 app.use(systemRouter);
 app.use(proPresenterRouter);
+app.use(wirelessRouter);
 
 // ── Static frontend (production) ───────────────────────────────────────────────
 const distDir = join(__dirname, '..', 'dist');

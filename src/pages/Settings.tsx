@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, CircleUser, MonitorCog, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CircleUser, MonitorCog, PackagePlus, RefreshCw, Trash2 } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
 import { HelpTip } from '../components/HelpTip';
 import { PersonPicker } from '../components/PersonPicker';
@@ -12,7 +12,7 @@ import { Field } from '../components/form/Field';
 import { FormRow } from '../components/form/FormRow';
 import { useDraft } from '../components/form/useDraft';
 import { useChurch } from '../layout/church';
-import { useQuery } from '../lib/useQuery';
+import { invalidate, useQuery } from '../lib/useQuery';
 import { viewsKey } from '../lib/keys';
 import { allIds, slugId } from '../lib/topology';
 import {
@@ -79,6 +79,13 @@ import {
   checkResiConnection,
   getEnabledIntegrations,
   setIntegrationEnabled,
+  getWirelessTeams,
+  getWirelessGear,
+  saveWirelessGear,
+  saveWirelessTeams,
+  updateWirelessGear,
+  removeWirelessGear,
+  type WirelessGear,
   type SecretGroup,
   type Version,
 } from '../api';
@@ -778,7 +785,7 @@ const secretGroupIntegration = (id: string): IntegrationId => ({
 
 const MANAGED_INTEGRATIONS: IntegrationId[] = [
   'planning-center', 'propresenter', 'resi', 'restream', 'youtube', 'slack',
-  'companion', 'prodmesh-rta', 'smaart', 'open-sound-meter', 'captions', 'prodcom',
+  'companion', 'prodmesh-wireless', 'prodmesh-rta', 'smaart', 'open-sound-meter', 'captions', 'prodcom',
 ];
 
 function IntegrationEnablePanel() {
@@ -1951,6 +1958,7 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
         <>
           {enabled('companion') && <CompanionEditor roomId={roomId} initial={conn.companion} status={chip(status?.companion)} />}
           {enabled('planning-center') && <PcServiceTypesEditor roomId={roomId} initial={conn.planningCenter?.serviceTypes ?? []} status={chip(status?.planningCenter)} />}
+          {enabled('prodmesh-wireless') && <WirelessIntegrationEditor roomId={roomId} />}
           {analysisEnabled && <AnalysisEditor roomId={roomId} initial={conn.analysis} status={chip(status?.analysis)} />}
           {enabled('youtube') && <YouTubeEditor roomId={roomId} initial={conn.youtube} />}
           {enabled('captions') && <CaptionsEditor roomId={roomId} initial={conn.captions} />}
@@ -1989,6 +1997,119 @@ function StatusChip({ status, checking, onRefresh }: {
         </button>
       )}
     </span>
+  );
+}
+
+const WIRELESS_GEAR_MODELS = {
+  wireless: [
+    ['Shure', 'UHF-R'], ['Shure', 'SLX-D'], ['Shure', 'QLX-D'], ['Shure', 'ULX-D'], ['Shure', 'Axient Digital'], ['Sennheiser', 'EW-DX'], ['Generic', 'Other wireless microphone'],
+  ],
+  wired: [
+    ['Shure', 'SM58'], ['Shure', 'Beta 58A'], ['Shure', 'SM57'], ['Sennheiser', 'e835'], ['Sennheiser', 'e935'], ['Generic', 'Other wired microphone'],
+  ],
+  pack: [
+    ['Shure', 'PSM 1000'], ['Shure', 'SLX-D bodypack'], ['Shure', 'QLX-D bodypack'], ['Shure', 'ULX-D bodypack'], ['Shure', 'Axient Digital bodypack'], ['Sennheiser', 'EW-DX bodypack'], ['Generic', 'Generic Bodypack'],
+  ],
+} as const;
+type WirelessGearMode = keyof typeof WIRELESS_GEAR_MODELS;
+
+function WirelessIntegrationEditor({ roomId }: { roomId: string }) {
+  const teams = useQuery(`wireless-teams:${roomId}`, () => getWirelessTeams(roomId), { staleMs: 60_000 });
+  const inventory = useQuery(`wireless-gear:${roomId}`, () => getWirelessGear(roomId), { staleMs: 10_000 });
+  const [selectedTeams, setSelectedTeams] = useState<string[] | null>(null);
+  const [mode, setMode] = useState<WirelessGearMode>('wireless');
+  const [model, setModel] = useState<string>(WIRELESS_GEAR_MODELS.wireless[0][1]);
+  const [label, setLabel] = useState('');
+  const [channel, setChannel] = useState('');
+  const [receiverHost, setReceiverHost] = useState('');
+  const [editing, setEditing] = useState<WirelessGear | null>(null);
+  const [savingTeams, setSavingTeams] = useState(false);
+  const [savingGear, setSavingGear] = useState(false);
+  const [error, setError] = useState('');
+  const selected = selectedTeams ?? teams.data?.selectedTeamIds ?? [];
+  const models = WIRELESS_GEAR_MODELS[mode];
+  const selectedPreset = (models.find((entry) => entry[1] === model) ?? models[0]) as readonly [string, string];
+  // The IP identifies the shared rack receiver, not the handheld or bodypack.
+  // Bodypacks therefore need the same receiver mapping as handheld systems.
+  const needsReceiver = mode !== 'wired' && selectedPreset[0] !== 'Generic';
+  const receiverPort = selectedPreset[0] === 'Sennheiser' ? 45 : 2202;
+
+  const chooseMode = (next: WirelessGearMode) => {
+    setMode(next);
+    setModel(next === 'wired' ? 'Wired microphone' : WIRELESS_GEAR_MODELS[next][0][1]);
+    setReceiverHost('');
+  };
+  const editGear = (item: WirelessGear) => {
+    const nextMode: WirelessGearMode = item.connection === 'wired' ? 'wired' : item.kind === 'pack' ? 'pack' : 'wireless';
+    setEditing(item); setMode(nextMode); setModel(item.model); setLabel(item.label); setChannel(item.channel); setReceiverHost(item.receiverHost); setError('');
+  };
+  const clearGearForm = () => { setEditing(null); chooseMode('wireless'); setLabel(''); setChannel(''); };
+
+  const saveTeams = async () => {
+    setSavingTeams(true); setError('');
+    try { await saveWirelessTeams(roomId, selected); invalidate(`wireless-teams:${roomId}`); }
+    catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setSavingTeams(false); }
+  };
+  const addGear = async (event: React.FormEvent) => {
+    event.preventDefault(); setSavingGear(true); setError('');
+    try {
+      const input: Partial<WirelessGear> & Pick<WirelessGear, 'kind' | 'model' | 'label'> = {
+        kind: mode === 'pack' ? 'pack' : 'microphone', connection: mode === 'wired' ? 'wired' : 'wireless',
+        vendor: mode === 'wired' ? 'Generic' : selectedPreset[0], model: mode === 'wired' ? 'Wired microphone' : model, label, channel,
+        ...(needsReceiver ? { receiverHost, receiverPort } : {}),
+      };
+      if (editing) await updateWirelessGear(roomId, editing.id, input);
+      else await saveWirelessGear(roomId, input);
+      clearGearForm(); invalidate(`wireless-gear:${roomId}`);
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setSavingGear(false); }
+  };
+  const removeGear = async (item: WirelessGear) => {
+    if (!window.confirm(`Remove ${item.label}? This cannot be undone while it is assigned to a service.`)) return;
+    setError('');
+    try { await removeWirelessGear(roomId, item.id); invalidate(`wireless-gear:${roomId}`); }
+    catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+  };
+
+  return (
+    <div className="fsection">
+      <div className="fsection__head">
+        <h3 className="fsection__title"><IntegrationTitle integration="prodmesh-wireless">ProdMesh Wireless</IntegrationTitle></h3>
+      </div>
+      <p className="settings__muted">Assign Planning Center people to your wired or wireless microphone inventory. Network receiver details are stored with network-capable wireless units.</p>
+
+      <h4 className="panel__label">Included Planning Center teams</h4>
+      <p className="settings__muted">With no teams selected, all scheduled people are included in the widget.</p>
+      {teams.error && <p className="settings__error">{teams.error}</p>}
+      {teams.data?.teams.map((team) => <Checkbox key={team.id} checked={selected.includes(team.id)} label={team.name} onChange={() => setSelectedTeams((current) => {
+        const next = new Set(current ?? teams.data!.selectedTeamIds);
+        if (next.has(team.id)) next.delete(team.id); else next.add(team.id);
+        return [...next];
+      })} />)}
+      <div className="fsection__actions"><button className="btn" onClick={saveTeams} disabled={savingTeams}>{savingTeams ? 'Saving teams…' : 'Save included teams'}</button></div>
+
+      <h4 className="panel__label">Microphone and pack inventory</h4>
+      <p className="settings__muted">Shure QLX-D, ULX-D, SLX-D and Axient Digital use their receiver’s IP over TCP 2202. Sennheiser EW-DX uses its receiver’s IP and legacy SSC UDP port 45. Give networked receivers a stable IP or DHCP reservation; SLX-D needs Controller Access enabled and EW-DX needs 3rd Party Access set to Legacy. Wired microphones do not need an IP address.</p>
+      {inventory.data?.gear.length ? (
+        <ul className="settings__muted">
+          {inventory.data.gear.map((item) => <li key={item.id}>
+            {item.label}{item.connection !== 'wired' ? ` · ${item.model}` : ''}{item.channel ? ` · channel ${item.channel}` : ''}{item.receiverHost ? ` · receiver ${item.receiverHost}:${item.receiverPort}` : ''}
+            {' '}<button className="btn" onClick={() => editGear(item)}>Edit</button>{' '}
+            <button className="btn" onClick={() => removeGear(item)}>Remove</button>
+          </li>)}
+        </ul>
+      ) : <p className="settings__muted">No gear added yet.</p>}
+      {error && <p className="settings__error">{error}</p>}
+      <form className="formrow" onSubmit={addGear}>
+        <Field label="Gear type"><SelectField value={mode} onChange={(event) => chooseMode(event.target.value as WirelessGearMode)}><option value="wireless">Wireless microphone</option><option value="wired">Wired microphone</option><option value="pack">Pack / IEM</option></SelectField></Field>
+        {mode !== 'wired' && <Field label="Model" width="grow"><SelectField value={model} onChange={(event) => setModel(event.target.value)}>{models.map(([vendor, name]) => <option key={name} value={name}>{vendor} · {name}</option>)}</SelectField></Field>}
+        <Field label="Label"><input required className="field" value={label} placeholder="e.g. Vocal 1" onChange={(event) => setLabel(event.target.value)} /></Field>
+        <Field label="Channel"><input className="field" value={channel} placeholder="Optional" onChange={(event) => setChannel(event.target.value)} /></Field>
+        {needsReceiver && <Field label={`Receiver IP · port ${receiverPort}`} width="grow"><input required className="field" value={receiverHost} placeholder="192.168.1.60" onChange={(event) => setReceiverHost(event.target.value)} /></Field>}
+        <div className="formrow__actions"><button className="btn" disabled={savingGear}><PackagePlus size={15} /> {savingGear ? 'Saving…' : editing ? 'Save gear' : 'Add gear'}</button>{editing && <button type="button" className="btn" onClick={clearGearForm}>Cancel</button>}</div>
+      </form>
+    </div>
   );
 }
 

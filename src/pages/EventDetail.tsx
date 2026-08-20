@@ -81,8 +81,8 @@ export function EventDetail() {
         </div>
       </div>
 
-      <WidgetGrid>
-        <Widget span="third" title="Times">
+        <WidgetGrid>
+          <Widget span="third" title="Times">
           {services.length > 0 && (
             <div>
               <p className="widget__hint">Services — open a Run of Show:</p>

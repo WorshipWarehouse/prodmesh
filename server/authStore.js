@@ -9,6 +9,7 @@ export const PERMISSIONS = [
   ['shows.operate', 'Operate shows', 'Start, end, and manually follow a show.'],
   ['shows.configure', 'Configure show automation', 'Edit ProPresenter mappings and automation.'],
   ['propresenter.control', 'Control ProPresenter', 'Trigger ProPresenter slides and playlist items from an approved dashboard widget.'],
+  ['wireless.manage', 'Manage wireless assignments', 'Configure wireless gear and assign microphones or packs to scheduled people.'],
   ['history.delete', 'Delete recorded shows', 'Remove a recorded run of show (and its timing/loudness data) from history.'],
   ['reports.view', 'View reports', 'View completed show reports and analytics.'],
   ['settings.manage', 'Manage settings', 'Edit operational settings and schedules.'],

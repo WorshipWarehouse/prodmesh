@@ -21,18 +21,23 @@ export const rooms = Object.create(null);
 // A room the seed file doesn't know starts simulated with the standard mode
 // set; the room configuration page takes it from there (connectivity.js
 // overwrites these keys from the database on apply).
+function parseTeamIds(value) {
+  try { const ids = JSON.parse(value ?? '[]'); return Array.isArray(ids) ? ids : []; }
+  catch { return []; }
+}
+
 function makeRoom(row, seed) {
   const base = seed
     ? structuredClone(seed)
     : { mock: true, companion: {}, state: { variable: 'roomState' }, modes: standardModes() };
-  return { ...base, id: row.id, name: row.name, site: row.siteId };
+  return { ...base, id: row.id, name: row.name, site: row.siteId, wirelessTeamIds: parseTeamIds(row.wirelessTeams) };
 }
 
 /** (Re)build the map from the topology tables; call after every topology save
  *  (followed by connectivity.applyConnectivity() and show.syncAutomation()). */
 export function rebuildRooms() {
   const rows = getDb()
-    .prepare('SELECT id, site_id AS siteId, name FROM site_rooms ORDER BY position')
+    .prepare('SELECT id, site_id AS siteId, name, wireless_teams AS wirelessTeams FROM site_rooms ORDER BY position')
     .all();
   const wanted = new Set(rows.map((r) => r.id));
 
@@ -41,6 +46,7 @@ export function rebuildRooms() {
     if (existing) {
       existing.name = row.name;
       existing.site = row.siteId;
+      existing.wirelessTeamIds = parseTeamIds(row.wirelessTeams);
     } else {
       rooms[row.id] = makeRoom(row, seedRooms[row.id]);
     }

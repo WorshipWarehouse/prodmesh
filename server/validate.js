@@ -129,10 +129,14 @@ export function validateChurch(input) {
       auditoriums: auditoriums.map((room) => {
         const roomId = claim(room?.id, 'Room');
         const tiles = Array.isArray(room.tiles) ? room.tiles : [];
+        const wirelessTeamIds = Array.isArray(room.wirelessTeamIds)
+          ? [...new Set(room.wirelessTeamIds.map((id) => String(id).trim()).filter((id) => /^[A-Za-z0-9_-]{1,80}$/.test(id)))]
+          : [];
         if (tiles.length > 40) throw new Error(`Room "${roomId}" has too many tiles (max 40)`);
         return {
           id: roomId,
           name: text(room.name, `Room "${roomId}" name`, 60, { required: true }),
+          wirelessTeamIds,
           tiles: tiles.map((tile) => validateTile(tile, claim, text)),
         };
       }),

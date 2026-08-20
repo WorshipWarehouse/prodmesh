@@ -4,6 +4,7 @@
 import express from 'express';
 
 import { rooms, rebuildRooms } from '../roomsStore.js';
+import { getDb } from '../db.js';
 import * as settings from '../settings.js';
 import * as show from '../showManager.js';
 import * as auth from '../authStore.js';
@@ -300,6 +301,20 @@ router.put('/api/config', requirePermission('config.manage'), (req, res) => {
   } catch (err) {
     res.status(400).json({ error: String(err.message ?? err) });
   }
+});
+
+// A focused Campus → Connectivity save for the teams displayed by the
+// ProdMesh Wireless widget. This avoids replacing a whole topology draft just
+// to change one operational integration setting.
+router.put('/api/config/rooms/:roomId/wireless/teams', requirePermission('config.manage'), (req, res) => {
+  const room = rooms[req.params.roomId];
+  if (!room) return res.status(404).json({ error: 'Unknown room' });
+  const raw = Array.isArray(req.body?.teamIds) ? req.body.teamIds : [];
+  const teamIds = [...new Set(raw.map((id) => String(id).trim()).filter((id) => /^[A-Za-z0-9_-]{1,80}$/.test(id)))];
+  getDb().prepare('UPDATE site_rooms SET wireless_teams = ? WHERE id = ?').run(JSON.stringify(teamIds), room.id);
+  room.wirelessTeamIds = teamIds;
+  auditSuccess(req, 'config.manage', { resourceType: 'wireless-teams', resourceId: room.id, details: { count: teamIds.length } });
+  res.json({ teamIds });
 });
 
 // ── Room connectivity (room configuration page) ───────────────────────────────

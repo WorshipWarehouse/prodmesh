@@ -849,7 +849,7 @@ export interface PlanItem {
   description: string | null;
 }
 
-export interface PlanTeamMember { id: string; name: string; position: string; teamId: string | null; teamName: string; status: string | null; photoUrl: string | null; }
+export interface PlanTeamMember { id: string; personId?: string | null; name: string; position: string; teamId: string | null; teamName: string; status: string | null; photoUrl: string | null; }
 
 export interface ServicePlan {
   id: string;
@@ -890,6 +890,79 @@ export const getRoomPlan = (id: string, planId: string) =>
   getJson<{ live: boolean; plan: ServicePlan }>(
     `/api/rooms/${encodeURIComponent(id)}/plan/${encodeURIComponent(planId)}`,
   );
+
+// ── Wireless prep board ──────────────────────────────────────────────────────
+
+export type WirelessGearKind = 'microphone' | 'pack';
+export type WirelessGearStatus = 'ready' | 'service' | 'repair' | 'retired';
+export interface WirelessGear {
+  id: string; roomId: string; kind: WirelessGearKind; vendor: string; model: string;
+  label: string; channel: string; connection: 'wired' | 'wireless'; receiverHost: string; receiverPort: number | null;
+  status: WirelessGearStatus; notes: string; updatedAt: number;
+}
+export interface WirelessTelemetry {
+  receiverOnline: boolean; online: boolean; batteryPercent: number | null; batteryMinutes: number | null;
+  rf: number | null; audio: number | null; muted: boolean; frequency: string; model: string; firmware: string; warnings: string[];
+}
+export interface WirelessBoardMember extends PlanTeamMember {
+  microphone: WirelessGear | null;
+  pack: WirelessGear | null;
+}
+export interface WirelessBoard {
+  live: boolean;
+  plan: Pick<ServicePlan, 'id' | 'title' | 'dates' | 'serviceTypeName'>;
+  gear: WirelessGear[];
+  telemetry: Record<string, WirelessTelemetry>;
+  members: WirelessBoardMember[];
+}
+
+export const getWirelessBoard = (roomId: string, planId: string) =>
+  getJson<WirelessBoard>(`/api/rooms/${encodeURIComponent(roomId)}/wireless/plans/${encodeURIComponent(planId)}`);
+
+export const getWirelessTeams = (roomId: string) =>
+  getJson<{ teams: Array<{ id: string; name: string }>; selectedTeamIds: string[] }>(`/api/rooms/${encodeURIComponent(roomId)}/wireless/teams`);
+
+export const getWirelessGear = (roomId: string) =>
+  getJson<{ gear: WirelessGear[] }>(`/api/rooms/${encodeURIComponent(roomId)}/wireless/gear`);
+
+export async function saveWirelessTeams(roomId: string, teamIds: string[]) {
+  const res = await fetch(`/api/config/rooms/${encodeURIComponent(roomId)}/wireless/teams`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify({ teamIds }),
+  });
+  await requireOk(res);
+  return res.json() as Promise<{ teamIds: string[] }>;
+}
+
+export async function saveWirelessGear(roomId: string, input: Partial<WirelessGear> & Pick<WirelessGear, 'kind' | 'model' | 'label'>) {
+  const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/wireless/gear`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify(input),
+  });
+  await requireOk(res);
+  return res.json() as Promise<{ gear: WirelessGear }>;
+}
+
+export async function updateWirelessGear(roomId: string, gearId: string, input: Partial<WirelessGear>) {
+  const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/wireless/gear/${encodeURIComponent(gearId)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify(input),
+  });
+  await requireOk(res);
+  return res.json() as Promise<{ gear: WirelessGear }>;
+}
+
+export async function removeWirelessGear(roomId: string, gearId: string) {
+  const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/wireless/gear/${encodeURIComponent(gearId)}`, {
+    method: 'DELETE', headers: requestHeaders(),
+  });
+  await requireOk(res);
+}
+
+export async function updateWirelessAssignment(roomId: string, planId: string, memberId: string, slot: WirelessGearKind, gearId: string | null) {
+  const res = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/wireless/plans/${encodeURIComponent(planId)}/assignments/${encodeURIComponent(memberId)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...requestHeaders() }, body: JSON.stringify({ slot, gearId }),
+  });
+  await requireOk(res);
+  return res.json() as Promise<{ gear: WirelessGear | null }>;
+}
 
 // ── Event Detail (times + notes + startup checklist for one event) ────────────
 

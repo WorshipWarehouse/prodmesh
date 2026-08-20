@@ -266,7 +266,7 @@ export function ViewEditor({
         )}
       </div>
 
-      <WidgetInspector placement={placements.find((p) => p.id === selected) ?? null} onChange={setConfig} />
+      <WidgetInspector roomId={view.roomId} placement={placements.find((p) => p.id === selected) ?? null} onChange={setConfig} />
 
       {/* Every keyboard move says where it landed, or that it refused. */}
       <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
@@ -274,8 +274,7 @@ export function ViewEditor({
   );
 }
 
-/** Settings live beside the canvas, never inside a small widget cell. */
-function WidgetInspector({ placement, onChange }: { placement: ViewPlacement | null; onChange: (id: string, patch: Record<string, unknown>) => void }) {
+function WidgetInspector({ placement, onChange }: { roomId: string; placement: ViewPlacement | null; onChange: (id: string, patch: Record<string, unknown>) => void }) {
   const pp = placement && (placement.type === 'propresenter-playlist' || placement.type === 'propresenter-controls');
   const loudness = placement && (placement.type === 'loudness' || placement.type === 'loudness-trend');
   const resiPlayer = placement && (placement.type === 'resi-stream' || placement.type === 'resi-broadcast');
