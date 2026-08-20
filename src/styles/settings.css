@@ -1126,6 +1126,18 @@
   box-shadow: none !important;
   background: transparent;
 }
+.integration-brand__beta {
+  padding: 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--border));
+  border-radius: 999px;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  font-size: .62rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 .integration-brand--propresenter .integration-brand__mark { background: #3169b5; }
 .integration-brand--planning-center .integration-brand__mark { background: #ef6b3e; }
 .integration-brand--restream .integration-brand__mark { background: #5968f2; }

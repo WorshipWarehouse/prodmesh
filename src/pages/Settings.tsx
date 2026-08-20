@@ -808,8 +808,7 @@ function IntegrationEnablePanel() {
     <p className="settings__muted">Turn off integrations your organization does not use. Their stored credentials remain intact, but their widgets are unavailable on new dashboards until re-enabled.</p>
     <div className="integration-switches">
       {MANAGED_INTEGRATIONS.map((id) => <div className="integration-switch" key={id}>
-        <IntegrationBrand integration={id} />
-        <span>{integrationInfo[id].name}</span>
+        <IntegrationBrand integration={id} label />
         <label className="integration-switch__toggle">
           <input type="checkbox" checked={enabled?.[id] ?? true} disabled={!enabled || saving === id} onChange={() => toggle(id)} />
           <span>{enabled?.[id] === false ? 'Disabled' : saving === id ? 'Saving…' : 'Enabled'}</span>
@@ -855,7 +854,7 @@ function SecretsPanel() {
         {groups.filter((group) => enabled?.[secretGroupIntegration(group.id)] !== false).map((group) => (
           <div key={group.id} className="integration">
             <div className="integration__head">
-              <span className="integration__name"><IntegrationBrand integration={secretGroupIntegration(group.id)} />{group.label}</span>
+              <span className="integration__name"><IntegrationBrand integration={secretGroupIntegration(group.id)} />{group.label}{integrationInfo[secretGroupIntegration(group.id)].beta && <span className="integration-brand__beta">Beta</span>}</span>
               <span className={`integration__state integration__state--${group.configured ? 'on' : 'off'}`}>
                 {group.configured ? 'Configured' : 'Not configured'}
               </span>

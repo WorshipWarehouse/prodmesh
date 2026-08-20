@@ -92,8 +92,7 @@ export function WidgetPalette({
             aria-controls={`palette-${integration}`}
             onClick={() => setOpenGroup((current) => current === integration ? null : integration)}
           >
-            <IntegrationBrand integration={integration} />
-            <span>{name}</span>
+            <IntegrationBrand integration={integration} label />
             <span className="palette__group-count">{group.length}</span>
             <ChevronDown className="palette__group-chevron" size={16} aria-hidden />
           </button>

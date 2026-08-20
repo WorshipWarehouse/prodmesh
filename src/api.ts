@@ -1306,6 +1306,8 @@ export interface WidgetConfigJson {
   autoplay?: boolean;
   muted?: boolean;
   playerControls?: boolean;
+  destinationLinks?: boolean;
+  videoPreview?: boolean;
   aspectRatio?: '16:9' | '4:3' | '1:1';
 }
 
