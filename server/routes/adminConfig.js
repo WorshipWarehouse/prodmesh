@@ -53,7 +53,8 @@ router.get('/api/integrations/restream/callback', async (req, res) => {
   try { await restream.exchangeCode(String(req.query.code), restreamCallback(req)); res.redirect('/settings?restream=connected'); }
   catch (err) { res.status(502).send(`Restream authorization failed: ${String(err.message ?? err)}`); }
 });
-router.get('/api/integrations/restream/status', async (_req, res) => {
+// Also a maintenance route now — see the Resi note above.
+router.get('/api/integrations/restream/status', requirePermission('config.manage'), async (_req, res) => {
   try { res.json(await restream.status()); }
   catch (err) { res.status(502).json({ connected: false, status: 'offline', error: String(err.message ?? err) }); }
 });
@@ -109,20 +110,22 @@ router.put('/api/secrets', requirePermission('*'), (req, res) => {
 // booleans only — never anything derived from the secret itself.
 router.get('/api/secrets/check', requirePermission('*'), async (_req, res) => {
   if (!pco.isConfigured()) return res.json({ planningCenter: null });
-  const serviceTypes = [...new Set(
-    Object.values(rooms).flatMap((r) => (r.planningCenter?.serviceTypes ?? []).map((st) => st.id)),
-  )];
-  if (!serviceTypes.length) return res.json({ planningCenter: null });
   try {
     pco.clearCache();
-    await pco.getUpcomingPlans({ id: serviceTypes[0], name: 'check' }, 1);
+    await pco.checkCredentials();
     res.json({ planningCenter: true });
-  } catch {
-    res.json({ planningCenter: false });
+  } catch (err) {
+    // This is safe to disclose: it contains only the endpoint and HTTP status,
+    // never either side of the Basic-auth credential pair.
+    res.json({ planningCenter: false, reason: String(err.message ?? err) });
   }
 });
 
-router.get('/api/integrations/resi/status', async (_req, res) => {
+// Widgets read Resi over the `integration:resi` topic now, so this is a
+// maintenance route. Gated for the same reason as the ProPresenter console
+// read: it calls a third-party API on the church's own token, and nothing
+// unauthenticated should be able to drive that.
+router.get('/api/integrations/resi/status', requirePermission('config.manage'), async (_req, res) => {
   res.json(await resi.status());
 });
 router.post('/api/integrations/resi/check', requirePermission('*'), async (_req, res) => {

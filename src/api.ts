@@ -187,7 +187,6 @@ export interface ResiStatus {
   capabilities: { player: boolean; viewers: boolean; telemetry: boolean };
 }
 
-export const getResiStatus = () => getJson<ResiStatus>('/api/integrations/resi/status');
 export async function checkResiConnection() {
   const res = await fetch('/api/integrations/resi/check', { method: 'POST', headers: requestHeaders() });
   const body = await res.json().catch(() => null) as ResiStatus | null;
@@ -553,7 +552,7 @@ export async function saveSecrets(updates: Record<string, string>): Promise<{ se
 
 /** Do the stored credentials actually work? null = not configured. */
 export const checkIntegrations = () =>
-  getJson<{ planningCenter: boolean | null }>('/api/secrets/check');
+  getJson<{ planningCenter: boolean | null; reason?: string }>('/api/secrets/check');
 
 export type IntegrationEnabled = Record<string, boolean>;
 export const getEnabledIntegrations = () => getJson<{ enabled: IntegrationEnabled }>('/api/integrations');
@@ -1307,6 +1306,8 @@ export interface WidgetConfigJson {
   autoplay?: boolean;
   muted?: boolean;
   playerControls?: boolean;
+  destinationLinks?: boolean;
+  videoPreview?: boolean;
   aspectRatio?: '16:9' | '4:3' | '1:1';
 }
 
