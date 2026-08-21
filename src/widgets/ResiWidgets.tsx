@@ -1,19 +1,18 @@
 import { Activity, Radio, UsersRound, Video } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { getResiStatus, type ResiStatus } from '../api';
+import { integrationTopic, useTopic } from '../lib/stream';
+import type { ResiStatus } from '../api';
 import type { WidgetProps } from './types';
 
-const intervals = { health: 3_000, viewers: 10_000 };
-
-function useResi(interval = intervals.health) {
-  const [state, setState] = useState<ResiStatus | null>(null);
-  useEffect(() => {
-    let mounted = true;
-    const load = () => getResiStatus().then((next) => mounted && setState(next)).catch((err) => mounted && setState({ connected: false, configured: true, live: false, health: 'connection-lost', title: 'Resi connection lost', error: String(err), capabilities: { player: false, viewers: false, telemetry: false } }));
-    load(); const id = window.setInterval(load, interval);
-    return () => { mounted = false; window.clearInterval(id); };
-  }, [interval]);
-  return state;
+/**
+ * One server-side producer polls Resi while anybody is watching and publishes
+ * on the shared stream (ADR 0010). Every Resi widget on the page reads the same
+ * topic, so four of them cost one poll rather than four intervals per tab.
+ *
+ * The interval argument is gone deliberately: freshness is now the producer's
+ * decision, and a widget cannot ask the service to be polled faster.
+ */
+function useResi() {
+  return useTopic<ResiStatus & { disabled?: boolean }>(integrationTopic('resi'));
 }
 
 function statusLabel(state: ResiStatus) {
@@ -40,12 +39,14 @@ function Embed({ state, config }: { state: ResiStatus; config: WidgetProps['conf
 export function ResiStreamWidget({ config }: WidgetProps) {
   const state = useResi();
   if (!state) return <p className="wgt__empty">Checking Resi…</p>;
+  if (state.disabled) return <p className="wgt__empty">Resi is disabled in Admin → Integrations.</p>;
   return <section className="wgt resi"><Head icon={Radio} title="Resi livestream" state={state} /><Embed state={state} config={config} /></section>;
 }
 
 export function ResiHealthWidget() {
   const state = useResi();
   if (!state) return <p className="wgt__empty">Checking Resi…</p>;
+  if (state.disabled) return <p className="wgt__empty">Resi is disabled in Admin → Integrations.</p>;
   const rows = [
     ['Encoder', state.encoder?.online == null ? null : state.encoder.online ? 'Online' : 'Offline'],
     ['Stream', state.live ? 'Live' : 'Offline'], ['Video', state.video], ['Audio', state.audio], ['Destination', state.destination],
@@ -54,13 +55,15 @@ export function ResiHealthWidget() {
 }
 
 export function ResiViewersWidget() {
-  const state = useResi(intervals.viewers);
+  const state = useResi();
   if (!state) return <p className="wgt__empty">Checking Resi…</p>;
+  if (state.disabled) return <p className="wgt__empty">Resi is disabled in Admin → Integrations.</p>;
   return <section className="wgt resi resi--viewers"><Head icon={UsersRound} title="Resi live viewers" state={state} /><strong className="wgt__value">{state.live && state.viewers != null ? state.viewers.toLocaleString() : '—'}</strong><p className="wgt__detail">{state.live ? state.viewers == null ? 'Viewer count is not available from this Resi account.' : [state.peakViewers != null && `peak ${state.peakViewers.toLocaleString()}`, state.totalViews != null && `${state.totalViews.toLocaleString()} total views`, state.averageWatchTime && `avg watch ${state.averageWatchTime}`].filter(Boolean).join(' · ') || 'Live' : state.connected ? 'No active broadcast' : state.error ?? 'Resi connection lost'}</p></section>;
 }
 
 export function ResiBroadcastWidget({ config }: WidgetProps) {
   const state = useResi();
   if (!state) return <p className="wgt__empty">Checking Resi…</p>;
+  if (state.disabled) return <p className="wgt__empty">Resi is disabled in Admin → Integrations.</p>;
   return <section className="wgt resi resi--broadcast"><Head icon={Radio} title={state.title || 'Resi broadcast'} state={state} /><Embed state={state} config={config} /><div className="resi__summary"><strong>{state.live && state.viewers != null ? `${state.viewers.toLocaleString()} viewers` : statusLabel(state)}</strong><span>{state.encoder?.online === true ? 'Encoder online' : state.encoder?.online === false ? 'Encoder offline' : state.connected ? 'Monitoring connected' : state.error ?? 'Connection lost'}</span></div></section>;
 }
