@@ -29,10 +29,6 @@ export interface PaletteEntry {
 export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement[], analysisSource?: AnalysisSource | null, captionSource?: CaptionsConfig['source'] | null, enabled?: Record<string, boolean>): PaletteEntry[] {
   const entries = widgetTypes
     .filter((type) => widgetAllowedOn(widgetRegistry[type], kind))
-    // Loudness widgets are supplied by the selected analysis integration, not
-    // a generic "audio" bucket. With no source configured there is nothing
-    // useful to add yet, so keep them out of the picker until one is chosen.
-    .filter((type) => !['loudness', 'loudness-trend'].includes(type) || Boolean(analysisSource))
     .map((type) => {
       const def = widgetRegistry[type];
       const placed = placements.some((p) => p.type === type);
@@ -45,7 +41,9 @@ export function paletteFor(kind: ViewKind, grid: Grid, placements: ViewPlacement
         size: def.size,
         integration: analysisTitle ? analysisIntegration(analysisSource) : captionTitle ? captionIntegration(captionSource) : def.integration ?? 'prodmesh',
         blocked:
-          widgetIsUnique(def) && placed
+          ['loudness', 'loudness-trend'].includes(type) && !analysisSource
+            ? 'Choose an Audio Analysis source in Campus settings first'
+            : widgetIsUnique(def) && placed
             ? 'Already on this view'
             : findFirstFit(grid, placements, def.size)
               ? null
