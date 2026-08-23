@@ -1,4 +1,4 @@
-# prodmesh
+# ProdMesh 1.3
 
 A production dashboard for churches, running on your own LAN. One screen the
 whole team opens: room status and mode control, the service order live from
@@ -12,13 +12,15 @@ calls you configure to Planning Center.
 ## Install
 
 ```bash
-curl -O https://raw.githubusercontent.com/jbeale/prodmesh/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/WorshipWarehouse/prodmesh/v1.3.0/docker-compose.yml
 docker compose up -d
 ```
 
 Open `http://<this-host-ip>:8080` and a setup wizard takes it from there — it
 asks who you are, creates the first admin, and starts with an empty building for
-you to describe. Images are published for amd64 and arm64.
+you to describe. This installs the `WorshipWarehouse/prodmesh` 1.3.0 image for
+amd64 and arm64. To follow unreleased work instead, replace `v1.3.0` with `main`
+in the URL and change the compose image tag from `:1.3.0` to `:latest`.
 
 Prefer a git checkout with auto-start via launchd or systemd? See
 [`deploy/README.md`](deploy/README.md), which covers both paths, updates and
