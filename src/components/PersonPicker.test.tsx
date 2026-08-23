@@ -4,6 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PersonPicker } from './PersonPicker';
 import type { PlanningCenterPerson } from '../api';
 
+// Every assertion below waits on a 250ms debounce inside PersonPicker, and
+// testing-library's default findBy timeout is 1000ms — 750ms of headroom for a
+// keystroke sequence, a rejected promise and a re-render. That held locally and
+// failed twice on CI, where 38 test files share a runner. The debounce is the
+// thing being waited on, so the timeout should be a multiple of it rather than
+// a coincidence.
+const DEBOUNCED = { timeout: 5000 };
+
 const api = vi.hoisted(() => ({ searchPlanningCenterPeople: vi.fn() }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -31,7 +39,7 @@ describe('PersonPicker', () => {
     const input = await screen.findByRole('combobox');
     await user.type(input, 'avery');
 
-    await user.click(await screen.findByRole('option', { name: /Avery Stone/ }));
+    await user.click(await screen.findByRole('option', { name: /Avery Stone/ }, DEBOUNCED));
     expect(onChange).toHaveBeenCalledWith('900001');
     // The picked person stays visible — an ID alone is unverifiable at a glance.
     expect(screen.getByText('Avery Stone')).toBeInTheDocument();
@@ -45,7 +53,7 @@ describe('PersonPicker', () => {
     render(<PersonPicker value="" onChange={onChange} />);
 
     await user.type(await screen.findByRole('combobox'), 'torres');
-    await screen.findByRole('option', { name: /Avery Stone/ });
+    await screen.findByRole('option', { name: /Avery Stone/ }, DEBOUNCED);
 
     // The first row is active on arrival, so one ArrowDown lands on Riley.
     await user.keyboard('{ArrowDown}{Enter}');
@@ -59,7 +67,7 @@ describe('PersonPicker', () => {
     const { rerender } = render(<PersonPicker value="" onChange={onChange} />);
 
     await user.type(await screen.findByRole('combobox'), 'avery');
-    await user.click(await screen.findByRole('option', { name: /Avery Stone/ }));
+    await user.click(await screen.findByRole('option', { name: /Avery Stone/ }, DEBOUNCED));
     rerender(<PersonPicker value="900001" onChange={onChange} />);
 
     await user.click(screen.getByRole('button', { name: 'Unlink Avery Stone' }));
@@ -73,7 +81,7 @@ describe('PersonPicker', () => {
     render(<PersonPicker value="" onChange={vi.fn()} />);
 
     await user.type(await screen.findByRole('combobox'), 'avery');
-    await screen.findByRole('option', { name: /Avery Stone/ });
+    await screen.findByRole('option', { name: /Avery Stone/ }, DEBOUNCED);
 
     // One probe on mount plus one search — not one request per keystroke.
     expect(api.searchPlanningCenterPeople).toHaveBeenCalledTimes(2);
@@ -119,7 +127,7 @@ describe('PersonPicker', () => {
     render(<PersonPicker value="" onChange={vi.fn()} />);
 
     await user.type(await screen.findByRole('combobox'), 'avery');
-    expect(await screen.findByText(/didn’t answer/)).toBeInTheDocument();
+    expect(await screen.findByText(/didn’t answer/, undefined, DEBOUNCED)).toBeInTheDocument();
   });
 
   it('links a typed ID directly, and does not pretend to know whose it is', async () => {
@@ -131,7 +139,7 @@ describe('PersonPicker', () => {
     render(<PersonPicker value="" onChange={onChange} />);
 
     await user.type(await screen.findByRole('combobox'), '442310777');
-    await user.click(await screen.findByRole('option', { name: /442310777/ }));
+    await user.click(await screen.findByRole('option', { name: /442310777/ }, DEBOUNCED));
 
     expect(onChange).toHaveBeenCalledWith('442310777');
     expect(screen.getByText('Name not checked')).toBeInTheDocument();
@@ -146,7 +154,7 @@ describe('PersonPicker', () => {
     render(<PersonPicker value="" onChange={vi.fn()} />);
 
     await user.type(await screen.findByRole('combobox'), '442310777');
-    expect(await screen.findByText(/didn’t answer/)).toBeInTheDocument();
+    expect(await screen.findByText(/didn’t answer/, undefined, DEBOUNCED)).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /442310777/ })).toBeInTheDocument();
   });
 
