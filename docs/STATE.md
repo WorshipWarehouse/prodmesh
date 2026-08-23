@@ -3,19 +3,53 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-10 (v1.2.0 released).
+Last updated: 2026-08-23 (v1.3.0 released).
 
-## In progress — ProPresenter production console
+## v1.3.0 at a glance
 
-`feat/propresenter-production-console` adds an opt-in dashboard widget set:
-Slides, Playlist, Controls, Slide Notes and Timers. The backend keeps the
-focused playlist (what an operator is browsing) distinct from the active
-playlist/item (what is live), expands active arrangements, and sends a full
-playlist only when it changes; slide/timer/video updates are compact SSE frames.
-Controls require both `propresenter.control` and an explicitly enabled stored
-dashboard widget. It is **not live-verified yet**: playlist response shapes,
-the thumbnail URL and PCO cue-trigger fallback need testing against the local
-ProPresenter build before release.
+The integrations release, and the first with outside contributors — most of it
+came from [@WorshipWarehouse](https://github.com/WorshipWarehouse) as pull
+requests (#7, #8, #11), reviewed and merged here.
+
+| | |
+|---|---|
+| **ProPresenter console** | Slides, Playlist, Controls, Slide Notes and Timers widgets. Focused playlist (what an operator browses) stays distinct from the active item (what is live); arrangements expand; rendered cue thumbnails proxy through us, never the device. Control needs `propresenter.control` **and** a stored dashboard widget with controls enabled — the database decides, not the browser. |
+| **Planning Center** | service, timer, schedule, team and service-report widgets |
+| **Restream** | OAuth connect, broadcast state, per-destination viewers and labels. Scopes are `channels.read` + `stream.read` only — exactly what the code calls |
+| **Resi** | stream, health, viewers and broadcast widgets — **Beta, see below** |
+| **Open Sound Meter** | a third analysis source beside Smaart and ProdMesh RTA, over UDP multicast (239.255.42.42:49007) rather than HTTP |
+| **Admin → Integrations** | enable/disable per integration; a disabled one is hidden *and* stops being polled |
+| **Setup wizard** | choose the integrations you use, and only be asked for those credentials |
+| **Widgets** | grouped by integration in the palette, every widget resizable, per-widget loudness meters |
+| **Org-level topics** | `integration:<id>` — the first stream topic that is not `room:*:<name>` (ADR 0010) |
+
+### Verified how
+
+Per the rule that green tests certify logic and nothing else:
+
+- **ProPresenter console** — run in the building during a service on 2026-08-16.
+- **Restream** — verified against a live account by the contributor who wrote
+  it, who then built further work on top of it.
+- **Resi — NOT verified against a real account by anyone.** Neither the
+  maintainer nor the contributor has a Resi subscription, so every Resi widget
+  is exercised only against its unconfigured and error paths. It ships labelled
+  **Beta** in the UI for exactly this reason.
+- **Open Sound Meter** — the multicast listener and its socket lifecycle are
+  tested; the +140 dB SPL reference is taken from OSM's own display and has not
+  been checked against a calibrated meter.
+
+**Beta means: not yet verified against real hardware or a real account by
+anyone here.** A Beta integration is named in the release notes and never
+blocks a tag — otherwise one unprovable integration holds every other fix
+hostage. It graduates when someone runs it in a building and records what they
+saw in [INTEGRATION-NOTES.md](./INTEGRATION-NOTES.md).
+
+### Known gaps
+
+- The Resi player and the optional Restream YouTube preview are `<iframe>`
+  embeds without a `sandbox` attribute, and both need a route to the internet —
+  a booth machine without one gets a blank frame rather than a clear message.
+- Integration logo assets are ~800 KB of PNG for icons rendered small.
 
 ## v1.2.0 at a glance
 
