@@ -1,6 +1,7 @@
 import { Activity, Radio, UsersRound, Video } from 'lucide-react';
 import { integrationTopic, useTopic } from '../lib/stream';
 import type { ResiStatus } from '../api';
+import { EMBED_ALLOW, EMBED_SANDBOX, safeEmbedUrl } from '../lib/embed';
 import type { WidgetProps } from './types';
 
 /**
@@ -28,12 +29,12 @@ function Head({ icon: Icon, state, title }: { icon: typeof Radio; state: ResiSta
 function Embed({ state, config }: { state: ResiStatus; config: WidgetProps['config'] }) {
   if (!state.live) return <div className="resi__offline"><Video size={26} /><strong>No active livestream</strong><span>{state.connected ? 'Resi reports no active broadcast.' : state.error ?? 'Connect Resi in Settings.'}</span></div>;
   if (!state.playerUrl) return <div className="resi__offline"><Video size={26} /><strong>Player URL not configured</strong><span>Add the official Resi player URL in Admin → Integrations → Resi.</span></div>;
-  let playerUrl: URL;
-  try { playerUrl = new URL(state.playerUrl); } catch { return <div className="resi__offline"><strong>Invalid player URL</strong><span>Update the Resi player URL in Settings.</span></div>; }
+  const playerUrl = safeEmbedUrl(state.playerUrl);
+  if (!playerUrl) return <div className="resi__offline"><strong>Invalid player URL</strong><span>The Resi player URL must be an https:// address. Update it in Settings.</span></div>;
   if (config.autoplay) playerUrl.searchParams.set('autoplay', '1');
   if (config.muted ?? true) playerUrl.searchParams.set('muted', '1');
   if (config.playerControls === false) playerUrl.searchParams.set('controls', '0');
-  return <div className="resi__player" style={{ aspectRatio: config.aspectRatio ?? '16 / 9' }}><iframe src={playerUrl.href} title="Resi livestream" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /></div>;
+  return <div className="resi__player" style={{ aspectRatio: config.aspectRatio ?? '16 / 9' }}><iframe src={playerUrl.href} title="Resi livestream" sandbox={EMBED_SANDBOX} allow={EMBED_ALLOW} allowFullScreen /></div>;
 }
 
 export function ResiStreamWidget({ config }: WidgetProps) {

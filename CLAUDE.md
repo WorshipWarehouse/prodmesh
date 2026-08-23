@@ -51,6 +51,16 @@ they are illustrative and match what an admin expects to type.
 to the internet. Fonts are bundled via `@fontsource`. Vendor any new asset
 rather than hotlinking it.
 
+**Third-party embeds go through `src/lib/embed.ts`.** A livestream player is the
+one thing that cannot be vendored, so the rule above has an exception and it is
+fenced: `safeEmbedUrl()` (https only — `new URL()` is a parser, not a check) and
+`EMBED_SANDBOX` on the `<iframe>`. The sandbox is not about token theft; the
+same-origin policy already stops a cross-origin frame reading our DOM or
+`localStorage`. It stops an embedded page navigating the tab, which on an
+unattended booth display means leaving the dashboard mid-service. Pin the
+hostname too where the host set is known (Restream's preview does); do not
+invent one where it is not.
+
 **Branch, then merge locally.** `feat/<name>` (or `fix/`, `chore/`, `docs/`) →
 tests green → live-verify against a running server → **the maintainer tests it**
 → merge `--no-ff` to main → push → delete the branch both sides. The maintainer
