@@ -3,13 +3,11 @@ import { report } from '../health.js';
 
 const TOKEN_URL = 'https://api.restream.io/oauth/token';
 const API = 'https://api.restream.io/v2';
-// Keep the consent request aligned with every capability Restream exposes in
-// ProdMesh. A customer can enable any subset in the Restream developer portal;
-// Restream will grant only scopes enabled for the application.
+// Least privilege: ProdMesh only reads the active event/viewer analytics and
+// destination metadata. It never controls a Restream stream or accesses chat,
+// clips, storage, Studio, or the account profile.
 const OAUTH_SCOPES = [
-  'profile.read', 'channels.read', 'stream.read', 'chat.read', 'clips.read',
-  'storage.read', 'studio.read', 'channels.write', 'clips.write',
-  'storage.write', 'stream.write', 'studio.write',
+  'channels.read', 'stream.read',
 ].join(' ');
 export const healthKey = () => 'restream';
 export const configured = () => Boolean(getSecret('restream.clientId') && getSecret('restream.clientSecret'));
