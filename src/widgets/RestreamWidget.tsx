@@ -1,4 +1,5 @@
 import { ExternalLink, Radio, UsersRound } from 'lucide-react';
+import { EMBED_ALLOW, EMBED_SANDBOX, safeEmbedUrl } from '../lib/embed';
 import { integrationTopic, useTopic } from '../lib/stream';
 import youtubeLogo from '../assets/integrations/youtube.png';
 import facebookLogo from '../assets/integrations/facebook.png';
@@ -15,7 +16,8 @@ type State = {
 function playerUrl(url: string | null | undefined) {
   if (!url) return null;
   try {
-    const parsed = new URL(url);
+    const parsed = safeEmbedUrl(url);
+    if (!parsed) return null;
     const host = parsed.hostname.replace(/^www\./, '');
     if (host === 'youtu.be') return `https://www.youtube-nocookie.com/embed/${parsed.pathname.slice(1)}`;
     if (host === 'youtube.com' || host === 'm.youtube.com') {
@@ -33,8 +35,11 @@ function Preview({ state }: { state: State }) {
   // destinations, but only an active YouTube destination gives this widget a
   // consistent, embeddable viewer without guessing at another service's rules.
   const youtube = state.channels?.find((channel) => channel.name.toLowerCase().includes('youtube'));
-  const embedUrl = youtube?.embedUrl || playerUrl(youtube?.url);
-  if (embedUrl) return <div className="restream__preview"><iframe src={embedUrl} title="Restream live stream preview" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /></div>;
+  // Both values arrive verbatim from Restream's API. They must pass through
+  // `playerUrl()`: it rejects non-HTTPS URLs *and* pins the preview to the
+  // supported YouTube/Facebook hosts before anything reaches an iframe.
+  const embedUrl = playerUrl(youtube?.embedUrl) ?? playerUrl(youtube?.url);
+  if (embedUrl) return <div className="restream__preview"><iframe src={embedUrl} title="Restream live stream preview" sandbox={EMBED_SANDBOX} allow={EMBED_ALLOW} allowFullScreen /></div>;
   return null;
 }
 
