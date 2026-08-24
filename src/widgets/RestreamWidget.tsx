@@ -35,10 +35,10 @@ function Preview({ state }: { state: State }) {
   // destinations, but only an active YouTube destination gives this widget a
   // consistent, embeddable viewer without guessing at another service's rules.
   const youtube = state.channels?.find((channel) => channel.name.toLowerCase().includes('youtube'));
-  // `embedUrl` arrives verbatim from Restream's API, so it gets the same scheme
-  // check as anything else we frame; `playerUrl()` below additionally pins the
-  // host, which is possible here because the host set is small and known.
-  const embedUrl = safeEmbedUrl(youtube?.embedUrl)?.href ?? playerUrl(youtube?.url);
+  // Both values arrive verbatim from Restream's API. They must pass through
+  // `playerUrl()`: it rejects non-HTTPS URLs *and* pins the preview to the
+  // supported YouTube/Facebook hosts before anything reaches an iframe.
+  const embedUrl = playerUrl(youtube?.embedUrl) ?? playerUrl(youtube?.url);
   if (embedUrl) return <div className="restream__preview"><iframe src={embedUrl} title="Restream live stream preview" sandbox={EMBED_SANDBOX} allow={EMBED_ALLOW} allowFullScreen /></div>;
   return null;
 }
