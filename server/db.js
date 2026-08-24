@@ -17,6 +17,7 @@
 
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
+import { assertNotSealed } from './restoreSeal.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -26,12 +27,29 @@ export const DATA_DIR = process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data')
 let db = null;
 
 export function getDb() {
+  // After a restore this database is a file that no longer exists as far as
+  // this process is concerned. Reopening it would write the old install's
+  // pages back over the restored ones — see restoreSeal.js.
+  assertNotSealed();
   if (db) return db;
   mkdirSync(DATA_DIR, { recursive: true });
   db = new Database(join(DATA_DIR, 'prodmesh.db'));
   db.pragma('journal_mode = WAL');
   migrate(db);
   return db;
+}
+
+/**
+ * Close the connection and forget it.
+ *
+ * Only the restore needs this, and it needs it BEFORE the file is overwritten:
+ * closing afterwards is precisely the operation that undoes a restore, because
+ * better-sqlite3 checkpoints the WAL into whatever is at that path by then.
+ */
+export function closeDb() {
+  if (!db) return;
+  db.close();
+  db = null;
 }
 
 // Add a column to an existing table if a migration introduced it later.

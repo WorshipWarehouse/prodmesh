@@ -10,6 +10,7 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { assertNotSealed } from './restoreSeal.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.PRODMESH_DATA_DIR ?? join(__dirname, 'data');
@@ -171,6 +172,10 @@ export function describeSecrets() {
  * i.e. readable by every local account on the box.
  */
 export function setSecrets(updates) {
+  // Same trap as settings.json: this file is written whole from a memoised
+  // copy, so after a restore it would put the old install's credentials back
+  // over the restored ones. See restoreSeal.js.
+  assertNotSealed();
   const next = structuredClone(load());
   const touched = [];
   for (const [path, raw] of Object.entries(updates ?? {})) {

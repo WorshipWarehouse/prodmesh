@@ -26,10 +26,11 @@
 
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
-import { getDb, DATA_DIR, SCHEMA_VERSION } from './db.js';
+import { getDb, closeDb, DATA_DIR, SCHEMA_VERSION } from './db.js';
+import { seal } from './restoreSeal.js';
 import { getVersion } from './deployment.js';
 
 /** Envelope format. Bumped only if the SHAPE changes, not the app version. */
@@ -159,9 +160,20 @@ export function readBackup(buf) {
  * built from the old database, and pretending otherwise would leave a
  * half-restored server that looks fine. The caller tells the operator to
  * restart, which is honest and cannot be subtly wrong.
+ *
+ * It does, however, have to SEAL the process first when the target is this
+ * installation's own data directory — the restart the operator is about to
+ * perform would otherwise write the old database back over the restored one.
+ * restoreSeal.js has the mechanism; the order here is the fix. Seal (so
+ * nothing reopens), close (so the WAL is checkpointed into the file we are
+ * about to replace, not into the replacement), then write.
  */
 export function restoreBackup(envelope, { dataDir = DATA_DIR } = {}) {
   const files = envelope.files ?? {};
+  if (resolve(dataDir) === resolve(DATA_DIR)) {
+    seal();
+    closeDb();
+  }
   mkdirSync(dataDir, { recursive: true });
 
   for (const [name, b64] of Object.entries(files)) {
