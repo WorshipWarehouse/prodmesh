@@ -25,7 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, statSync, chmodSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
@@ -48,6 +48,22 @@ const HISTORY_TABLES = ['spl_samples', 'stream_samples', 'show_summaries'];
  */
 const FILES = ['settings.json', 'secrets.json', 'checklists.json'];
 const DIRS = { branding: false, timelines: true }; // value = is it history?
+
+/**
+ * Files whose MODE is part of what they are.
+ *
+ * secrets.js writes secrets.json 0600 and re-chmods it every time, because it
+ * holds the Planning Center token and every integration credential in plain
+ * text. A restore that recreates it 0644 hands the rebuilt machine a quietly
+ * weaker installation than the one that was backed up — and it stays that way
+ * until somebody happens to edit a secret. Found on a real restored box.
+ *
+ * prodmesh.db is deliberately not here: SQLite creates it 0644 itself, so
+ * restoring it 0644 is parity rather than a downgrade. Tightening it belongs
+ * in db.js if it belongs anywhere, not in a code path that only some
+ * installations ever run.
+ */
+const RESTRICTED_MODE = new Map([['secrets.json', 0o600]]);
 
 const isSafeName = (n) => /^[\w.-]+$/.test(n) && !n.startsWith('.');
 
@@ -184,7 +200,17 @@ export function restoreBackup(envelope, { dataDir = DATA_DIR } = {}) {
     if (parts.length > 2 || !parts.every(isSafeName)) continue;
     const target = join(dataDir, ...parts);
     mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, Buffer.from(b64, 'base64'));
+    const mode = RESTRICTED_MODE.get(name);
+    writeFileSync(target, Buffer.from(b64, 'base64'), mode ? { mode } : undefined);
+    if (mode) {
+      // An existing file keeps its old mode through a write, so say it again —
+      // exactly as secrets.js has to.
+      try {
+        chmodSync(target, mode);
+      } catch {
+        /* best effort — Windows and some mounts don't support it */
+      }
+    }
   }
 
   // The database last, and the sidecars removed with it: a stale -wal beside a

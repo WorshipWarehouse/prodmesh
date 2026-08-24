@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, statSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
@@ -147,4 +147,22 @@ test('a crafted path in a backup cannot write outside the data directory', () =>
   assert.equal(existsSync('/etc/escaped3'), false);
   // The legitimate file beside them still lands.
   assert.match(readFileSync(join(into, 'settings.json'), 'utf8'), /kept/);
+});
+
+test('secrets.json comes back locked down, not world-readable', { skip: process.platform === 'win32' && 'no file modes' }, () => {
+  // secrets.js writes this file 0600 and re-chmods it on every save, because
+  // it is the Planning Center token and every integration credential in the
+  // clear. Restoring it 0644 gives the rebuilt machine a weaker installation
+  // than the one that was backed up, silently, until someone edits a secret.
+  const env = backup.readBackup(backup.createBackup());
+  const { into, db } = restoreInto(env);
+  db.close();
+  assert.equal(statSync(join(into, 'secrets.json')).mode & 0o777, 0o600);
+
+  // And again over a file that already exists with a wider mode: a plain write
+  // keeps whatever mode the file had.
+  writeFileSync(join(into, 'secrets.json'), '{}');
+  chmodSync(join(into, 'secrets.json'), 0o644);
+  backup.restoreBackup(env, { dataDir: into });
+  assert.equal(statSync(join(into, 'secrets.json')).mode & 0o777, 0o600);
 });
