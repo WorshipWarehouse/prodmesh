@@ -252,7 +252,12 @@ function startStreamWatcher(roomId) {
   if (!cfg.mock && !youtube.hasCredentials()) return;
   const ctl = new AbortController();
   streamWatchers.set(roomId, ctl);
-  youtube.watchViewers(cfg, (s) => onStreamSample(roomId, s), ctl.signal).catch(() => {
+  // `recording` keeps the idle backoff off the ladder for a room whose show is
+  // running: a broadcast that starts late must be picked up in minutes, not
+  // whenever the ladder next comes round. A show starting calls
+  // restartStreamWatcher, so this is re-evaluated at exactly the right moment.
+  const opts = { recording: shows.has(roomId) };
+  youtube.watchViewers(cfg, (s) => onStreamSample(roomId, s), ctl.signal, undefined, opts).catch(() => {
     if (!ctl.signal.aborted) {
       streams.set(roomId, null);
       publishStream(roomId);

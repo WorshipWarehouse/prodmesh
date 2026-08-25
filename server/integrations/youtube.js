@@ -42,6 +42,36 @@ const RESOLVE_TTL_MS = 15 * 60_000;
 const RESOLVE_RETRY_MS = 2 * 60_000; // nothing live yet — look again sooner
 const REQUEST_TIMEOUT_MS = 10_000;
 
+/**
+ * How long to wait after each consecutive cycle that finds nothing live.
+ *
+ * Issue #10: the 15-minute TTL above only ever applied to a video id we
+ * already had. With nothing live there is no id, so the TTL was skipped and
+ * every idle cycle spent a fresh search at the 2-minute retry — 720 searches a
+ * day per room from a dashboard left open, which exhausts the 10,000-unit
+ * allowance in 3.3 hours. Worse, `search.list` also carries its own soft cap
+ * of 100 QUERIES a day that no amount of unit budget buys out, and that cap is
+ * the one a church actually hits.
+ *
+ * Nothing live is the ORDINARY state — most of a week is Tuesday. So the gap
+ * grows while nothing is there and collapses the moment something is. Worst
+ * case falls from 720 searches a day to 30.
+ *
+ * The ladder is safe to climb because it is never the only thing watching:
+ * showManager restarts this watcher when a show starts and when a subscriber
+ * arrives, and a fresh watcher starts at the bottom rung again.
+ */
+const IDLE_BACKOFF_MS = [2, 5, 15, 30, 60].map((m) => m * 60_000);
+
+/**
+ * …except while a show is recording, where the ladder must not climb at all.
+ * A stream that starts ten minutes into a service would otherwise go unnoticed
+ * for another fifteen, and those minutes are exactly the ones the Show Report
+ * exists to record. During a show the quota question is settled anyway: an
+ * hour of 30-second polling is ~120 units.
+ */
+const RECORDING_IDLE_MS = RESOLVE_RETRY_MS;
+
 /** Configured = we know where to look. An explicit video id skips the search. */
 export const isConfigured = (cfg) => Boolean(cfg && (cfg.mock || cfg.videoId || cfg.channelId));
 
@@ -200,16 +230,26 @@ function mockSample(startedAt) {
  * unreachable, exactly as with the analysis sources. Failures land in
  * Admin → Health instead.
  */
-export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_POLL_MS) {
+export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_POLL_MS, { recording = false } = {}) {
   const startedAt = Date.now();
   let videoId = cfg.videoId ?? null;
   let resolvedAt = 0;
+
+  // Consecutive cycles that found nothing live. Reset by anything live, and by
+  // the watcher being restarted — which showManager does on show start.
+  let idleStreak = 0;
+  const idleWait = () => {
+    const rung = IDLE_BACKOFF_MS[Math.min(idleStreak, IDLE_BACKOFF_MS.length - 1)];
+    idleStreak += 1;
+    return recording ? Math.min(rung, RECORDING_IDLE_MS) : rung;
+  };
 
   while (!signal.aborted) {
     let wait = intervalMs;
     try {
       if (cfg.mock) {
         const m = mockSample(startedAt);
+        idleStreak = 0;
         onSample({ ts: Date.now(), viewers: m.viewers, videoId: 'mock', title: m.title });
       } else {
         // Resolve (or re-resolve) the live video when we have no id, or the
@@ -222,7 +262,7 @@ export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_P
           // Nothing live. Not an error — most of the week looks like this.
           report(healthKey(cfg), true);
           onSample(null);
-          wait = RESOLVE_RETRY_MS;
+          wait = idleWait();
         } else {
           const v = await readVideo(videoId, signal);
           report(healthKey(cfg), true);
@@ -230,8 +270,11 @@ export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_P
             // The broadcast ended — drop the id so the next cycle looks again.
             if (!cfg.videoId) videoId = null;
             onSample(null);
-            wait = RESOLVE_RETRY_MS;
+            wait = idleWait();
           } else {
+            // Something is live: back to the top of the ladder, so the next
+            // gap in the stream is noticed in seconds rather than an hour.
+            idleStreak = 0;
             onSample({ ts: Date.now(), viewers: v.viewers, videoId, title: v.title });
           }
         }

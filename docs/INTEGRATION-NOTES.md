@@ -295,14 +295,58 @@ Default 10,000 units/day, and the two calls differ by 100x:
 | `videos.list?part=liveStreamingDetails` | **1** | the viewer count |
 | `search.list?eventType=live` | **100** | finding today's video id |
 
-So the live video is resolved rarely (15-min TTL, re-resolved sooner when
-nothing is live) and viewers are polled every 30s. A 90-minute service is
-~180 units plus a handful of searches.
+`search.list` also carries a **second, separate limit: a soft cap of ~100
+queries a day**, which no amount of unit budget buys out and which is the one a
+church actually hits. Raising it means a Google quota request that has to be
+justified — not practical for a LAN appliance.
+
+The live video is resolved rarely (15-min TTL) and viewers are polled every
+30s, so a 90-minute service is ~180 units plus a handful of searches.
+
+**Idle backoff (issue #10).** That TTL only ever applied to a video id we
+already had. With nothing live there is no id, the TTL was skipped, and every
+idle cycle spent a fresh search at the flat 2-minute retry: **720 searches a
+day per room** from a dashboard left open — the whole unit allowance in 3.3
+hours, and the search cap in the same 3.3 hours. Nothing live is the ordinary
+state; most of a week is Tuesday. So consecutive idle cycles now climb a ladder
+— 2, 5, 15, 30, 60 minutes — which anything live resets to the bottom, and
+which a room with a running show never climbs at all (a broadcast starting late
+must be picked up in minutes, and those are the minutes the Show Report exists
+to record). Measured: 720 searches a day becomes 28.
+
+That is comfortable for one streaming room and **not** unlimited: at 28 a day,
+about three rooms with channels and permanently-open dashboards would reach the
+100-query cap again. The durable fix is to stop resolving with `search.list`
+at all — see below.
 
 Quota exhaustion returns **403 with `reason: quotaExceeded`** — worth naming
 explicitly, because a bare 403 sends someone hunting for a permissions problem
 that isn't there. The watcher backs off 30 minutes on it; retrying cannot help
 until the daily UTC reset.
+
+### Resolving the live video without `search.list` — unverified
+
+The obvious replacement costs 3 units instead of 100 and never touches the
+search cap: `channels.list` → the channel's uploads playlist id (stable, cache
+it), `playlistItems.list` → recent video ids, `videos.list?part=liveStreamingDetails`
+→ which of them is live.
+
+**It has not been shown to work here, and there is evidence against it.**
+Probed against a real church channel (2026-08-25, nothing live at the
+time): the uploads playlist returned 10 recent videos and **not one of them had
+`liveStreamingDetails` at all** — no `actualStartTime`, including on that
+week's service videos. On this channel the uploads playlist appears to hold
+uploaded VODs rather than stream archives, which would mean a live broadcast
+never shows up there for us to find.
+
+What that probe could NOT settle is the case that matters: whether a currently-
+live broadcast appears in uploads while it is live. Both methods agreed on
+"nothing live", which is agreement about nothing. **Before building on this,
+run the probe during an actual service** and compare its answer with
+`search.list`. If uploads stays empty of the live broadcast, the remaining
+options are pinning the video per service (already supported, zero searches),
+or OAuth + `liveBroadcasts.list`, which needs the verification review this
+integration deliberately avoided.
 
 ### Which broadcast belongs to which service
 
