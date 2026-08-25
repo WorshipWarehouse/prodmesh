@@ -322,9 +322,16 @@ so nothing resets the ladder in that gap, and a dashboard open since Tuesday
 would sit on the 60-minute rung and not notice the broadcast until as late as
 8:50 — most of the way through the service it was meant to record. So the gap
 is capped at **5 minutes when a service is due** (30 minutes before the
-earliest service time to 2 hours after the latest, from Planning Center plan
+earliest service time to 1 hour after the latest, from Planning Center plan
 times, behind its 10-minute cache and consulted only when the wait would
-otherwise have been long). Five and not two: the cap is paid across the whole
+otherwise have been long).
+
+Both bounds are measured from a service **start**, which is what makes an hour
+enough on the tail: the question is not how long a service runs but how late
+after the last scheduled start a broadcast could still begin. While a service
+is actually running the window is irrelevant — a running show pins the gap
+tighter than the window ever would. On an 8:00 + 9:30 plan the window is
+7:30 → 10:30. Five and not two: the cap is paid across the whole
 window, and at two minutes a Sunday morning alone would spend most of the daily
 search allowance. A room with no service types, or an unreachable Planning
 Center, climbs the ladder as normal.

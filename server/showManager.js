@@ -256,9 +256,16 @@ export function youtubeConfigForTest(roomId, planId, timeId) {
  * Never throws and never blocks a poll: Planning Center behind a 10-minute
  * cache, consulted only when the watcher was about to sleep for a long time,
  * and a room with no service types answers false without a request.
+ *
+ * Both bounds are measured from a service START, which is what makes an hour
+ * enough on the tail: it is not "how long a service runs" but "how late after
+ * the last scheduled start could a broadcast still begin" — a stream Companion
+ * started late, or a service nobody autostarted. While a service is actually
+ * running the window does not matter at all, because a running show pins the
+ * gap tighter than this ever would.
  */
 const SERVICE_LEAD_MS = 30 * 60 * 1000;
-const SERVICE_TAIL_MS = 2 * 60 * 60 * 1000;
+const SERVICE_TAIL_MS = 60 * 60 * 1000;
 
 async function serviceSoon(roomId) {
   const types = rooms[roomId]?.planningCenter?.serviceTypes ?? [];
