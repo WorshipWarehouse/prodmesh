@@ -244,6 +244,38 @@ export function youtubeConfigForTest(roomId, planId, timeId) {
   }
 }
 
+/**
+ * Is this room close enough to a service that a broadcast could be up?
+ *
+ * Churches start the stream before the service — Companion on a timer, ten
+ * minutes ahead in the maintainer's building — so "a show is running" is not
+ * the same question and answers it too late. Deliberately wide on the tail: an
+ * 8:00 and a 9:30 on one plan are one continuous morning, and the gap between
+ * the first stream ending and the second starting is minutes.
+ *
+ * Never throws and never blocks a poll: Planning Center behind a 10-minute
+ * cache, consulted only when the watcher was about to sleep for a long time,
+ * and a room with no service types answers false without a request.
+ */
+const SERVICE_LEAD_MS = 30 * 60 * 1000;
+const SERVICE_TAIL_MS = 2 * 60 * 60 * 1000;
+
+async function serviceSoon(roomId) {
+  const types = rooms[roomId]?.planningCenter?.serviceTypes ?? [];
+  if (!types.length) return false;
+  const now = Date.now();
+  for (const st of types) {
+    for (const plan of await pco.getUpcomingPlans(st, 2).catch(() => [])) {
+      const times = await pco
+        .getPlanTimes({ id: plan.serviceTypeId, name: plan.serviceTypeName }, plan.id)
+        .catch(() => []);
+      const window = armWindow(times, SERVICE_LEAD_MS, SERVICE_TAIL_MS);
+      if (window && now >= window.from && now <= window.to) return true;
+    }
+  }
+  return false;
+}
+
 function startStreamWatcher(roomId) {
   if (streamWatchers.has(roomId)) return;
   const cfg = youtubeConfigFor(roomId);
@@ -256,7 +288,7 @@ function startStreamWatcher(roomId) {
   // running: a broadcast that starts late must be picked up in minutes, not
   // whenever the ladder next comes round. A show starting calls
   // restartStreamWatcher, so this is re-evaluated at exactly the right moment.
-  const opts = { recording: shows.has(roomId) };
+  const opts = { recording: shows.has(roomId), serviceSoon: () => serviceSoon(roomId) };
   youtube.watchViewers(cfg, (s) => onStreamSample(roomId, s), ctl.signal, undefined, opts).catch(() => {
     if (!ctl.signal.aborted) {
       streams.set(roomId, null);

@@ -72,6 +72,23 @@ const IDLE_BACKOFF_MS = [2, 5, 15, 30, 60].map((m) => m * 60_000);
  */
 const RECORDING_IDLE_MS = RESOLVE_RETRY_MS;
 
+/**
+ * …and a third case, which the ladder alone gets wrong.
+ *
+ * Churches start the broadcast BEFORE the service, on a timer: the maintainer's
+ * SOP has Companion going live 10 minutes ahead of each service time, so the
+ * 8:00 stream starts at 7:50 and the 9:30 stream at 9:20. A show does not start
+ * until ProPresenter moves at 8:00, so between 7:50 and 8:00 nothing has reset
+ * the ladder — a dashboard left open since Tuesday would sit on the top rung
+ * and not notice the broadcast until as late as 8:50, most of the way through
+ * the service it was supposed to be recording.
+ *
+ * So when a service is due, the gap is capped here instead. Five minutes, not
+ * two: the cap is paid for the whole window, and at two minutes a Sunday
+ * morning alone would spend most of the daily search allowance.
+ */
+const IMMINENT_IDLE_MS = 5 * 60_000;
+
 /** Configured = we know where to look. An explicit video id skips the search. */
 export const isConfigured = (cfg) => Boolean(cfg && (cfg.mock || cfg.videoId || cfg.channelId));
 
@@ -230,7 +247,13 @@ function mockSample(startedAt) {
  * unreachable, exactly as with the analysis sources. Failures land in
  * Admin → Health instead.
  */
-export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_POLL_MS, { recording = false } = {}) {
+export async function watchViewers(
+  cfg,
+  onSample,
+  signal,
+  intervalMs = DEFAULT_POLL_MS,
+  { recording = false, serviceSoon = null } = {},
+) {
   const startedAt = Date.now();
   let videoId = cfg.videoId ?? null;
   let resolvedAt = 0;
@@ -238,10 +261,19 @@ export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_P
   // Consecutive cycles that found nothing live. Reset by anything live, and by
   // the watcher being restarted — which showManager does on show start.
   let idleStreak = 0;
-  const idleWait = () => {
+  const idleWait = async () => {
     const rung = IDLE_BACKOFF_MS[Math.min(idleStreak, IDLE_BACKOFF_MS.length - 1)];
     idleStreak += 1;
-    return recording ? Math.min(rung, RECORDING_IDLE_MS) : rung;
+    if (recording) return Math.min(rung, RECORDING_IDLE_MS);
+    // Only worth asking when we were about to wait a long time — which keeps
+    // this to a handful of (cached) Planning Center reads a day rather than one
+    // per cycle. A room with no schedule, or an unreachable PCO, just climbs.
+    if (rung <= IMMINENT_IDLE_MS || !serviceSoon) return rung;
+    try {
+      return (await serviceSoon()) ? IMMINENT_IDLE_MS : rung;
+    } catch {
+      return rung;
+    }
   };
 
   while (!signal.aborted) {
@@ -262,7 +294,7 @@ export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_P
           // Nothing live. Not an error — most of the week looks like this.
           report(healthKey(cfg), true);
           onSample(null);
-          wait = idleWait();
+          wait = await idleWait();
         } else {
           const v = await readVideo(videoId, signal);
           report(healthKey(cfg), true);
@@ -270,7 +302,7 @@ export async function watchViewers(cfg, onSample, signal, intervalMs = DEFAULT_P
             // The broadcast ended — drop the id so the next cycle looks again.
             if (!cfg.videoId) videoId = null;
             onSample(null);
-            wait = idleWait();
+            wait = await idleWait();
           } else {
             // Something is live: back to the top of the ladder, so the next
             // gap in the stream is noticed in seconds rather than an hour.

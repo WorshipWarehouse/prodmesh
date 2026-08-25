@@ -298,3 +298,51 @@ test('a recording show never climbs the ladder', async () => {
   assert.deepEqual(minutes(waits), [2, 2, 2, 2, 2]);
   assert.equal(cycles, 6);
 });
+
+test('a service due soon keeps the gap short, even after a quiet week', async () => {
+  // The SOP this exists for: the broadcast goes live ten minutes BEFORE the
+  // service, and no show has started yet to reset anything. On the top rung a
+  // dashboard open since Tuesday would not notice until most of the way
+  // through the service.
+  handler = () => ({ items: [] });
+  const { waits, restore } = recordWaits();
+  const ctl = new AbortController();
+  let asked = 0;
+  let cycles = 0;
+  try {
+    await yt.watchViewers(
+      { channelId: 'UC1' },
+      () => { if (++cycles >= 7) ctl.abort(); },
+      ctl.signal,
+      30_000,
+      { serviceSoon: async () => { asked += 1; return true; } },
+    );
+  } finally {
+    restore();
+  }
+  // The first two rungs are already inside the cap and are not worth a
+  // Planning Center read; from the third on, the cap holds the gap at five.
+  assert.deepEqual(minutes(waits), [2, 5, 5, 5, 5, 5]);
+  assert.equal(asked, 5, 'asked only from the third rung on, never on a short wait');
+});
+
+test('an unreachable schedule lets the ladder climb rather than failing', async () => {
+  // Planning Center being down must not turn into a tight polling loop, and
+  // must not stop the watcher either.
+  handler = () => ({ items: [] });
+  const { waits, restore } = recordWaits();
+  const ctl = new AbortController();
+  let cycles = 0;
+  try {
+    await yt.watchViewers(
+      { channelId: 'UC1' },
+      () => { if (++cycles >= 6) ctl.abort(); },
+      ctl.signal,
+      30_000,
+      { serviceSoon: async () => { throw new Error('PCO unreachable'); } },
+    );
+  } finally {
+    restore();
+  }
+  assert.deepEqual(minutes(waits), [2, 5, 15, 30, 60]);
+});

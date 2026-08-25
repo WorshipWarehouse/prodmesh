@@ -314,10 +314,29 @@ which a room with a running show never climbs at all (a broadcast starting late
 must be picked up in minutes, and those are the minutes the Show Report exists
 to record). Measured: 720 searches a day becomes 28.
 
-That is comfortable for one streaming room and **not** unlimited: at 28 a day,
-about three rooms with channels and permanently-open dashboards would reach the
-100-query cap again. The durable fix is to stop resolving with `search.list`
-at all — see below.
+**The broadcast starts before the service, so the ladder alone gets Sunday
+wrong.** Churches go live on a timer — the maintainer's SOP has Companion
+starting each stream 10 minutes ahead, so the 8:00 service streams from 7:50
+and the 9:30 from 9:20. A show does not start until ProPresenter moves at 8:00,
+so nothing resets the ladder in that gap, and a dashboard open since Tuesday
+would sit on the 60-minute rung and not notice the broadcast until as late as
+8:50 — most of the way through the service it was meant to record. So the gap
+is capped at **5 minutes when a service is due** (30 minutes before the
+earliest service time to 2 hours after the latest, from Planning Center plan
+times, behind its 10-minute cache and consulted only when the wait would
+otherwise have been long). Five and not two: the cap is paid across the whole
+window, and at two minutes a Sunday morning alone would spend most of the daily
+search allowance. A room with no service types, or an unreachable Planning
+Center, climbs the ladder as normal.
+
+Ends do not need the same treatment: the 8:00 broadcast ending resets the
+ladder to its bottom rung, so the 9:20 start is picked up within a couple of
+minutes on the existing behaviour.
+
+This is comfortable for one streaming room and **not** unlimited: at ~28 a day
+idle, about three rooms with channels and permanently-open dashboards would
+reach the 100-query cap again. The durable fix is to stop resolving with
+`search.list` at all — see below.
 
 Quota exhaustion returns **403 with `reason: quotaExceeded`** — worth naming
 explicitly, because a bare 403 sends someone hunting for a permissions problem
