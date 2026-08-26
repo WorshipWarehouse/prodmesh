@@ -211,3 +211,138 @@ test('mock mode produces a plausible curve and makes no requests at all', async 
   assert.ok(seen[0].viewers >= 0);
   assert.equal(calls.length, 0, 'mock must never reach the network');
 });
+
+// ── Idle backoff (issue #10) ────────────────────────────────────────────────
+//
+// The waits are the whole subject here, so they are what gets asserted. Every
+// sleep is recorded and fired immediately, which turns a day of idle polling
+// into a few milliseconds.
+function recordWaits() {
+  const real = globalThis.setTimeout;
+  const waits = [];
+  globalThis.setTimeout = (fn, ms, ...rest) => {
+    waits.push(ms);
+    return real(fn, 0, ...rest);
+  };
+  return { waits, restore: () => { globalThis.setTimeout = real; } };
+}
+
+const minutes = (waits) => waits.filter((w) => w >= 60_000).map((w) => w / 60_000);
+
+test('an idle channel backs off instead of searching every two minutes', async () => {
+  // Before this, every idle cycle spent a 100-unit search at a flat 2-minute
+  // retry: 720 a day from one dashboard left open, against a 10,000-unit
+  // allowance and a 100-query/day cap on search.list itself.
+  handler = () => ({ items: [] }); // nothing live — an ordinary Tuesday
+  const { waits, restore } = recordWaits();
+  const ctl = new AbortController();
+  let cycles = 0;
+  try {
+    await yt.watchViewers({ channelId: 'UC1' }, () => { if (++cycles >= 7) ctl.abort(); }, ctl.signal);
+  } finally {
+    restore();
+  }
+  assert.deepEqual(minutes(waits), [2, 5, 15, 30, 60, 60], 'the gap grows and then holds at an hour');
+
+  // One search per cycle is still true and still correct — the fix is the
+  // CADENCE, not the call. At the top rung that is 24 searches a day, not 720.
+  assert.equal(calls.filter((c) => c.path === 'search').length, cycles);
+});
+
+test('anything live puts the watcher straight back on the bottom rung', async () => {
+  // A stream that appears after two hours of nothing must not wait an hour to
+  // be noticed a second time, so a live cycle resets the ladder.
+  let live = false;
+  const ended = { items: [{ liveStreamingDetails: { actualStartTime: '2026-08-09T17:00:00Z', actualEndTime: '2026-08-09T18:30:00Z' }, snippet: { title: 'Sunday Service' } }] };
+  handler = (u) => (u.pathname.endsWith('/search')
+    ? { items: live ? [{ id: { videoId: 'v1' } }] : [] }
+    : (live ? liveVideo(11) : ended));
+  const { waits, restore } = recordWaits();
+  const ctl = new AbortController();
+  const seen = [];
+  try {
+    await yt.watchViewers({ channelId: 'UC1' }, (s) => {
+      seen.push(s);
+      if (seen.length === 3) live = true;   // the service starts
+      if (seen.length === 5) live = false;  // and ends
+      if (seen.length >= 8) ctl.abort();
+    }, ctl.signal, 30_000);
+  } finally {
+    restore();
+  }
+  // Three idle rungs, then live (short polls, no minute-scale wait), then idle
+  // again from the BOTTOM of the ladder rather than where it left off.
+  assert.deepEqual(minutes(waits), [2, 5, 15, 2, 5]);
+  assert.ok(seen.some((s) => s?.viewers === 11), 'it still reports viewers while live');
+});
+
+test('a recording show never climbs the ladder', async () => {
+  // A broadcast that starts ten minutes into a service would otherwise go
+  // unseen for another fifteen — and those are the minutes the Show Report
+  // exists to record.
+  handler = () => ({ items: [] });
+  const { waits, restore } = recordWaits();
+  const ctl = new AbortController();
+  let cycles = 0;
+  try {
+    await yt.watchViewers(
+      { channelId: 'UC1' },
+      () => { if (++cycles >= 6) ctl.abort(); },
+      ctl.signal,
+      30_000,
+      { recording: true },
+    );
+  } finally {
+    restore();
+  }
+  assert.deepEqual(minutes(waits), [2, 2, 2, 2, 2]);
+  assert.equal(cycles, 6);
+});
+
+test('a service due soon keeps the gap short, even after a quiet week', async () => {
+  // The SOP this exists for: the broadcast goes live ten minutes BEFORE the
+  // service, and no show has started yet to reset anything. On the top rung a
+  // dashboard open since Tuesday would not notice until most of the way
+  // through the service.
+  handler = () => ({ items: [] });
+  const { waits, restore } = recordWaits();
+  const ctl = new AbortController();
+  let asked = 0;
+  let cycles = 0;
+  try {
+    await yt.watchViewers(
+      { channelId: 'UC1' },
+      () => { if (++cycles >= 7) ctl.abort(); },
+      ctl.signal,
+      30_000,
+      { serviceSoon: async () => { asked += 1; return true; } },
+    );
+  } finally {
+    restore();
+  }
+  // The first two rungs are already inside the cap and are not worth a
+  // Planning Center read; from the third on, the cap holds the gap at five.
+  assert.deepEqual(minutes(waits), [2, 5, 5, 5, 5, 5]);
+  assert.equal(asked, 5, 'asked only from the third rung on, never on a short wait');
+});
+
+test('an unreachable schedule lets the ladder climb rather than failing', async () => {
+  // Planning Center being down must not turn into a tight polling loop, and
+  // must not stop the watcher either.
+  handler = () => ({ items: [] });
+  const { waits, restore } = recordWaits();
+  const ctl = new AbortController();
+  let cycles = 0;
+  try {
+    await yt.watchViewers(
+      { channelId: 'UC1' },
+      () => { if (++cycles >= 6) ctl.abort(); },
+      ctl.signal,
+      30_000,
+      { serviceSoon: async () => { throw new Error('PCO unreachable'); } },
+    );
+  } finally {
+    restore();
+  }
+  assert.deepEqual(minutes(waits), [2, 5, 15, 30, 60]);
+});
