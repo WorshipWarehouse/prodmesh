@@ -35,8 +35,10 @@ export function ObsHealthWidget({ roomId, config }: WidgetProps) {
         <div><span>FPS</span><strong>{state.activeFps == null ? '—' : state.activeFps.toFixed(1)}</strong></div>
         <div><span>Bitrate</span><strong>{state.bitrateKbps == null ? '—' : `${state.bitrateKbps.toLocaleString()} kbps`}</strong></div>
       </div>
-      <div className={`obs-health__audio obs-health__audio--${state.audioStatus}`}><Mic size={15} /><span>{state.primaryAudioInput ?? 'Program audio'}</span><strong>{state.audioDb == null ? 'No signal' : `${state.audioDb.toFixed(1)} dB`}</strong></div>
-      <div className={`obs-health__frames${warning ? ' obs-health__frames--warn' : ''}`}>{warning ? <CircleAlert size={14} /> : <CircleCheck size={14} />}<span>Dropped frames</span><strong>{state.droppedFrames.toLocaleString()} · {state.droppedFramesPercent.toFixed(2)}%</strong></div>
+      <div className="obs-health__telemetry">
+        <div className={`obs-health__audio obs-health__audio--${state.audioStatus}`}><Mic size={15} /><span>{state.primaryAudioInput ?? 'Program audio'}</span><strong>{state.audioDb == null ? 'No signal' : `${state.audioDb.toFixed(1)} dB`}</strong></div>
+        <div className={`obs-health__frames${warning ? ' obs-health__frames--warn' : ''}`}>{warning ? <CircleAlert size={14} /> : <CircleCheck size={14} />}<span>Dropped frames</span><strong>{state.droppedFrames.toLocaleString()} · {state.droppedFramesPercent.toFixed(2)}%</strong></div>
+      </div>
       {config.obsDetails && <div className="obs-health__details"><span>CPU {state.cpuUsage == null ? '—' : `${state.cpuUsage.toFixed(1)}%`}</span><span>Disk {state.diskFreeGb == null ? '—' : `${state.diskFreeGb.toFixed(1)} GB free`}</span>{state.programSources.length > 0 && <span>{state.programSources.length} program sources</span>}</div>}
     </>}
   </section>;

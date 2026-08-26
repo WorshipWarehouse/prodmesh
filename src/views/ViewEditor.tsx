@@ -5,7 +5,7 @@ import { WidgetPalette, paletteFor } from './WidgetPalette';
 import { useGridDrag, type Cell } from './useGridDrag';
 import { findFirstFit, isFree, occupancy, rowCount, type Grid } from '../lib/gridLayout';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
-import { widgetMax, widgetMin, widgetResizable, type WidgetSize } from '../widgets/types';
+import { NEW_WIDGET_SIZE, widgetMax, widgetMin, widgetResizable, type WidgetSize } from '../widgets/types';
 import { IntegrationBeta, IntegrationBrand } from '../components/IntegrationBrand';
 import { getEnabledIntegrations, getRoom, getRoomConnectivity, type View, type ViewPlacement } from '../api';
 import { useQuery } from '../lib/useQuery';
@@ -69,7 +69,7 @@ export function ViewEditor({
     if (!def) return;
     onChange([
       ...placements,
-      { id: `new-${type}-${placements.length}`, type, ...at, ...def.size, config: {} },
+      { id: `new-${type}-${placements.length}`, type, ...at, ...NEW_WIDGET_SIZE, config: {} },
     ]);
   };
 
@@ -106,7 +106,7 @@ export function ViewEditor({
 
   const addFromPalette = (type: string) => {
     const def = isWidgetType(type) ? widgetRegistry[type] : null;
-    const at = def && findFirstFit(grid, placements, def.size);
+    const at = def && findFirstFit(grid, placements, NEW_WIDGET_SIZE);
     if (!at || !def) return;
     place(type, at);
     setAnnounce(`${def.title} added at column ${at.x + 1}, row ${at.y + 1}.`);
@@ -209,7 +209,7 @@ export function ViewEditor({
         {resizable && (
           <span
             className="viewcell__resize"
-            title={`Drag to resize (${widgetMin(def!).w}–${widgetMax(def!).w} columns, ${widgetMin(def!).h}–${widgetMax(def!).h} rows)`}
+            title="Drag to resize"
             aria-hidden
             {...resizeHandlers(placement, boundsFor(placement.type))}
           />
