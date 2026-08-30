@@ -13,6 +13,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { validateSchedules } from './validate.js';
+import { assertNotSealed } from './restoreSeal.js';
 import { writeJsonAtomic } from './atomicFile.js';
 import { wantsDemoSeed } from './seedMode.js';
 
@@ -75,6 +76,10 @@ function load() {
 }
 
 function persist() {
+  // `settings` is memoised and written back whole, so after a restore this
+  // would rewrite the restored file from the old install's memory — admin PIN
+  // included. See restoreSeal.js.
+  assertNotSealed();
   writeJsonAtomic(FILE, settings);
 }
 

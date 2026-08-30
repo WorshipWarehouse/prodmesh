@@ -25,11 +25,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, statSync, chmodSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
-import { getDb, DATA_DIR, SCHEMA_VERSION } from './db.js';
+import { getDb, closeDb, DATA_DIR, SCHEMA_VERSION } from './db.js';
+import { seal } from './restoreSeal.js';
 import { getVersion } from './deployment.js';
 
 /** Envelope format. Bumped only if the SHAPE changes, not the app version. */
@@ -47,6 +48,22 @@ const HISTORY_TABLES = ['spl_samples', 'stream_samples', 'show_summaries'];
  */
 const FILES = ['settings.json', 'secrets.json', 'checklists.json'];
 const DIRS = { branding: false, timelines: true }; // value = is it history?
+
+/**
+ * Files whose MODE is part of what they are.
+ *
+ * secrets.js writes secrets.json 0600 and re-chmods it every time, because it
+ * holds the Planning Center token and every integration credential in plain
+ * text. A restore that recreates it 0644 hands the rebuilt machine a quietly
+ * weaker installation than the one that was backed up — and it stays that way
+ * until somebody happens to edit a secret. Found on a real restored box.
+ *
+ * prodmesh.db is deliberately not here: SQLite creates it 0644 itself, so
+ * restoring it 0644 is parity rather than a downgrade. Tightening it belongs
+ * in db.js if it belongs anywhere, not in a code path that only some
+ * installations ever run.
+ */
+const RESTRICTED_MODE = new Map([['secrets.json', 0o600]]);
 
 const isSafeName = (n) => /^[\w.-]+$/.test(n) && !n.startsWith('.');
 
@@ -159,9 +176,20 @@ export function readBackup(buf) {
  * built from the old database, and pretending otherwise would leave a
  * half-restored server that looks fine. The caller tells the operator to
  * restart, which is honest and cannot be subtly wrong.
+ *
+ * It does, however, have to SEAL the process first when the target is this
+ * installation's own data directory — the restart the operator is about to
+ * perform would otherwise write the old database back over the restored one.
+ * restoreSeal.js has the mechanism; the order here is the fix. Seal (so
+ * nothing reopens), close (so the WAL is checkpointed into the file we are
+ * about to replace, not into the replacement), then write.
  */
 export function restoreBackup(envelope, { dataDir = DATA_DIR } = {}) {
   const files = envelope.files ?? {};
+  if (resolve(dataDir) === resolve(DATA_DIR)) {
+    seal();
+    closeDb();
+  }
   mkdirSync(dataDir, { recursive: true });
 
   for (const [name, b64] of Object.entries(files)) {
@@ -172,7 +200,17 @@ export function restoreBackup(envelope, { dataDir = DATA_DIR } = {}) {
     if (parts.length > 2 || !parts.every(isSafeName)) continue;
     const target = join(dataDir, ...parts);
     mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, Buffer.from(b64, 'base64'));
+    const mode = RESTRICTED_MODE.get(name);
+    writeFileSync(target, Buffer.from(b64, 'base64'), mode ? { mode } : undefined);
+    if (mode) {
+      // An existing file keeps its old mode through a write, so say it again —
+      // exactly as secrets.js has to.
+      try {
+        chmodSync(target, mode);
+      } catch {
+        /* best effort — Windows and some mounts don't support it */
+      }
+    }
   }
 
   // The database last, and the sidecars removed with it: a stale -wal beside a

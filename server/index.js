@@ -19,6 +19,8 @@ import * as streamStore from './streamStore.js';
 import * as summaries from './showSummaries.js';
 import { initHealthDeclarations } from './healthBootstrap.js';
 import { resolveIdentity } from './httpAuth.js';
+import { isSealed, SEALED_MESSAGE } from './restoreSeal.js';
+import * as deployment from './deployment.js';
 
 import './roomStateWatcher.js'; // registers the room:*:mode topic
 import './roomHealth.js'; // registers the room:*:health topic
@@ -83,6 +85,21 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+/**
+ * Everything after a restore.
+ *
+ * The data directory under this process has been replaced; its database is
+ * closed and its caches describe an installation that no longer exists. Say
+ * that once, clearly, rather than letting each route fail its own way — a
+ * screen full of assorted 500s reads as "the restore broke prodmesh" when what
+ * it means is "the restore worked, now restart".
+ */
+app.use('/api', (_req, res, next) => {
+  if (!isSealed()) return next();
+  res.status(503).json({ error: 'restored', message: SEALED_MESSAGE, restart: deployment.restartHint() });
+});
+
 app.use(resolveIdentity);
 
 // ── API (routers declare full /api/... paths) ─────────────────────────────────
