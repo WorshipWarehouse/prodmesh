@@ -75,6 +75,23 @@ describe('IdentityDialog', () => {
     expect(screen.queryByRole('option', { name: /South Campus/i })).not.toBeInTheDocument();
   });
 
+  it('points an administrator at the credential they already know', () => {
+    // The reconciliation in ADR 0012: the admin PIN is the `admin` account's
+    // PIN, so it works in this box. Discoverability was the actual complaint —
+    // people reached for it here and it failed.
+    render(
+      <IdentityDialog
+        stationRequired={false}
+        campusId="north"
+        status={readOnlyStatus}
+        onStation={vi.fn()}
+        onLogin={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /log in as .?admin.? with the admin PIN/i })).toBeInTheDocument();
+  });
+
   it('logs in on Enter and reports authentication failures', async () => {
     api.loginUser.mockRejectedValue(new Error('Invalid username or PIN'));
     const user = userEvent.setup();

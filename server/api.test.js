@@ -70,6 +70,71 @@ test('admin login rejects a wrong PIN and accepts the right one', async () => {
   assert.ok(token);
 });
 
+test('the admin PIN is an account, reachable through either door', async () => {
+  // The reconciliation in ADR 0012. The PIN gate on the Admin page and the
+  // ordinary login form are now two ways to the SAME credential — before this,
+  // typing the PIN people actually know into the login box simply failed,
+  // because "admin" was a hash in settings.json rather than a user.
+  const viaPin = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  assert.equal(viaPin.user.username, 'admin');
+  assert.equal(viaPin.user.displayName, 'System Administrator');
+  assert.deepEqual(viaPin.permissions, ['*']);
+
+  const viaForm = await post('/api/auth/login', { username: 'admin', pin: 'admin1234' }, null, station.token);
+  assert.equal(viaForm.status, 200);
+  const form = await viaForm.json();
+  assert.equal(form.user.id, viaPin.user.id, 'one account, not two');
+  assert.deepEqual(form.permissions, ['*']);
+
+  // Both are ordinary sessions now, so status reports a real user rather than
+  // the invented `legacy-admin` it used to answer with.
+  const status = await (await fetch(base + '/api/auth/status', {
+    headers: { Authorization: `Bearer ${viaPin.token}` },
+  })).json();
+  assert.equal(status.authenticated, true);
+  assert.equal(status.admin, true);
+  assert.equal(status.user.id, viaPin.user.id);
+});
+
+test('an admin action is attributable to somebody', async () => {
+  // The point of the change, not a nicety: admin actions used to audit with a
+  // station and no user, so "who ran the update" had no answer.
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  const log = await (await fetch(base + '/api/system/audit', { headers: { Authorization: `Bearer ${token}` } })).json();
+  const login = log.entries.find((entry) => entry.action === 'auth.admin' && entry.result === 'allowed');
+  assert.ok(login, 'the admin login is in the log');
+  // The log joins to users, so a row with no user reads as a blank name. This
+  // is the assertion the old behaviour could not pass.
+  assert.equal(login.username, 'admin');
+  assert.equal(login.userName, 'System Administrator');
+});
+
+test('the built-in admin cannot be stripped of its authority', async () => {
+  // It is the way back into a box in a building. A screen that can remove its
+  // group is a screen that can lock a church out of its own booth.
+  const { token, user } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  const res = await apiRequest(`/api/users/${user.id}/groups`, { method: 'PUT', token, body: { groupIds: [] } });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /must stay an administrator/);
+
+  // Still an admin afterwards.
+  const still = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  assert.deepEqual(still.permissions, ['*']);
+});
+
+test('changing the admin PIN changes the account, both doors at once', async () => {
+  const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();
+  const change = await apiRequest('/api/settings/pins', { method: 'POST', token, body: { admin: 'rotated789' } });
+  assert.equal(change.status, 200);
+  try {
+    assert.equal((await post('/api/auth/admin', { pin: 'admin1234' })).status, 401, 'the old PIN is gone');
+    const form = await post('/api/auth/login', { username: 'admin', pin: 'rotated789' }, null, station.token);
+    assert.equal(form.status, 200, 'and the login form has the new one');
+  } finally {
+    settings.setPins({ admin: 'admin1234' }); // the rest of this file expects it
+  }
+});
+
 test('settings endpoint requires an admin token', async () => {
   assert.equal((await fetch(base + '/api/settings')).status, 401);
   const { token } = await (await post('/api/auth/admin', { pin: 'admin1234' })).json();

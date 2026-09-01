@@ -9,6 +9,7 @@ import {
 import { useChurch } from '../layout/church';
 import { SelectField } from './SelectField';
 import { PasswordInput } from './PasswordInput';
+import { HelpTip } from './HelpTip';
 
 export function IdentityDialog({
   stationRequired,
@@ -106,10 +107,22 @@ export function IdentityDialog({
                 `${status?.station?.name ?? 'This station'} stays available in read-only mode when nobody is logged in.`
               )}
             </p>
-            <label className="identity__field">
-              <span>Username</span>
-              <input className="field" autoFocus autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
-            </label>
+            {/* A div and an explicit `for`, where the PIN field below just
+                wraps its input in the label. The reason is the tip: anything
+                inside a <label> joins the control's accessible name, so a
+                wrapped one would name this box "Username Administrators log in
+                as admin with the admin PIN…" to a screen reader. */}
+            <div className="identity__field">
+              <span className="identity__label">
+                <label htmlFor="identity-username">Username</label>
+                {/* The admin PIN is the `admin` account's PIN (ADR 0012), and
+                    people reach for the credential they know. Saying so here
+                    is the whole reason that reconciliation happened: before
+                    it, typing it in this box simply failed. */}
+                <HelpTip text="Administrators log in as “admin” with the admin PIN — the same one the Admin page asks for." />
+              </span>
+              <input id="identity-username" className="field" autoFocus autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+            </div>
             <label className="identity__field">
               <span>PIN</span>
               <PasswordInput className="field mono" inputMode="numeric" autoComplete="current-password" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()} />

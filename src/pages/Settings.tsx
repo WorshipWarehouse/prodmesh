@@ -139,7 +139,9 @@ function SetupForm({ onDone }: { onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    // First-run sets the ADMIN PIN, which gates a full permission bypass.
+    // First-run sets the ADMIN PIN. It is the built-in `admin` account's PIN
+    // (ADR 0012), so this is creating an administrator, not a second kind of
+    // authority — hence the floor: six characters, checked again server-side.
     if (pin.length < 6) return setErr('Use at least 6 characters.');
     if (pin !== confirm) return setErr('PINs do not match.');
     await setPins({ admin: pin });

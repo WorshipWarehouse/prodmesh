@@ -229,7 +229,7 @@ router.post('/api/settings/pins', (req, res) => {
     // mode change for someone already standing at the booth.
     const wantsAdminPin = req.body?.admin !== undefined;
     const permission = wantsAdminPin ? '*' : 'settings.manage';
-    if (!req.legacyAdmin && !auth.hasPermission(req.auth, permission)) {
+    if (!auth.hasPermission(req.auth, permission)) {
       return res.status(req.auth ? 403 : 401).json(permissionRequired(permission));
     }
   }

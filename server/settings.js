@@ -99,7 +99,20 @@ function verifyHash(pin, stored) {
   return dk.length === hb.length && crypto.timingSafeEqual(dk, hb);
 }
 
-export const verifyAdmin = (pin) => verifyHash(pin, load().pins.admin);
+/**
+ * The stored admin PIN hash, for authStore to project onto the built-in
+ * `admin` account. This file stays the SOURCE of that credential — it is what
+ * somebody edits on the server when the PIN is forgotten, and the restore seal
+ * covers it — while authorizing an admin is now an ordinary user session.
+ */
+export const adminPinHash = () => load().pins.admin ?? null;
+
+// Told, not polled: server/index.js registers authStore's projection so the
+// account tracks the file. A hook rather than an import because settings are a
+// FILE and users are a DATABASE, and a module about the first should not have
+// to know the second exists.
+const adminPinListeners = new Set();
+export const onAdminPinChange = (fn) => adminPinListeners.add(fn);
 export const verifyOverride = (pin) => verifyHash(pin, load().pins.override);
 export const isAdminSetupNeeded = () => load().pins.admin == null;
 export const isOverrideSet = () => load().pins.override != null;
@@ -134,6 +147,7 @@ export function setPins({ admin, override } = {}) {
   if (admin !== undefined) s.pins.admin = admin === '' ? null : hashPin(admin);
   if (override !== undefined) s.pins.override = override === '' ? null : hashPin(override);
   persist();
+  if (admin !== undefined) for (const fn of adminPinListeners) fn(s.pins.admin);
 }
 
 // ── First-run setup ───────────────────────────────────────────────────────────
@@ -217,28 +231,11 @@ export function isModeLocked(roomId, modeId, now = new Date()) {
   return p.active && p.enforced && p.lockedModes.includes(modeId);
 }
 
-// ── Sessions (in-memory bearer tokens for the admin) ──────────────────────────
-const sessions = new Map(); // token → expiresAt (ms)
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
-
-export function createSession() {
-  const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, Date.now() + SESSION_TTL_MS);
-  return token;
-}
-
-export function checkSession(token) {
-  if (!token) return false;
-  const exp = sessions.get(token);
-  if (!exp) return false;
-  if (Date.now() > exp) {
-    sessions.delete(token);
-    return false;
-  }
-  return true;
-}
-
-export const destroySession = (token) => sessions.delete(token);
+// The admin bearer token used to live HERE, in a process-local Map, and to set
+// a flag that skipped every permission check. It is now an ordinary row in
+// user_sessions like anyone else's — which is what makes an admin action
+// attributable, and incidentally means a server restart no longer signs the
+// administrator out mid-service.
 
 // App version moved to server/deployment.js — it depends on how this copy was
 // installed, not on settings. It stays cached for the life of the process

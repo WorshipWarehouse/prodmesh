@@ -42,6 +42,8 @@ import adminConfigRouter from './routes/adminConfig.js';
 import systemRouter from './routes/system.js';
 import proPresenterRouter from './routes/proPresenter.js';
 import * as branding from './branding.js';
+import * as settings from './settings.js';
+import * as auth from './authStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,6 +51,14 @@ const PORT = process.env.PORT ?? (process.env.NODE_ENV === 'production' ? 8080 :
 
 // Fail fast on a malformed room config instead of erroring deep in a request.
 validateRooms(rooms);
+
+// The admin PIN is the password of the built-in `admin` account (ADR 0012).
+// settings.json remains where that credential is STORED — it is what an
+// administrator edits on the server when the PIN is forgotten — so the
+// account is refreshed from it here at boot, and again whenever it changes.
+// An install that upgrades into this simply finds the account already there.
+settings.onAdminPinChange((hash) => auth.projectAdminAccount(hash));
+auth.projectAdminAccount(settings.adminPinHash());
 
 const app = express();
 

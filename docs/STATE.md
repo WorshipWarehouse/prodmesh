@@ -130,10 +130,21 @@ Notes:
   named-user login/lock, SQLite users + permission groups + extensible dotted
   ACLs, built-in Administrators wildcard, optional Planning Center person ID,
   login throttling, and user+station audit records. Admin → Users & permissions
-  creates groups/users and assigns memberships. Legacy Admin PIN remains the
-  bootstrap credential. Representative writes now enforced server-side: room
+  creates groups/users and assigns memberships. Representative writes now enforced server-side: room
   modes, checklist completion, show operation/config, templates, settings, and
   updates.
+- **One admin identity** (ADR 0012, 1.4.0-dev): the admin PIN is the PIN of a
+  real `admin` / "System Administrator" account, so the Admin page's PIN box
+  and the ordinary login form reach the same credential — typing it into the
+  login form used to just fail, which is what prompted this. `req.legacyAdmin`,
+  the flag that short-circuited every permission check, is gone; both doors
+  produce an ordinary session. Three consequences worth knowing: an admin
+  action is finally attributable in the audit log, an admin stays signed in
+  across a restart (the token was a process-local `Map`), and rotating the PIN
+  signs its sessions out. `settings.json` is still where that credential is
+  STORED — the account is projected from it at boot and on change, hash copied
+  verbatim, so an existing install upgrades in silence
+  (`adminAccountUpgrade.test.js` boots one that has only a PIN and proves it).
 - PC Services plan display on Quick Access + Room Status (real data).
 - Run of Show: **server-coordinated show sessions** (one active per room, Start/End
   buttons, browsers are views — see ADR 0004) with live ProPresenter follow, slide

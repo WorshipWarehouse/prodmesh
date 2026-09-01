@@ -376,6 +376,14 @@
   text-transform: uppercase;
 }
 
+/* A field label that carries a "?" beside it. The tip sits OUTSIDE the
+   <label> so it stays out of the input's accessible name. */
+.identity__label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .identity__field .field,
 .identity__field .selectfield {
   width: 100%;
