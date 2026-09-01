@@ -189,6 +189,20 @@ Notes:
   Checklists subpages. The account menu requires confirmation before returning a
   station to read-only mode. When a user has a Planning Center Services Person ID,
   their Services profile thumbnail is shown as their avatar.
+- **Room configuration is read-only cards** (2026-09-01, #23 + #22): the
+  page at Admin → Campuses → room is a header (name and site, edited in
+  place) over a grid of summary cards — Quick Access tiles, each integration,
+  and Schedules & Locks, which moved here from Admin → General because a
+  schedule is a fact about a room and needs the room's modes to say what it
+  locks. A card shows what is stored and the live status dot; clicking it
+  opens the editor in a dialog with one Save. The editors themselves did not
+  change (`src/pages/RoomConfig.tsx` is them, lifted out of the 2,600-line
+  Settings.tsx), so nothing server-side moved. `EditDialog` is the shared
+  modal: Escape closes only a clean one, the cancel button says "Discard
+  changes" when there is something to discard, and Save closes only if the
+  save stuck. This is the groundwork for per-room integration settings such
+  as the Companion poll rate (#24): a dialog per integration is where such a
+  setting now has a home.
 - **Views — dashboards & displays** (2026-08-04, ADR 0011): a room owns 0..many
   Views. A `dashboard` is an interactive 6-column grid with a header row that
   picks the Event and Service time every widget on it inherits; a `display` is

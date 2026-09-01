@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -25,6 +25,8 @@ const api = vi.hoisted(() => ({
   saveAnalysis: vi.fn(),
   saveProPresenter: vi.fn(),
   saveCompanion: vi.fn(),
+  getSettings: vi.fn(),
+  saveSchedules: vi.fn(),
 }));
 
 vi.mock('../api', async (importOriginal) => ({
@@ -238,7 +240,34 @@ describe('Campuses', () => {
     api.saveProPresenter.mockImplementation(async (_room: string, proPresenter: unknown) => proPresenter);
     api.saveCompanion.mockReset();
     api.saveCompanion.mockImplementation(async (_room: string, companion: unknown) => companion);
+    api.getRooms.mockResolvedValue([{
+      id: 'north-main', name: 'Main Auditorium', site: 'north', hasCompanion: true,
+      modes: [{ id: 'sunday', label: 'Sunday', color: '#34c759', isStandby: false }, { id: 'standby', label: 'Standby', color: '#8b97a8', isStandby: true }],
+    }]);
+    api.getSettings.mockReset().mockResolvedValue({
+      pins: { adminSet: true, overrideSet: false },
+      schedules: {
+        'north-main': [{ id: 'w1', label: 'Sunday Services', days: [0], start: '07:00', end: '13:30', lock: ['standby'] }],
+        'north-youth': [{ id: 'w2', label: 'Youth', days: [3], start: '18:00', end: '21:00', lock: [] }],
+      },
+    });
+    api.saveSchedules.mockReset().mockResolvedValue(undefined);
   });
+
+  const roomPage = () => render(
+    <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
+      <Routes>
+        <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  /** The page is read-only cards; the whole card is the button that opens the
+   *  editor. Every editing test starts here. */
+  const openCard = async (user: ReturnType<typeof userEvent.setup>, title: RegExp) =>
+    user.click(await screen.findByRole('button', { name: title }));
+
+  const dialog = () => within(screen.getByRole('dialog'));
 
   it('overview lists rooms with Configure links; new rooms need a save first', async () => {
     const user = userEvent.setup();
@@ -257,80 +286,100 @@ describe('Campuses', () => {
     expect(sent.sites[0].auditoriums).toHaveLength(2);
   });
 
-  it('room page edits a tile host and saves the whole tree', async () => {
-    const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
-        <Routes>
-          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+  it('the page is summaries: what is set, and whether it answers', async () => {
+    roomPage();
+    const tiles = await screen.findByRole('button', { name: /Quick Access tiles/ });
+    expect(tiles).toHaveTextContent('2 tiles');
+    expect(tiles).toHaveTextContent('Companion · Camera 9');
+    expect(screen.getByRole('button', { name: /Bitfocus Companion & modes/ })).toHaveTextContent('192.0.2.51:8000 · $(roomState)');
+    expect(screen.getByRole('button', { name: /Analysis source/ })).toHaveTextContent('Smaart · 192.0.2.40:26000');
+    expect(screen.getByRole('button', { name: /ProPresenter/ })).toHaveTextContent('192.0.2.15:62202');
+    // Nothing is a form until you open one: no field on the page, no Save
+    // but the header's.
+    expect(screen.queryByLabelText('Host')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Save/ })).toHaveLength(1);
+  });
 
-    expect(await screen.findByText('Quick Access tiles')).toBeInTheDocument();
-    // Two Host fields exist (Companion tile + analysis source) — take the tile's.
-    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.10')!;
+  it('room page edits a tile host in its dialog and saves the whole tree', async () => {
+    const user = userEvent.setup();
+    roomPage();
+
+    await openCard(user, /Quick Access tiles/);
+    const host = dialog().getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.10')!;
     await user.clear(host);
     await user.type(host, '192.0.2.17');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(api.saveConfig).toHaveBeenCalled());
     const sent = api.saveConfig.mock.calls[0][0];
     expect(sent.sites[0].auditoriums[0].tiles[0].host).toBe('192.0.2.17');
+    // Saved → closed, and the card shows the stored tree.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('a dialog closed with edits in it discards them, and Escape will not do that', async () => {
+    const user = userEvent.setup();
+    roomPage();
+
+    await openCard(user, /Quick Access tiles/);
+    const label = dialog().getAllByLabelText('Label')[0];
+    await user.clear(label);
+    await user.type(label, 'Renamed');
+
+    // Escape closes a clean dialog only — ten minutes of mode buttons must not
+    // vanish on a reflex keypress. The button says what it will do instead.
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await user.click(dialog().getByRole('button', { name: 'Discard changes' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.saveConfig).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Quick Access tiles/ })).toHaveTextContent('Companion · Camera 9');
+
+    // Clean again, so Escape may.
+    await openCard(user, /Quick Access tiles/);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('edits Planning Center service types independently of the topology save', async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
-        <Routes>
-          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    roomPage();
 
-    expect(await screen.findByText('Planning Center service types')).toBeInTheDocument();
-    // "Sunday" is also a mode label now — pick the service-type name field.
-    const pcName = screen.getAllByDisplayValue('Sunday')
-      .find((el) => (el as HTMLInputElement).placeholder === 'e.g. Sunday');
-    expect(pcName).toBeTruthy();
+    await openCard(user, /Planning Center service types/);
+    expect(dialog().getByDisplayValue('Sunday')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '+ Add service type' }));
-    const names = screen.getAllByLabelText('Name');
-    const ids = screen.getAllByLabelText('Service type ID');
+    await user.click(dialog().getByRole('button', { name: '+ Add service type' }));
+    const names = dialog().getAllByLabelText('Name');
+    const ids = dialog().getAllByLabelText('Service type ID');
     await user.type(names[names.length - 1], 'Second Service');
     await user.type(ids[ids.length - 1], '500002');
-    await user.click(screen.getByRole('button', { name: 'Save service types' }));
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(api.savePcServiceTypes).toHaveBeenCalledWith('north-main', [
       { id: '500001', name: 'Sunday' },
       { id: '500002', name: 'Second Service' },
     ]));
     expect(api.saveConfig).not.toHaveBeenCalled();
+    // The card shows what the server stored, not what was typed.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Planning Center service types/ })).toHaveTextContent('Sunday · Second Service'));
   });
 
   it('switches the analysis source to ProdMesh RTA and saves it', async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
-        <Routes>
-          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    roomPage();
 
-    expect(await screen.findByText('Analysis source')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('192.0.2.40')).toBeInTheDocument();
+    await openCard(user, /Analysis source/);
+    expect(dialog().getByDisplayValue('192.0.2.40')).toBeInTheDocument();
     // Smaart shows the password field; RTA must not.
-    expect(screen.getByLabelText('API password')).toBeInTheDocument();
+    expect(dialog().getByLabelText('API password')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Source'), 'rta');
-    expect(screen.queryByLabelText('API password')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Start\/stop SPL logging/)).not.toBeInTheDocument();
-    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.40')!;
+    await user.selectOptions(dialog().getByLabelText('Source'), 'rta');
+    expect(dialog().queryByLabelText('API password')).not.toBeInTheDocument();
+    expect(dialog().queryByText(/Start\/stop SPL logging/)).not.toBeInTheDocument();
+    const host = dialog().getByLabelText('Host');
     await user.clear(host);
     await user.type(host, '192.0.2.52');
-    await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
 
     // target/limit are edited on the widgets now, not here — but this form PUTs
     // a whole analysis object, so they must ride through a host change rather
@@ -343,17 +392,11 @@ describe('Campuses', () => {
 
   it('enables show-driven SPL log control for a Smaart source', async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
-        <Routes>
-          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    roomPage();
 
-    expect(await screen.findByText('Analysis source')).toBeInTheDocument();
-    await user.click(screen.getByText(/Start\/stop SPL logging/));
-    await user.click(screen.getByRole('button', { name: 'Save analysis source' }));
+    await openCard(user, /Analysis source/);
+    await user.click(dialog().getByText(/Start\/stop SPL logging/));
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(api.saveAnalysis).toHaveBeenCalledWith('north-main', {
       source: 'smaart', host: '192.0.2.40', port: 26000, logControl: true, target: 90, limit: 95,
@@ -362,56 +405,47 @@ describe('Campuses', () => {
 
   it('edits ProPresenter connectivity and clears it by blanking the host', async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
-        <Routes>
-          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    roomPage();
 
-    expect(await screen.findByText('ProPresenter')).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Countdown timer'), 'Service Start');
-    await user.click(screen.getByRole('button', { name: 'Save ProPresenter' }));
+    await openCard(user, /ProPresenter/);
+    await user.type(dialog().getByLabelText('Countdown timer'), 'Service Start');
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.saveProPresenter).toHaveBeenCalledWith('north-main', {
       host: '192.0.2.15', port: 62202, timer: 'Service Start',
     }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /ProPresenter/ })).toHaveTextContent('Countdown timer: Service Start');
 
     // Blanking the host means "no ProPresenter in this room" — saves a clear.
-    const host = screen.getAllByLabelText('Host').find((el) => (el as HTMLInputElement).value === '192.0.2.15')!;
-    await user.clear(host);
-    await user.click(screen.getByRole('button', { name: 'Save ProPresenter' }));
+    await openCard(user, /ProPresenter/);
+    await user.clear(dialog().getByLabelText('Host'));
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.saveProPresenter).toHaveBeenLastCalledWith('north-main', null));
+    await waitFor(() => expect(screen.getByRole('button', { name: /ProPresenter/ })).toHaveTextContent('Not in this room.'));
   });
 
   it('moves a mode button to a different page/row/col and adds a new mode', async () => {
     const user = userEvent.setup();
-    render(
-      <MemoryRouter initialEntries={['/admin/campuses/north-main']}>
-        <Routes>
-          <Route path="/admin/campuses/:roomId" element={<RoomConfigPanel />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    roomPage();
 
-    expect(await screen.findByText('Bitfocus Companion & modes')).toBeInTheDocument();
+    await openCard(user, /Bitfocus Companion & modes/);
     // Re-point the Sunday mode's button (first mode row) to page 3, row 0.
-    const [page] = screen.getAllByLabelText('Page');
-    const [row] = screen.getAllByLabelText('Row');
+    const [page] = dialog().getAllByLabelText('Page');
+    const [row] = dialog().getAllByLabelText('Row');
     await user.clear(page);
     await user.type(page, '3');
     await user.clear(row);
     await user.type(row, '0');
 
-    await user.click(screen.getByRole('button', { name: '+ Add mode' }));
-    const labels = screen.getAllByLabelText('Label');
-    const ids = screen.getAllByLabelText('ID');
-    const matches = screen.getAllByLabelText('Match');
+    await user.click(dialog().getByRole('button', { name: '+ Add mode' }));
+    const labels = dialog().getAllByLabelText('Label');
+    const ids = dialog().getAllByLabelText('ID');
+    const matches = dialog().getAllByLabelText('Match');
     await user.type(labels[labels.length - 1], 'Second Service');
     await user.type(ids[ids.length - 1], 'second');
     await user.type(matches[matches.length - 1], 'SECOND');
 
-    await user.click(screen.getByRole('button', { name: 'Save Bitfocus Companion' }));
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.saveCompanion).toHaveBeenCalledWith('north-main', {
       mock: false, host: '192.0.2.51', port: 8000, variable: 'roomState',
       modes: [
@@ -420,6 +454,34 @@ describe('Campuses', () => {
         { id: 'second', label: 'Second Service', color: '#5b8def', match: 'SECOND' },
       ],
     }));
+    // The card's swatches follow the stored modes.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Bitfocus Companion & modes/ })).toHaveTextContent('Second Service'));
+  });
+
+  it('schedules & locks live on the room page and save only this room’s windows', async () => {
+    const user = userEvent.setup();
+    roomPage();
+
+    // The summary names the lock by the mode's label, not its id.
+    const card = await screen.findByRole('button', { name: /Schedules & Locks/ });
+    await waitFor(() => expect(card).toHaveTextContent('Sunday Services · Sun 07:00–13:30 · locks Standby'));
+
+    await user.click(card);
+    await user.click(dialog().getByRole('button', { name: '+ Window' }));
+    const names = dialog().getAllByLabelText('Window name');
+    await user.clear(names[1]);
+    await user.type(names[1], 'Midweek');
+    await user.click(dialog().getByRole('button', { name: 'Save' }));
+
+    // The API stores every room's schedules as one map: this room's entry is
+    // replaced and the other room's rides through untouched.
+    await waitFor(() => expect(api.saveSchedules).toHaveBeenCalled());
+    const sent = api.saveSchedules.mock.calls[0][0];
+    expect(sent['north-youth']).toEqual([{ id: 'w2', label: 'Youth', days: [3], start: '18:00', end: '21:00', lock: [] }]);
+    expect(sent['north-main']).toHaveLength(2);
+    expect(sent['north-main'][0]).toEqual({ id: 'w1', label: 'Sunday Services', days: [0], start: '07:00', end: '13:30', lock: ['standby'] });
+    expect(sent['north-main'][1]).toMatchObject({ label: 'Midweek', days: [0], start: '08:00', end: '12:00', lock: [] });
+    await waitFor(() => expect(screen.getByRole('button', { name: /Schedules & Locks/ })).toHaveTextContent('Midweek · Sun 08:00–12:00'));
   });
 
   it('room page shows not-found for an unknown room id', async () => {
