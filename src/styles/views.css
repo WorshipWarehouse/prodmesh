@@ -609,6 +609,22 @@
 .widgetinspector label { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; color: var(--text-dim); }
 .widgetinspector small { display: block; color: var(--text-dim); line-height: 1.35; }
 .widgetinspector .widgetinspector__check { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--text); }
+/* HelpTip inside the inspector.
+
+   Two things are different here from every other place the "?" is used. The
+   panel is a sticky column against the RIGHT edge of the window, so a bubble
+   centred on its trigger hangs off the screen — `place` only solves the
+   vertical version of that. And the bubble's own background is --bg-raised,
+   which is this panel's background too, so it reads as part of the panel
+   rather than as something on top of it. */
+.widgetinspector .helptip__bubble {
+  left: auto;
+  right: 0;
+  transform: none;
+  max-width: 220px;
+  background: var(--bg-tile);
+}
+
 .widgetinspector select { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
 /* Text and number fields only. A checkbox stretched to 100% with padding is
    what broke every check row in this panel when the Companion rows editor

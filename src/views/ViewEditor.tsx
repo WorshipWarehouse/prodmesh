@@ -7,6 +7,7 @@ import { findFirstFit, isFree, occupancy, rowCount, type Grid } from '../lib/gri
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
 import { widgetMax, widgetMin, widgetResizable, type CompanionVariableRow, type WidgetSize } from '../widgets/types';
 import { IntegrationBeta, IntegrationBrand } from '../components/IntegrationBrand';
+import { HelpTip } from '../components/HelpTip';
 import { getEnabledIntegrations, getRoom, getRoomConnectivity, type View, type ViewPlacement } from '../api';
 import { useQuery } from '../lib/useQuery';
 import { analysisIntegration, analysisWidgetTitle } from '../lib/analysisSource';
@@ -300,12 +301,13 @@ function WidgetInspector({ placement, onChange }: { placement: ViewPlacement | n
           type="checkbox"
           checked={Boolean(placement.config.hideHeader)}
           onChange={(e) => onChange(placement.id, { hideHeader: e.target.checked })}
-        /> Hide the widget header
+        /> Hide widget title
+        {/* Optional reading, per docs/UI_TEXT.md: the label says what the
+            switch does, and the tip answers the question it raises — where
+            the widget goes once its title strip is gone. Nothing must-know
+            is in here; the editor keeps its handle either way. */}
+        <HelpTip text="Removes the title strip on the live view only. In this editor the widget keeps its handle, so you can still move it and open its settings." />
       </label>
-      {/* Said plainly because the editor cannot show it: this canvas always
-          draws the handle strip in the header's place, so the effect is only
-          visible on the live view. */}
-      <small>Removes the title strip on the live view. The handle stays here in the editor, so the widget is still yours to move and configure.</small>
     </aside>
   );
 }

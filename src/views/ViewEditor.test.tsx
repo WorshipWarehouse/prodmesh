@@ -304,10 +304,10 @@ describe('ViewEditor', () => {
     // The clock has no settings of its own, and the panel used to say exactly
     // that. Every widget has a header, so every widget now has this.
     const panel = within(screen.getByText('Widget settings').closest('aside')!);
-    const hide = panel.getByLabelText('Hide the widget header');
+    const hide = panel.getByLabelText(/^Hide widget title/);
     expect(hide).not.toBeChecked();
     await user.click(hide);
-    expect(panel.getByLabelText('Hide the widget header')).toBeChecked();
+    expect(panel.getByLabelText(/^Hide widget title/)).toBeChecked();
 
     // The cell keeps its handle: the editor's chrome stands in for the header,
     // so the widget is still selectable and movable after hiding it.

@@ -202,7 +202,8 @@ Notes:
   `roomHealth.test.js` asserts that against realistic probe text and fails if
   a field is passed through. YouTube is read from the health registry rather
   than probed, because every YouTube request is metered quota.
-  Any widget may **hide its header** (`hideHeader`, 1.4.0-dev): the branded
+  Any widget may **hide its title** ("Hide widget title", stored as
+  `hideHeader`, 1.4.0-dev): the branded
   title strip is the right default on a booth dashboard holding two meters and
   wrong on a foyer wall showing one big clock. Live views only — the editor
   always draws its handle strip in the header's place, so hiding one can never
