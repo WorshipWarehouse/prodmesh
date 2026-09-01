@@ -69,7 +69,10 @@ Two invariants protect the way back in:
   drops that account's sessions; clearing it deactivates the account rather
   than deleting it, since the audit history points at it. Rotation is what
   somebody does when they think the PIN leaked, and leaving the old session
-  alive for the rest of its eight hours answers the wrong question.
+  alive for the rest of its eight hours answers the wrong question. The
+  maintainer put the everyday version of this better than the security one:
+  it is how you sign out of a station you walked away from, when you are no
+  longer sure how many are logged in.
 
 ## Consequences
 
@@ -77,8 +80,9 @@ Two invariants protect the way back in:
   `system.update`, `secrets` and `users.manage` attributable.
 - An administrator stays signed in across a restart, because the session is a
   row rather than a `Map` entry.
-- An administrator who changes their own PIN is signed out, which is what every
-  password change does and is worth the surprise.
+- An administrator who changes their own PIN is signed out — which is what
+  every password change does, and doubles as the "sign me out everywhere"
+  button this app does not otherwise have. Admin → General says so on the row.
 - `settings.verifyAdmin`, `createSession`, `checkSession` and `destroySession`
   are gone. `settings.adminPinHash()` and `onAdminPinChange()` replace them —
   a hook rather than an import, because settings are a FILE and users are a
