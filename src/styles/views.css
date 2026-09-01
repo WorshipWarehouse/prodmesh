@@ -610,7 +610,10 @@
 .widgetinspector small { display: block; color: var(--text-dim); line-height: 1.35; }
 .widgetinspector .widgetinspector__check { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--text); }
 .widgetinspector select { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
-.widgetinspector input { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+/* Text and number fields only. A checkbox stretched to 100% with padding is
+   what broke every check row in this panel when the Companion rows editor
+   brought the first <input> here. */
+.widgetinspector input:not([type="checkbox"]) { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
 
 /* One Companion variable's settings. A fieldset per row rather than a flat
    run of inputs: the panel holds up to eight of these, and without a boundary
