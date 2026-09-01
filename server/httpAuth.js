@@ -1,6 +1,5 @@
 // HTTP-layer identity + permission helpers shared by all routers.
 
-import * as settings from './settings.js';
 import * as auth from './authStore.js';
 
 // Require a valid admin bearer token. Attach to any admin-only route.
@@ -8,11 +7,12 @@ export function bearer(req) {
   return (req.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
 }
 
+// One kind of identity, whichever door it came through. The admin PIN used to
+// produce a second one (`req.legacyAdmin`) that every permission check had to
+// remember to consult — and that no audit row could name.
 export function resolveIdentity(req, _res, next) {
   req.station = auth.resolveStation(req.get('x-prodmesh-station'));
-  const token = bearer(req);
-  req.auth = auth.resolveSession(token);
-  req.legacyAdmin = settings.checkSession(token);
+  req.auth = auth.resolveSession(bearer(req));
   next();
 }
 
@@ -31,7 +31,7 @@ export const permissionRequired = (permission) => ({
 
 export function requirePermission(permission) {
   return (req, res, next) => {
-    if (req.legacyAdmin || auth.hasPermission(req.auth, permission)) return next();
+    if (auth.hasPermission(req.auth, permission)) return next();
     auth.audit({
       userId: req.auth?.user?.id,
       stationId: req.station?.id,

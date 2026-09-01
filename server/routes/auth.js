@@ -163,6 +163,10 @@ router.post('/api/auth/login', (req, res) => {
   const retryAfter = lockedFor(keys);
   if (retryAfter > 0) return res.status(429).json({ error: 'temporarily_locked', retryAfter });
 
+  // @admin is an account like any other here — the reason this reconciliation
+  // exists is that it was not, and typing the PIN people actually know into
+  // the login box simply failed.
+  auth.projectAdminAccount(settings.adminPinHash());
   const session = auth.authenticate(req.body?.username, req.body?.pin, req.station.id);
   if (!session) {
     recordFailure(keys);
@@ -174,18 +178,31 @@ router.post('/api/auth/login', (req, res) => {
   res.json(session);
 });
 
-// Admin login. Returns a bearer token the client sends on admin requests.
+// The admin PIN, the short way in — Admin → enter PIN, no username.
 //
-// This token sets req.legacyAdmin, which short-circuits EVERY permission check
-// including POST /api/system/update (which spawns update.sh). An unthrottled,
-// unaudited PIN check in front of that is remote code execution: measured at
-// ~40 guesses/second, a 4-digit PIN falls in about four minutes.
+// It is the SAME credential as logging in as @admin, because the PIN is that
+// account's PIN (authStore.projectAdminAccount). What it no longer is, is a
+// second kind of authority: this hands back an ordinary session, so an admin
+// action is attributable, survives a restart, and is revoked by logging out
+// like anyone else's.
+//
+// The throttle stays where it was and matters as much: a session with '*' can
+// POST /api/system/update, which spawns update.sh. Unthrottled, that is remote
+// code execution — measured at ~40 guesses/second, a 4-digit PIN falls in
+// about four minutes.
 router.post('/api/auth/admin', (req, res) => {
   const keys = [{ k: `admin:${sourceIp(req)}`, after: 5 }];
   const retryAfter = lockedFor(keys);
   if (retryAfter > 0) return res.status(429).json({ error: 'temporarily_locked', retryAfter });
 
-  if (!settings.verifyAdmin(req.body?.pin)) {
+  // Kept in step here as well as at boot, so a PIN changed on another server
+  // process — or edited into settings.json by an administrator who has been
+  // locked out — takes effect at the next attempt.
+  auth.projectAdminAccount(settings.adminPinHash());
+  // A station is optional on purpose: this door is reachable before a browser
+  // has registered one, which is the point of a way back in.
+  const session = auth.authenticate(auth.ADMIN_USERNAME, req.body?.pin, req.station?.id ?? null);
+  if (!session) {
     recordFailure(keys);
     auth.audit({
       stationId: req.station?.id ?? null, action: 'auth.admin', result: 'denied',
@@ -194,30 +211,31 @@ router.post('/api/auth/admin', (req, res) => {
     return res.status(401).json({ error: 'Bad PIN' });
   }
   clearFailures(keys);
-  auth.audit({ stationId: req.station?.id ?? null, action: 'auth.admin', result: 'allowed' });
-  res.json({ token: settings.createSession() });
+  auth.audit({ userId: session.user.id, stationId: req.station?.id ?? null, action: 'auth.admin', result: 'allowed' });
+  res.json(session);
 });
 
 router.post('/api/auth/logout', (req, res) => {
   const token = bearer(req);
   if (req.auth) auth.audit({ userId: req.auth.user.id, stationId: req.station?.id, action: 'auth.logout', result: 'allowed' });
   auth.destroySession(token);
-  settings.destroySession(token);
   res.json({ ok: true });
 });
 
 router.get('/api/auth/status', async (req, res) => {
-  const legacy = req.legacyAdmin;
-  const user = req.auth?.user ?? (legacy ? { id: 'legacy-admin', username: 'admin', displayName: 'System Administrator', planningCenterPersonId: null } : null);
+  // This used to invent a user for the admin token — a literal `legacy-admin`
+  // object with the display name of an account that did not exist. It exists
+  // now, so the honest answer and the convenient one are the same.
+  const user = req.auth?.user ?? null;
   const pcProfile = user?.planningCenterPersonId
     ? await pco.getPersonProfile(user.planningCenterPersonId).catch(() => null)
     : null;
   res.json({
-    authenticated: Boolean(req.auth || legacy),
-    admin: Boolean(legacy || auth.hasPermission(req.auth, '*')),
+    authenticated: Boolean(req.auth),
+    admin: auth.hasPermission(req.auth, '*'),
     setupNeeded: settings.isAdminSetupNeeded(),
     user: user ? { ...user, avatarUrl: pcProfile?.avatarUrl ?? null } : null,
-    permissions: legacy ? ['*'] : req.auth?.permissions ?? [],
+    permissions: req.auth?.permissions ?? [],
     station: req.station ?? null,
   });
 });
@@ -287,7 +305,7 @@ router.put('/api/users/:userId/groups', requirePermission('users.manage'), (req,
     // this, users.manage was a one-request path to '*': add your own account
     // to Administrators. Full admins ('*') are exempt — a superuser granting
     // a subset of their own powers is the whole point of the screen.
-    if (!req.legacyAdmin && !auth.hasPermission(req.auth, '*')) {
+    if (!auth.hasPermission(req.auth, '*')) {
       if (req.auth?.user?.id === req.params.userId) {
         return res.status(403).json({ error: 'cannot_change_own_groups' });
       }

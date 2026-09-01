@@ -198,6 +198,87 @@ export function destroySession(token) {
   if (token) getDb().prepare('DELETE FROM user_sessions WHERE token_hash = ?').run(digest(token));
 }
 
+// ── The built-in administrator ───────────────────────────────────────────────
+//
+//  The admin PIN used to be a second, parallel way to be authorized: it minted
+//  a process-local token that set `req.legacyAdmin`, which short-circuited
+//  EVERY permission check. Two consequences, neither of them intended.
+//
+//    • Nothing could say WHO did an admin thing. Audit rows carried a station
+//      and no user, so "who ran the update" had no answer.
+//    • The one credential everybody in a church actually knows could not be
+//      typed into the login box, because it was not an account. You reached it
+//      through a separate door on the Admin page — which is exactly the
+//      inconsistency this replaces.
+//
+//  So the PIN is now the password of a real account. `settings.json` stays its
+//  source of truth (that file is what somebody edits on the server when the
+//  PIN is forgotten, and the restore seal covers it), and this account is a
+//  PROJECTION of it: the stored hash is copied across verbatim, which is
+//  possible because both sides have always hashed PINs identically — scrypt,
+//  16-byte salt, 32-byte key, `salt:hash` in hex. Nobody re-enters anything,
+//  and an install that upgrades into this simply finds the account there.
+
+export const ADMIN_USERNAME = 'admin';
+export const ADMIN_DISPLAY_NAME = 'System Administrator';
+const ADMIN_GROUP = 'group-admin';
+
+export const adminUser = () =>
+  getDb().prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(ADMIN_USERNAME) ?? null;
+
+/**
+ * Make the built-in admin account match the stored PIN hash, creating it if
+ * this install predates it. Idempotent, and cheap enough to run at every boot
+ * and after every PIN change — which together are the only two moments the
+ * hash can move.
+ *
+ * A credential that MOVED takes its sessions with it. Rotating the admin PIN
+ * is what somebody does when they think it leaked, and a rotation that leaves
+ * the old session alive for the rest of its eight hours answers the wrong
+ * question. The cost is that an administrator changing their own PIN is signed
+ * out — correct, and the same thing every password change does.
+ *
+ * A null hash means no admin PIN is set: a fresh install mid-wizard, or one
+ * where an administrator deliberately cleared it. The account is DEACTIVATED
+ * rather than deleted — audit history points at it — and deactivated really
+ * does mean shut: `authenticate` and `resolveSession` both require active = 1,
+ * so the last PIN stops working the moment it is cleared.
+ */
+export function projectAdminAccount(pinHash) {
+  const db = getDb();
+  const existing = adminUser();
+  const dropSessions = (userId) =>
+    db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(userId);
+
+  if (!pinHash) {
+    if (!existing?.active) return existing ? getUser(existing.id) : null;
+    db.transaction(() => {
+      db.prepare('UPDATE users SET active = 0 WHERE id = ?').run(existing.id);
+      dropSessions(existing.id);
+    })();
+    return getUser(existing.id);
+  }
+
+  const userId = existing?.id ?? id();
+  const moved = !existing || existing.pin_hash !== pinHash || !existing.active;
+  db.transaction(() => {
+    if (existing) {
+      if (moved) {
+        db.prepare('UPDATE users SET pin_hash = ?, active = 1 WHERE id = ?').run(pinHash, userId);
+        dropSessions(userId);
+      }
+    } else {
+      db.prepare(
+        'INSERT INTO users (id, username, display_name, pin_hash, planning_center_person_id, created_at) VALUES (?, ?, ?, ?, NULL, ?)',
+      ).run(userId, ADMIN_USERNAME, ADMIN_DISPLAY_NAME, pinHash, Date.now());
+    }
+    // Membership is re-asserted rather than assumed: this account exists to be
+    // the way back in, so it may not be left in the building without keys.
+    db.prepare('INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)').run(userId, ADMIN_GROUP);
+  })();
+  return getUser(userId);
+}
+
 export function hasPermission(session, permission) {
   return Boolean(session?.permissions?.includes('*') || session?.permissions?.includes(permission));
 }
@@ -268,6 +349,12 @@ export function createGroup({ name, permissions = [] }) {
 export function updateUserGroups(userId, groupIds) {
   const db = getDb();
   if (!getUser(userId)) throw new Error('Unknown user');
+  // The built-in administrator is the way back into a box in a building, and
+  // a screen that can remove its authority is a screen that can lock a church
+  // out of its own booth on a Sunday. Every other account is fair game.
+  if (adminUser()?.id === userId && !(groupIds ?? []).includes(ADMIN_GROUP)) {
+    throw new Error(`@${ADMIN_USERNAME} must stay an administrator`);
+  }
   db.transaction(() => {
     db.prepare('DELETE FROM user_groups WHERE user_id = ?').run(userId);
     const add = db.prepare('INSERT OR IGNORE INTO user_groups (user_id, group_id) VALUES (?, ?)');

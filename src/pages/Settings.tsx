@@ -139,7 +139,9 @@ function SetupForm({ onDone }: { onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    // First-run sets the ADMIN PIN, which gates a full permission bypass.
+    // First-run sets the ADMIN PIN. It is the built-in `admin` account's PIN
+    // (ADR 0012), so this is creating an administrator, not a second kind of
+    // authority — hence the floor: six characters, checked again server-side.
     if (pin.length < 6) return setErr('Use at least 6 characters.');
     if (pin !== confirm) return setErr('PINs do not match.');
     await setPins({ admin: pin });
@@ -294,7 +296,11 @@ export function UserManagementPanel() {
 
       <div className="users__list">
         <h3>Current users</h3>
-        {directory.users.length === 0 && <p className="settings__muted">No named users yet. The existing Admin PIN remains available for bootstrap access.</p>}
+        {/* @admin is always here now (ADR 0012), so an empty list is no longer
+            possible — "nobody yet" means nobody BUT the built-in account. */}
+        {directory.users.every((entry) => entry.username === 'admin') && (
+          <p className="settings__muted">No named users yet — only the built-in @admin. Add people so the audit log records who did what.</p>
+        )}
         {directory.users.map((entry) => (
           <div className="users__row" key={entry.id}>
             <div className="users__identity">
@@ -723,7 +729,7 @@ function SecurityPanel() {
     if (adminPin.length < 6) return setMsg(fail('Admin PIN must be at least 6 characters.'));
     try {
       await setPins({ admin: adminPin });
-      setAdminPin(''); setMsg(ok('Admin PIN updated.'));
+      setAdminPin(''); setMsg(ok('Admin PIN updated. Sign in again with the new PIN.'));
     } catch (err) { setMsg(fail(err)); }
   };
   const saveOverride = async () => {
@@ -746,7 +752,12 @@ function SecurityPanel() {
       <div className="panel__row">
         <div>
           <div className="panel__label">Admin PIN</div>
-          <div className="settings__muted">Protects Settings + system updates.</div>
+          {/* Two must-know facts, so neither hides in a tooltip: whose PIN this
+              is (it logs in as @admin from the ordinary login box too), and
+              that changing it ends every session that account has open —
+              which is also how you sign it out of a station you have walked
+              away from. */}
+          <div className="settings__muted">The @admin account’s PIN. Protects Settings + system updates. Changing it signs @admin out everywhere.</div>
         </div>
         <div className="panel__controls">
           <PasswordInput className="field field--sm" inputMode="numeric" placeholder="New admin PIN"

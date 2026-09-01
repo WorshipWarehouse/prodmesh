@@ -50,7 +50,7 @@ export async function applyMode(room, mode) {
 // Returns null when the change is allowed, or the 403 response body when not.
 export function modeLockError(req, roomId, modeId, overridePin) {
   if (!settings.isModeLocked(roomId, modeId)) return null;
-  const permitted = req.legacyAdmin || auth.hasPermission(req.auth, 'rooms.mode.override_lock');
+  const permitted = auth.hasPermission(req.auth, 'rooms.mode.override_lock');
   if (!permitted && !settings.verifyOverride(overridePin)) {
     return { error: 'override_required', mode: modeId };
   }

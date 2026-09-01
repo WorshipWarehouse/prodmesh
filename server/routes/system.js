@@ -234,7 +234,7 @@ function redactHealth(snap) {
 }
 
 router.get('/api/system/health', (req, res) => {
-  const detailed = auth.hasPermission(req.auth, 'system.logs') || req.legacyAdmin;
+  const detailed = auth.hasPermission(req.auth, 'system.logs');
   const snap = health.snapshot();
   res.json({
     integrations: detailed ? snap : redactHealth(snap),

@@ -215,7 +215,7 @@ router.post('/api/rooms/:id/event/:planId/checklist/:itemId', requirePermission(
 
     const done = Boolean(req.body?.done);
     if (done && item.action?.type === 'mode') {
-      if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'rooms.mode.change')) {
+      if (!auth.hasPermission(req.auth, 'rooms.mode.change')) {
         return res.status(403).json(permissionRequired('rooms.mode.change'));
       }
       const mode = room.modes.find((m) => m.id === item.action.mode);
@@ -253,7 +253,7 @@ router.get('/api/rooms/:id/plan/:planId/report', (req, res) => {
   const report =
     timeline.getReport(instance) ?? { items: [], totals: { planned: 0, actual: 0, delta: 0 } };
 
-  if (!req.legacyAdmin && !auth.hasPermission(req.auth, 'reports.view')) {
+  if (!auth.hasPermission(req.auth, 'reports.view')) {
     return res.json({
       items: [],
       totals: { planned: 0, actual: 0, delta: 0 },
