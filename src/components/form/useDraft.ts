@@ -15,7 +15,9 @@ export interface DraftForm {
   busy: boolean;
   err: string;
   savedFlash: boolean;
-  submit: () => Promise<void>;
+  /** Resolves true when the save stuck — a dialog closes on that, and stays
+   *  open with the error otherwise. */
+  submit: () => Promise<boolean>;
 }
 
 // The draft/dirty/save state machine every connectivity editor shares:
@@ -61,8 +63,10 @@ export function useDraft<T extends object>(initial: T, save: (draft: T) => Promi
       setSavedFlash(true);
       clearTimeout(flashTimer.current);
       flashTimer.current = setTimeout(() => setSavedFlash(false), 2500);
+      return true;
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
+      return false;
     } finally { setBusy(false); }
   };
 

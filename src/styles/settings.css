@@ -1308,3 +1308,172 @@
 }
 
 .linkbtn:disabled { color: var(--text-faint); cursor: default; }
+
+/* ── Room configuration: summary cards ──────────────────────────────────────
+
+   The page is read-only summaries, one per thing the room has, and each card
+   is the button that opens its editor. Two columns at desk width, one on a
+   tablet; the cards are sized to hold two lines of facts and a mode swatch
+   row without growing past their neighbours. */
+
+.cfgcards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.cfgcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-tile);
+}
+
+.cfgcard__open {
+  /* The whole card is the control. Reset the button so it reads as a card
+     and keep the focus ring, which is the only thing saying it is one. */
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  /* The grid stretches every card to its row's height; without this the
+     button stops at its own content and the hover ends short of the bottom
+     edge on any card shorter than its neighbour. */
+  flex: 1;
+  padding: 14px 16px;
+  border-radius: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cfgcard--static .cfgcard__open { cursor: default; }
+
+.cfgcard__open:hover,
+.cfgcard__open:focus-visible { background: var(--bg-tile-hover); }
+.cfgcard--static .cfgcard__open:hover { background: transparent; }
+.cfgcard__open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.cfgcard__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  /* Room for the status chip, which sits over the top-right corner. */
+  padding-right: 110px;
+}
+
+.cfgcard__title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-weight: 650;
+  font-size: 0.95rem;
+}
+
+.cfgcard__section {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.cfgcard__chevron {
+  margin-left: auto;
+  flex: none;
+  color: var(--text-faint);
+}
+
+.cfgcard__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 0.86rem;
+  color: var(--text-dim);
+}
+
+.cfgcard__line {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cfgcard__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  white-space: normal;
+}
+
+.cfgcard__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cfgcard__mode i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Outside the button (a button in a button is markup nobody can announce),
+   drawn over its corner. */
+.cfgcard__status {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  pointer-events: none;
+}
+
+.cfgcard .connstatus__detail { display: none; }
+
+/* ── The edit dialog ──────────────────────────────────────────────────────── */
+
+.editdlg {
+  max-width: 560px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.editdlg--wide { max-width: 920px; }
+
+.editdlg__title {
+  margin: 0;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+}
+
+.editdlg__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  /* Focus rings and the colour swatch's shadow must not be clipped by the
+     scroll container. */
+  padding: 2px;
+  margin: -2px;
+}
+
+.editdlg__body > .btn { align-self: flex-start; }
+
+.editdlg__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
