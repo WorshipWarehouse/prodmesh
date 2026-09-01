@@ -51,12 +51,14 @@ import {
   PermissionError,
   saveProPresenter,
   saveCompanion,
+  saveObs,
   type PcServiceType,
   type AnalysisConfig,
   type CaptionsConfig,
   type YouTubeConfig,
   type ProPresenterConfig,
   type CompanionConfig,
+  type ObsConfig,
   type ModeConfig,
   type RoomConnectivity,
   type RoomConnectivityStatus,
@@ -796,7 +798,7 @@ const INTEGRATION_GROUPS: Array<{ title: string; description: string; integratio
   {
     title: 'Video & Streaming',
     description: 'Monitor broadcasts, destinations, and audience activity.',
-    integrations: ['youtube', 'restream', 'resi'],
+    integrations: ['youtube', 'restream', 'resi', 'obs'],
   },
   {
     title: 'Communication',
@@ -804,6 +806,22 @@ const INTEGRATION_GROUPS: Array<{ title: string; description: string; integratio
     integrations: ['slack', 'captions', 'prodcom'],
   },
 ];
+
+const INTEGRATION_GUIDANCE: Partial<Record<IntegrationId, string>> = {
+  'planning-center': 'Create a Personal Access Token in Planning Center Services → Account Settings → Developer, then enter its application ID and secret.',
+  propresenter: 'Enable Network in ProPresenter Preferences, then enter the Mac or PC hostname and network port in the room’s Campus setup.',
+  companion: 'Install Bitfocus Companion, enable its HTTP API, then enter that computer’s host and port in the room’s Campus setup.',
+  'open-sound-meter': 'Enable Remote API Server from Open Sound Meter’s Wi‑Fi menu. ProdMesh listens on its documented multicast address on the same network.',
+  smaart: 'Enable Smaart’s network API and enter the analyzer computer’s host, port, and optional API password in the room’s Campus setup.',
+  'prodmesh-rta': 'Install ProdMesh Remote RTA on the analyzer computer, then enter its host and port in the room’s Campus setup.',
+  youtube: 'Create a YouTube Data API key in Google Cloud, save it under credentials, then choose the YouTube channel for each room.',
+  restream: 'Create a Restream developer app, add ProdMesh’s displayed callback URL, select the requested scopes, then connect the Restream account.',
+  resi: 'Request an API token and monitoring endpoint from Resi support or your Resi administrator, then enter them under credentials.',
+  obs: 'Enable Tools → WebSocket Server Settings in OBS Studio. Configure the host, port, and password for each room under Campus setup.',
+  slack: 'Create a Slack app with the needed bot scopes, install it to your workspace, and add the bot token and channel under credentials.',
+  captions: 'Choose ProdMesh Caption or ProdCom in the room’s Campus setup and enter the caption server host, port, and optional key.',
+  prodcom: 'Configure ProdCom under Captions in the room’s Campus setup; its host, port, and optional pre-shared key are room-specific.',
+};
 
 function IntegrationEnablePanel() {
   const [enabled, setEnabled] = useState<Record<string, boolean> | null>(null);
@@ -966,7 +984,10 @@ function SecretsDialog({
     <div className="confirm" role="dialog" aria-modal="true" aria-labelledby="secret-title">
       <div className="confirm__card secretdlg">
         <p className="eyebrow">Credentials</p>
-        <h3 id="secret-title" className="secretdlg__title">{group.label}</h3>
+        <h3 id="secret-title" className="secretdlg__title">
+          {group.label}
+          <HelpTip text={INTEGRATION_GUIDANCE[secretGroupIntegration(group.id)] ?? 'Save the credentials required by this integration. Room-specific connections are configured from Admin → Campuses.'} place="below" />
+        </h3>
         <p className="settings__muted">{group.hint}</p>
 
         {group.fields.map((f) => (
@@ -2000,10 +2021,22 @@ function ConnectivityPanel({ roomId }: { roomId: string }) {
           {enabled('youtube') && <YouTubeEditor roomId={roomId} initial={conn.youtube} />}
           {enabled('captions') && <CaptionsEditor roomId={roomId} initial={conn.captions} />}
           {enabled('propresenter') && <ProPresenterEditor roomId={roomId} initial={conn.proPresenter} status={chip(status?.proPresenter)} />}
+          {enabled('obs') && <ObsEditor roomId={roomId} initial={conn.obs} status={chip(status?.obs)} />}
         </>
       )}
     </section>
   );
+}
+
+interface ObsDraft { host: string; port: string; password: string; hasPassword: boolean; primaryAudioInput: string; droppedFramesWarning: string; previewImageUrl: string; }
+const toObsDraft = (cfg: ObsConfig | null): ObsDraft => ({ host: cfg?.host ?? '', port: cfg?.port != null ? String(cfg.port) : '4455', password: '', hasPassword: Boolean(cfg?.hasPassword), primaryAudioInput: cfg?.primaryAudioInput ?? '', droppedFramesWarning: cfg?.droppedFramesWarning != null ? String(cfg.droppedFramesWarning) : '0.5', previewImageUrl: cfg?.previewImageUrl ?? '' });
+function ObsEditor({ roomId, initial, status }: { roomId: string; initial: ObsConfig | null; status?: ReactNode }) {
+  const [testState, setTestState] = useState<{ busy: boolean; ok?: boolean; detail?: string }>({ busy: false });
+  const f = useDraft(toObsDraft(initial), async (d) => toObsDraft(await saveObs(roomId, d.host.trim() ? { host: d.host.trim(), port: Number(d.port || 4455), ...(d.password ? { password: d.password } : {}), primaryAudioInput: d.primaryAudioInput.trim() || undefined, droppedFramesWarning: d.droppedFramesWarning === '' ? undefined : Number(d.droppedFramesWarning), previewImageUrl: d.previewImageUrl.trim() || undefined } : null)));
+  return <EditorSection title={<IntegrationTitle integration="obs">OBS Studio</IntegrationTitle>} status={status} help="Monitor this room’s OBS Studio through its built-in WebSocket server. In OBS, open Tools → WebSocket Server Settings, enable it, set a password, and use port 4455 (the OBS default). ProdMesh only reads stream, recording, scene, audio, and frame health; it never controls OBS." saveLabel="Save OBS Studio" form={f}>
+    <FormRow><Field label="Host or IP" width="grow"><input className="field" placeholder="e.g. 192.168.1.50" value={f.draft.host} onChange={(e) => f.patch({ host: e.target.value })} /></Field><Field label="WebSocket port"><input className="field" inputMode="numeric" value={f.draft.port} onChange={(e) => f.patch({ port: e.target.value })} /></Field><Field label={f.draft.hasPassword ? 'Password (set)' : 'Password'}><PasswordInput className="field" autoComplete="new-password" placeholder={f.draft.hasPassword ? 'unchanged' : 'OBS WebSocket password'} value={f.draft.password} onChange={(e) => f.patch({ password: e.target.value })} /></Field></FormRow>
+    <div className="fsection__actions"><button type="button" className="btn btn--secondary" disabled={testState.busy || f.busy || !f.draft.host.trim()} onClick={() => { setTestState({ busy: true }); getRoomConnectivityStatus(roomId).then((result) => setTestState({ busy: false, ok: result.obs?.ok === true, detail: result.obs?.detail ?? 'Save the OBS host first.' })).catch((err) => setTestState({ busy: false, ok: false, detail: err instanceof Error ? err.message : String(err) })); }}>{testState.busy ? 'Testing connection…' : 'Test saved connection'}</button>{testState.detail && <span className={testState.ok ? 'fsection__ok' : 'fsection__error'}>{testState.detail}</span>}</div>
+  </EditorSection>;
 }
 
 // The live dot next to an integration's title: green = the probe's real
@@ -2047,7 +2080,7 @@ function PcServiceTypesEditor({ roomId, initial, status }: { roomId: string; ini
     <EditorSection
       title={<IntegrationTitle integration="planning-center">Planning Center service types</IntegrationTitle>}
       status={status}
-      help="The event types this room hosts. The ID is in the Planning Center Services URL for that service type."
+      help="First create a Personal Access Token in Planning Center Services → Account Settings → Developer, then save its application ID and secret in Admin → Integrations. Here, add only the service types this room should use; each ID is in that Planning Center Services URL."
       saveLabel="Save service types"
       form={f}
     >
@@ -2127,7 +2160,7 @@ function CaptionsEditor({ roomId, initial }: { roomId: string; initial: Captions
   return (
     <EditorSection
       title="Captions"
-      help="Live transcript of the production comms channels, so the band can read what the music director and monitor engineer are saying. Shown by the Comms widget on a dashboard or display; nothing else surfaces it. prodmesh reads only — it never renames a channel or clears a transcript."
+      help="Choose the caption application installed for this room. ProdMesh Caption normally uses port 8518. ProdCom normally uses port 24480 and may require its pre-shared API key. ProdMesh only reads transcripts; it never changes channels or clears messages."
       saveLabel="Save captions"
       form={f}
     >
@@ -2313,7 +2346,7 @@ function AnalysisEditor({ roomId, initial, status }: { roomId: string; initial: 
       form={f}
     >
       <FormRow>
-        <Field label="Source">
+        <Field label="Source" help={draft.source === 'smaart' ? INTEGRATION_GUIDANCE.smaart : draft.source === 'rta' ? INTEGRATION_GUIDANCE['prodmesh-rta'] : draft.source === 'open-sound-meter' ? INTEGRATION_GUIDANCE['open-sound-meter'] : 'Choose the system supplying SPL data for this room.'}>
           <SelectField value={draft.source}
             onChange={(e) => f.patch({ source: e.target.value as AnalysisDraft['source'] })}>
             <option value="none">None</option>
@@ -2456,7 +2489,7 @@ function CompanionEditor({ roomId, initial, status }: { roomId: string; initial:
     <EditorSection
       title={<IntegrationTitle integration="companion">Bitfocus Companion &amp; modes</IntegrationTitle>}
       status={status}
-      help="The room's Bitfocus Companion install. Each mode presses a Bitfocus Companion button (page/row/column) and shows as active when the state variable matches its value. Every Bitfocus Companion lays its buttons out differently — set each mode's location to match this room's."
+      help="Install Bitfocus Companion and enable its HTTP API, then enter that computer’s host and port here. Each mode presses a Companion button and becomes active when its state variable matches; set each page, row, and column to match this room’s Companion layout."
       saveLabel="Save Bitfocus Companion"
       form={f}
     >
@@ -2571,7 +2604,7 @@ function ProPresenterEditor({ roomId, initial, status }: { roomId: string; initi
     <EditorSection
       title={<IntegrationTitle integration="propresenter">ProPresenter</IntegrationTitle>}
       status={status}
-      help="The room's ProPresenter API (official, 7.9+) — drives Run of Show tracking and the service countdown. Leave the host empty if the room has no ProPresenter."
+      help="In ProPresenter 7.9 or later, enable Network in Preferences and note the computer’s host and network port. Enter those values here. ProdMesh uses the official API for Run of Show tracking and service countdowns; leave Host empty when this room has no ProPresenter."
       saveLabel="Save ProPresenter"
       form={f}
     >

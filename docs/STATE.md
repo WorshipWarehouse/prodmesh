@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-23 (v1.3.0 released).
+Last updated: 2026-08-26 (v1.3.0 released; OBS Studio monitoring is pending hardware verification).
 
 ## v1.3.0 at a glance
 
@@ -17,8 +17,9 @@ requests (#7, #8, #11), reviewed and merged here.
 | **Planning Center** | service, timer, schedule, team and service-report widgets |
 | **Restream** | OAuth connect, broadcast state, per-destination viewers and labels. Scopes are `channels.read` + `stream.read` only — exactly what the code calls |
 | **Resi** | stream, health, viewers and broadcast widgets — **Beta, see below** |
+| **OBS Studio** | room-level, read-only WebSocket v5 health widget: stream/record state and duration, FPS, bitrate, dropped frames, scene, and broadcast audio meter — **Beta, see below** |
 | **Open Sound Meter** | a third analysis source beside Smaart and ProdMesh RTA, over UDP multicast (239.255.42.42:49007) rather than HTTP |
-| **Admin → Integrations** | enable/disable per integration; a disabled one is hidden *and* stops being polled |
+| **Admin → Integrations** | enable/disable per integration with setup guidance; a disabled one is hidden *and* stops being polled. Network devices (including OBS) are configured per room in Admin → Campuses. |
 | **Setup wizard** | choose the integrations you use, and only be asked for those credentials |
 | **Widgets** | grouped by integration in the palette, every widget resizable, per-widget loudness meters |
 | **Org-level topics** | `integration:<id>` — the first stream topic that is not `room:*:<name>` (ADR 0010) |
@@ -34,6 +35,10 @@ Per the rule that green tests certify logic and nothing else:
   maintainer nor the contributor has a Resi subscription, so every Resi widget
   is exercised only against its unconfigured and error paths. It ships labelled
   **Beta** in the UI for exactly this reason.
+- **OBS Studio — NOT verified against a real OBS instance by anyone.** The
+  WebSocket v5 handshake, authentication, reconnect path, and normalized
+  unconfigured/error states are covered in code. The telemetry contract still
+  needs a building test against the church's OBS version and input names.
 - **Open Sound Meter** — the multicast listener and its socket lifecycle are
   tested; the +140 dB SPL reference is taken from OSM's own display and has not
   been checked against a calibrated meter.
