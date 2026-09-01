@@ -5,7 +5,7 @@ import { WidgetPalette, paletteFor } from './WidgetPalette';
 import { useGridDrag, type Cell } from './useGridDrag';
 import { findFirstFit, isFree, occupancy, rowCount, type Grid } from '../lib/gridLayout';
 import { widgetRegistry, isWidgetType } from '../widgets/registry';
-import { widgetMax, widgetMin, widgetResizable, type WidgetSize } from '../widgets/types';
+import { widgetMax, widgetMin, widgetResizable, type CompanionVariableRow, type WidgetSize } from '../widgets/types';
 import { IntegrationBeta, IntegrationBrand } from '../components/IntegrationBrand';
 import { getEnabledIntegrations, getRoom, getRoomConnectivity, type View, type ViewPlacement } from '../api';
 import { useQuery } from '../lib/useQuery';
@@ -280,6 +280,115 @@ function WidgetInspector({ placement, onChange }: { placement: ViewPlacement | n
   const loudness = placement && (placement.type === 'loudness' || placement.type === 'loudness-trend');
   const resiPlayer = placement && (placement.type === 'resi-stream' || placement.type === 'resi-broadcast');
   const restream = placement?.type === 'restream';
+  const companion = placement?.type === 'companion-variables';
   const title = placement?.type === 'propresenter-playlist' ? 'ProPresenter Playlist' : placement?.type === 'propresenter-controls' ? 'ProPresenter Controls' : 'Decibel Meter';
-  return <aside className="widgetinspector"><h2>Widget settings</h2>{!placement ? <p>Select a widget to configure it.</p> : loudness ? <><p className="widgetinspector__name">{title}</p><label>Target dB<input type="number" min="40" max="130" placeholder="Optional" value={placement.config.target ?? ''} onChange={(e) => onChange(placement.id, { target: e.target.value === '' ? undefined : Number(e.target.value) })} /></label><label>Limit dB<input type="number" min="40" max="130" placeholder="Optional" value={placement.config.limit ?? ''} onChange={(e) => onChange(placement.id, { limit: e.target.value === '' ? undefined : Number(e.target.value) })} /></label><label>Weighting<select value={placement.config.weighting ?? 'A'} onChange={(e) => onChange(placement.id, { weighting: e.target.value })}><option value="A">A-weighted</option><option value="B">B-weighted</option><option value="C">C-weighted</option><option value="Z">Z-weighted</option></select></label><label>Response<select value={placement.config.response ?? 'Slow'} onChange={(e) => onChange(placement.id, { response: e.target.value })}><option value="Fast">Fast</option><option value="Slow">Slow</option></select></label></> : restream ? <><p className="widgetinspector__name">Restream</p><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.videoPreview)} onChange={(e) => onChange(placement.id, { videoPreview: e.target.checked })} /> Show YouTube video preview</label><small>Shows the active YouTube destination inside this widget.</small><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.destinationLinks)} onChange={(e) => onChange(placement.id, { destinationLinks: e.target.checked })} /> Show destination links</label><small>Opens each active destination in a new tab.</small></> : resiPlayer ? <><p className="widgetinspector__name">{placement.type === 'resi-stream' ? 'Resi Stream' : 'Resi Broadcast Monitor'}</p><label>Player aspect ratio<select value={placement.config.aspectRatio ?? '16:9'} onChange={(e) => onChange(placement.id, { aspectRatio: e.target.value })}><option value="16:9">16:9 widescreen</option><option value="4:3">4:3 standard</option><option value="1:1">Square</option></select></label><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.autoplay)} onChange={(e) => onChange(placement.id, { autoplay: e.target.checked })} /> Autoplay when allowed</label><label className="widgetinspector__check"><input type="checkbox" checked={placement.config.muted ?? true} onChange={(e) => onChange(placement.id, { muted: e.target.checked })} /> Muted by default</label><label className="widgetinspector__check"><input type="checkbox" checked={placement.config.playerControls ?? true} onChange={(e) => onChange(placement.id, { playerControls: e.target.checked })} /> Show player controls</label></> : !pp ? <p><strong>{placement.type}</strong><br />This widget has no settings.</p> : <><p className="widgetinspector__name">{title}</p><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.slideControls)} onChange={(event) => onChange(placement.id, { slideControls: event.target.checked })} /> Enable slide controls</label>{placement.type === 'propresenter-playlist' && <><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.keyboardControls)} onChange={(event) => onChange(placement.id, { keyboardControls: event.target.checked })} /> Enable arrow keys and spacebar</label><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.followActive)} onChange={(event) => onChange(placement.id, { followActive: event.target.checked })} /> Follow active cue</label><label>Slide display<select value={placement.config.slideMode ?? 'image'} onChange={(event) => onChange(placement.id, { slideMode: event.target.value })}><option value="image">Rendered previews</option><option value="text">Slide text</option></select></label><label>Slide width (px)<input type="number" min="0" max="200" step="1" value={placement.config.slideSize ?? 60} onChange={(event) => onChange(placement.id, { slideSize: Number(event.target.value) })} /><small>0–200 px. Lower values fit more cues across; 0 uses a safe 32 px rendering floor.</small></label></>}</>}</aside>;
+  return <aside className="widgetinspector"><h2>Widget settings</h2>{!placement ? <p>Select a widget to configure it.</p> : companion ? <CompanionRows rows={placement.config.rows ?? []} onChange={(rows) => onChange(placement.id, { rows })} /> : loudness ? <><p className="widgetinspector__name">{title}</p><label>Target dB<input type="number" min="40" max="130" placeholder="Optional" value={placement.config.target ?? ''} onChange={(e) => onChange(placement.id, { target: e.target.value === '' ? undefined : Number(e.target.value) })} /></label><label>Limit dB<input type="number" min="40" max="130" placeholder="Optional" value={placement.config.limit ?? ''} onChange={(e) => onChange(placement.id, { limit: e.target.value === '' ? undefined : Number(e.target.value) })} /></label><label>Weighting<select value={placement.config.weighting ?? 'A'} onChange={(e) => onChange(placement.id, { weighting: e.target.value })}><option value="A">A-weighted</option><option value="B">B-weighted</option><option value="C">C-weighted</option><option value="Z">Z-weighted</option></select></label><label>Response<select value={placement.config.response ?? 'Slow'} onChange={(e) => onChange(placement.id, { response: e.target.value })}><option value="Fast">Fast</option><option value="Slow">Slow</option></select></label></> : restream ? <><p className="widgetinspector__name">Restream</p><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.videoPreview)} onChange={(e) => onChange(placement.id, { videoPreview: e.target.checked })} /> Show YouTube video preview</label><small>Shows the active YouTube destination inside this widget.</small><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.destinationLinks)} onChange={(e) => onChange(placement.id, { destinationLinks: e.target.checked })} /> Show destination links</label><small>Opens each active destination in a new tab.</small></> : resiPlayer ? <><p className="widgetinspector__name">{placement.type === 'resi-stream' ? 'Resi Stream' : 'Resi Broadcast Monitor'}</p><label>Player aspect ratio<select value={placement.config.aspectRatio ?? '16:9'} onChange={(e) => onChange(placement.id, { aspectRatio: e.target.value })}><option value="16:9">16:9 widescreen</option><option value="4:3">4:3 standard</option><option value="1:1">Square</option></select></label><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.autoplay)} onChange={(e) => onChange(placement.id, { autoplay: e.target.checked })} /> Autoplay when allowed</label><label className="widgetinspector__check"><input type="checkbox" checked={placement.config.muted ?? true} onChange={(e) => onChange(placement.id, { muted: e.target.checked })} /> Muted by default</label><label className="widgetinspector__check"><input type="checkbox" checked={placement.config.playerControls ?? true} onChange={(e) => onChange(placement.id, { playerControls: e.target.checked })} /> Show player controls</label></> : !pp ? <p><strong>{placement.type}</strong><br />This widget has no settings.</p> : <><p className="widgetinspector__name">{title}</p><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.slideControls)} onChange={(event) => onChange(placement.id, { slideControls: event.target.checked })} /> Enable slide controls</label>{placement.type === 'propresenter-playlist' && <><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.keyboardControls)} onChange={(event) => onChange(placement.id, { keyboardControls: event.target.checked })} /> Enable arrow keys and spacebar</label><label className="widgetinspector__check"><input type="checkbox" checked={Boolean(placement.config.followActive)} onChange={(event) => onChange(placement.id, { followActive: event.target.checked })} /> Follow active cue</label><label>Slide display<select value={placement.config.slideMode ?? 'image'} onChange={(event) => onChange(placement.id, { slideMode: event.target.value })}><option value="image">Rendered previews</option><option value="text">Slide text</option></select></label><label>Slide width (px)<input type="number" min="0" max="200" step="1" value={placement.config.slideSize ?? 60} onChange={(event) => onChange(placement.id, { slideSize: Number(event.target.value) })} /><small>0–200 px. Lower values fit more cues across; 0 uses a safe 32 px rendering floor.</small></label></>}</>}</aside>;
+}
+
+/**
+ * The Companion widget's rows.
+ *
+ * Written out rather than folded into the ternary above because it is the
+ * only setting that is a LIST — rows are added, removed and reordered — and a
+ * list editor inline in an expression is where that panel would stop being
+ * readable.
+ *
+ * Fields appear per display style, since the questions genuinely differ: a
+ * bullet needs to know which values are good, a bar needs to know the ends,
+ * and plain text needs neither. Showing all of them always would ask every
+ * operator to ignore four boxes to fill in one.
+ */
+function CompanionRows({ rows, onChange }: { rows: CompanionVariableRow[]; onChange: (rows: CompanionVariableRow[]) => void }) {
+  const patch = (i: number, fields: Partial<CompanionVariableRow>) =>
+    onChange(rows.map((row, n) => (n === i ? { ...row, ...fields } : row)));
+
+  return (
+    <>
+      <p className="widgetinspector__name">Companion variables</p>
+
+      {rows.map((row, i) => (
+        <fieldset className="cvarsettings" key={i}>
+          <legend>
+            Variable {i + 1}
+            <button type="button" onClick={() => onChange(rows.filter((_, n) => n !== i))}>
+              Remove
+            </button>
+          </legend>
+
+          <label>
+            Variable
+            <input
+              value={row.variable}
+              placeholder="custom:roomState"
+              onChange={(e) => patch(i, { variable: e.target.value.trim() })}
+            />
+            {/* Companion's own syntax, minus the $() an operator would have to
+                remember to strip. `custom` is its reserved label for custom
+                variables; anything else is a connection label. */}
+            <small>As Companion writes it: <code>custom:name</code>, or <code>connection:name</code> for a module variable.</small>
+          </label>
+
+          <label>
+            Label
+            <input
+              value={row.label ?? ''}
+              placeholder="Optional — defaults to the variable name"
+              onChange={(e) => patch(i, { label: e.target.value })}
+            />
+          </label>
+
+          <label>
+            Display
+            <select value={row.display ?? 'text'} onChange={(e) => patch(i, { display: e.target.value as CompanionVariableRow['display'] })}>
+              <option value="text">Text</option>
+              <option value="status">Text with a status bullet</option>
+              <option value="bar">Progress bar</option>
+            </select>
+          </label>
+
+          {row.display === 'status' && (
+            <>
+              <label>
+                Green when
+                <input value={row.ok ?? ''} placeholder="LIVE, OPEN" onChange={(e) => patch(i, { ok: e.target.value })} />
+              </label>
+              <label>
+                Amber when
+                <input value={row.warn ?? ''} placeholder="STARTING" onChange={(e) => patch(i, { warn: e.target.value })} />
+              </label>
+              <label>
+                Red when
+                <input value={row.bad ?? ''} placeholder="OFF, ERROR" onChange={(e) => patch(i, { bad: e.target.value })} />
+                <small>Comma-separated values, matched exactly (case is ignored). A value in no list shows a grey bullet.</small>
+              </label>
+            </>
+          )}
+
+          {row.display === 'bar' && (
+            <>
+              <label>
+                Bar minimum
+                <input type="number" value={row.min ?? ''} placeholder="0" onChange={(e) => patch(i, { min: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </label>
+              <label>
+                Bar maximum
+                <input type="number" value={row.max ?? ''} placeholder="100" onChange={(e) => patch(i, { max: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                <small>The bar is drawn only when the value is a number; anything else stays as text.</small>
+              </label>
+            </>
+          )}
+        </fieldset>
+      ))}
+
+      {/* Eight is the server's cap, and about what a tall cell shows before the
+          type is too small to read from across a room. */}
+      {rows.length < 8 ? (
+        <button type="button" className="cvarsettings__add" onClick={() => onChange([...rows, { variable: '', display: 'text' }])}>
+          Add a variable
+        </button>
+      ) : (
+        <small>Eight variables per widget. Add a second Companion widget for more.</small>
+      )}
+    </>
+  );
 }

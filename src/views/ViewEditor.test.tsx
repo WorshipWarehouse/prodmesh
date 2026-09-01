@@ -293,6 +293,42 @@ describe('ViewEditor', () => {
     });
   });
 
+  it('the Companion widget takes its variables from the settings panel', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await openPaletteGroup(user, 'Bitfocus Companion');
+    await user.click(screen.getByRole('button', { name: 'Add Companion variables' }));
+
+    // Selecting the cell is what opens its settings — the panel is beside the
+    // canvas, never inside a cell that may be one grid square.
+    await user.click(within(at('companion-variables')).getByRole('button', { name: /Move Companion variables/ }));
+    const panel = within(screen.getByText('Widget settings').closest('aside')!);
+    await user.click(panel.getByRole('button', { name: 'Add a variable' }));
+    await user.type(panel.getByLabelText(/^Variable/), 'custom:doorsOpen');
+    await user.type(panel.getByLabelText('Label'), 'Doors');
+
+    // The live cell IS the preview — the editor renders the same component a
+    // screen in the building does, so a config change is visible immediately.
+    expect(within(at('companion-variables')).getByText('Doors')).toBeInTheDocument();
+
+    // Only the questions that display style actually asks. Text asks neither.
+    expect(panel.queryByLabelText(/^Green when/)).not.toBeInTheDocument();
+    expect(panel.queryByLabelText(/^Bar maximum/)).not.toBeInTheDocument();
+
+    await user.selectOptions(panel.getByLabelText('Display'), 'status');
+    expect(panel.getByLabelText(/^Green when/)).toBeInTheDocument();
+    expect(panel.queryByLabelText(/^Bar maximum/)).not.toBeInTheDocument();
+
+    await user.selectOptions(panel.getByLabelText('Display'), 'bar');
+    expect(panel.getByLabelText(/^Bar maximum/)).toBeInTheDocument();
+    expect(panel.queryByLabelText(/^Green when/)).not.toBeInTheDocument();
+
+    await user.click(panel.getByRole('button', { name: 'Remove' }));
+    expect(within(at('companion-variables')).queryByText('Doors')).not.toBeInTheDocument();
+    expect(within(at('companion-variables')).getByText(/add them in Widget settings/i)).toBeInTheDocument();
+  });
+
   it('the palette shows each widget’s size, since the grid is what it competes for', async () => {
     const user = userEvent.setup();
     render(<Harness />);

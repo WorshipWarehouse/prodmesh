@@ -232,6 +232,12 @@ export const WIDGET_TYPES = new Map([
   }],
   ['now-next', { unique: true, display: true, size: { w: 3, h: 1 } }],
   ['room-mode', { unique: true, display: true, size: { w: 2, h: 1 } }],
+  // The first widget that is genuinely multi-instance: two of these are two
+  // different sets of variables, and the rows in their config say which.
+  ['companion-variables', {
+    unique: false, display: true,
+    size: { w: 2, h: 2 }, min: { w: 1, h: 1 }, max: { w: 3, h: 4 },
+  }],
   ['clock', { unique: true, display: true, size: { w: 2, h: 1 } }],
   ['captions', {
     unique: true, display: true,
@@ -364,6 +370,72 @@ const sizeRange = (min, max) =>
     ? `${min.w}×${min.h}`
     : `between ${min.w}×${min.h} and ${max.w}×${max.h}`;
 
+/**
+ * A Companion variable reference as Companion itself writes it — `label:name`,
+ * where `custom` is the reserved label for a custom variable and anything else
+ * is a connection label ($(internal:time_hms)).
+ *
+ * Deliberately narrow: these two segments go straight into a topic name, where
+ * ':' is the separator, and into a URL path on the way to Companion. Shared
+ * with server/companionVariables.js so the thing that is stored and the thing
+ * that is polled cannot disagree about what a name may contain.
+ */
+export const COMPANION_VAR_SEGMENT = /^[A-Za-z0-9_.-]{1,64}$/;
+
+/** Rows one Companion widget may hold. Eight is what fits a tall cell before
+ *  the text is too small to read across a room, which is what the widget is
+ *  for. More variables means a second widget, which is why it is not unique. */
+const MAX_COMPANION_ROWS = 8;
+const ROW_DISPLAYS = new Set(['text', 'status', 'bar']);
+
+/**
+ * Normalize the Companion widget's rows.
+ *
+ * Bad input THROWS rather than being dropped, unlike an unknown scalar key
+ * above: a row with a mistyped variable is not a preference this build does
+ * not understand, it is a widget that would render a permanent blank. Saying
+ * so at save time is the only moment anyone is looking.
+ */
+function companionRows(rows) {
+  if (!Array.isArray(rows)) return undefined;
+  if (rows.length > MAX_COMPANION_ROWS) {
+    throw new Error(`A Companion widget holds at most ${MAX_COMPANION_ROWS} variables`);
+  }
+  return rows.map((row) => {
+    const variable = String(row?.variable ?? '').trim();
+    const [label, name, ...extra] = variable.split(':');
+    if (extra.length || !COMPANION_VAR_SEGMENT.test(label ?? '') || !COMPANION_VAR_SEGMENT.test(name ?? '')) {
+      throw new Error(`"${variable || '(empty)'}" is not a Companion variable — write it as label:name, e.g. custom:roomState`);
+    }
+    const out = { variable: `${label}:${name}` };
+    const text = String(row?.label ?? '').trim();
+    if (text) {
+      if (text.length > 40) throw new Error('A Companion row label is at most 40 characters');
+      out.label = text;
+    }
+    out.display = ROW_DISPLAYS.has(row?.display) ? row.display : 'text';
+    // Match lists for the status bullet: the values that mean each colour,
+    // comma-separated. Stored as typed so the editor round-trips exactly what
+    // the operator wrote, including the spacing.
+    for (const key of ['ok', 'warn', 'bad']) {
+      const value = String(row?.[key] ?? '').trim();
+      if (!value) continue;
+      if (value.length > 120) throw new Error(`A Companion row "${key}" list is at most 120 characters`);
+      out[key] = value;
+    }
+    for (const key of ['min', 'max']) {
+      if (row?.[key] == null || row[key] === '') continue;
+      const value = Number(row[key]);
+      if (!Number.isFinite(value)) throw new Error(`A Companion row ${key} must be a number`);
+      out[key] = value;
+    }
+    if (out.min != null && out.max != null && out.max <= out.min) {
+      throw new Error('A Companion row max must be above its min');
+    }
+    return out;
+  });
+}
+
 function viewWidgetConfig(config) {
   if (!config || typeof config !== 'object') return {};
   const out = {};
@@ -403,5 +475,7 @@ function viewWidgetConfig(config) {
     if (typeof config[key] === 'boolean') out[key] = config[key];
   }
   if (['16:9', '4:3', '1:1'].includes(config.aspectRatio)) out.aspectRatio = config.aspectRatio;
+  const rows = companionRows(config.rows);
+  if (rows) out.rows = rows;
   return out;
 }

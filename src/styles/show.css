@@ -1133,3 +1133,104 @@ span.ros-track__status {
 @media (prefers-reduced-motion: reduce) {
   .lyr__list { scroll-behavior: auto; }
 }
+
+/* ── Companion variables ─────────────────────────────────────────────────────
+
+   A rack of label/value lines. Unlike the integration dots next door this one
+   grows DOWN rather than across: each row is one variable, and a second column
+   would put two unrelated facts on one eye-line where the labels are the only
+   thing telling them apart. Width buys longer values instead. */
+
+.wgt--cvars {
+  container-type: inline-size;
+  min-height: 0;
+}
+
+.cvar {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cvar__line {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.cvar__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+
+/* The value is the content; the label is the caption for it. Tabular figures
+   so a counting variable does not jiggle the row every time it ticks. */
+.cvar__value {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Waiting for the first read, or no value to show. Dimmed rather than hidden:
+   the row still names a variable somebody asked to see. */
+.cvar__row--quiet .cvar__value {
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+.cvar__dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  /* Baseline-aligned text next to a dot puts the dot on the baseline, i.e.
+     under the middle of the type. Nudge it back up to the x-height. */
+  align-self: center;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.cvar__dot--ok { background: var(--ok); }
+.cvar__dot--warn { background: var(--warn); }
+.cvar__dot--bad { background: var(--danger); }
+
+.cvar__bar {
+  display: block;
+  height: 5px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: var(--bg-tile);
+  overflow: hidden;
+}
+
+.cvar__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  /* Companion publishes on change and the poll is seconds apart, so a moving
+     value arrives as steps. Easing them is honest here — the bar is showing a
+     level, not an event — and stops a battery meter snapping about. */
+  transition: width 240ms ease;
+}
+
+/* A single-cell placement. The label alone identifies the row at this width,
+   and the value is what the row is FOR — so the label is what gives way. */
+@container (max-width: 150px) {
+  .cvar__line { font-size: 0.85rem; gap: 6px; }
+  .cvar__name { flex: 0 1 auto; }
+}

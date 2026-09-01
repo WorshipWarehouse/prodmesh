@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { readCustomVariable, pressButton } from './companion.js';
+import { readCustomVariable, pressButton, readVariable } from './companion.js';
 
 // A fake Companion HTTP API: records every request and answers via `handler`.
 async function fakeCompanion(handler) {
@@ -86,4 +86,57 @@ test('a server that accepts the socket but never responds times out (~2.5s)', as
   } finally {
     await srv.close();
   }
+});
+
+// ── readVariable: any $(label:name), module or custom ────────────────────────
+
+test('readVariable uses the module path for a connection label', async () => {
+  const srv = await fakeCompanion((_req, res) => res.end(' 10:42:15 \n'));
+  try {
+    assert.equal(await readVariable(srv.companion, 'internal', 'time_hms'), '10:42:15');
+    // Verified against a real Companion 2026-09-01: this path serves module
+    // variables, and `custom` as well — but custom keeps its own endpoint
+    // below, because that is the one proven in the buildings.
+    assert.equal(srv.seen[0].url, '/api/variable/internal/time_hms/value');
+  } finally {
+    await srv.close();
+  }
+});
+
+test('readVariable reads a custom variable through the endpoint the room mode uses', async () => {
+  const srv = await fakeCompanion((_req, res) => res.end('SUNDAY'));
+  try {
+    assert.equal(await readVariable(srv.companion, 'custom', 'room state'), 'SUNDAY');
+    assert.equal(srv.seen[0].url, '/api/custom-variable/room%20state/value');
+  } finally {
+    await srv.close();
+  }
+});
+
+test('readVariable reports a 404 as a status, not as a dead Companion', async () => {
+  // The distinction the widget renders: 404 is a variable that does not exist
+  // (a typo in someone's config), which is NOT the same news as the machine
+  // being unreachable — and the box plainly answered, so health stays green.
+  const srv = await fakeCompanion((_req, res) => {
+    res.statusCode = 404;
+    res.end('Not found');
+  });
+  try {
+    await assert.rejects(readVariable(srv.companion, 'internal', 'nope'), (err) => {
+      assert.equal(err.status, 404);
+      return true;
+    });
+  } finally {
+    await srv.close();
+  }
+});
+
+test('readVariable rejects with no status when the machine cannot be reached', async () => {
+  const srv = await fakeCompanion((_req, res) => res.end('x'));
+  const { companion } = srv;
+  await srv.close(); // nothing listening now
+  await assert.rejects(readVariable(companion, 'custom', 'roomState'), (err) => {
+    assert.equal(err.status, undefined, 'no HTTP status: there was no HTTP answer');
+    return true;
+  });
 });

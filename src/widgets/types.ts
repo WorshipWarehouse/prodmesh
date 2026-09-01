@@ -25,6 +25,32 @@ import type { IntegrationId } from '../components/IntegrationBrand';
 //  display, which is defined as non-interactive.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * One line of the Companion widget.
+ *
+ * `variable` is written the way Companion writes it — `label:name`, where
+ * `custom` is the reserved label for a custom variable and anything else is a
+ * connection label (`internal:time_hms`). Stored as one string because that is
+ * what an operator reads off a Companion button, and splitting it into two
+ * fields would only ask them to translate.
+ *
+ * `ok`/`warn`/`bad` are comma-separated VALUE lists for the status bullet: the
+ * values that mean each colour. Anything a row does not name is neutral, which
+ * is deliberate — a grey bullet says "this is not one of the states I was told
+ * about", and inventing a colour for it would be a guess shown as a fact.
+ */
+export interface CompanionVariableRow {
+  variable: string;
+  label?: string;
+  display?: 'text' | 'status' | 'bar';
+  ok?: string;
+  warn?: string;
+  bad?: string;
+  /** Bar ends. Default 0–100, which is what a percentage variable already is. */
+  min?: number;
+  max?: number;
+}
+
 /** Per-instance settings from a stored layout. Every field is optional: a
  *  widget must render something sensible knowing only its room. */
 export interface WidgetConfig {
@@ -52,6 +78,10 @@ export interface WidgetConfig {
   videoPreview?: boolean;
   aspectRatio?: '16:9' | '4:3' | '1:1';
   slides?: 'current' | 'next' | 'both';
+  /** Companion variables, one row each. The only config that is a LIST:
+   *  every other widget answers one question, and this one is a rack of
+   *  labelled values whose whole point is holding several at once. */
+  rows?: CompanionVariableRow[];
   /** Runtime-only identity injected by ViewCanvas; never persisted. */
   viewId?: string;
   widgetId?: string;
@@ -148,6 +178,7 @@ export type WidgetType =
   | 'run-of-show'
   | 'now-next'
   | 'room-mode'
+  | 'companion-variables'
   | 'room-health'
   | 'captions'
   | 'lyrics'
