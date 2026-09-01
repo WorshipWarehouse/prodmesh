@@ -94,6 +94,42 @@ test('validateView drops unknown widget config keys rather than rejecting', () =
   assert.deepEqual(validateView(view({ widgets: [at('countdown', 0, 0)] })).widgets[0].config, {});
 });
 
+test('validateView normalizes Companion variable rows and refuses bad ones', () => {
+  const rows = (list) => validateView(view({
+    widgets: [{ type: 'companion-variables', x: 0, y: 0, w: 2, h: 2, config: { rows: list } }],
+  })).widgets[0].config.rows;
+
+  assert.deepEqual(rows([{ variable: ' custom:roomState ', label: ' Mode ', display: 'status', ok: 'SUNDAY', junk: 1 }]),
+    [{ variable: 'custom:roomState', label: 'Mode', display: 'status', ok: 'SUNDAY' }],
+    'trimmed, junk dropped');
+  assert.deepEqual(rows([{ variable: 'internal:time_hms' }]),
+    [{ variable: 'internal:time_hms', display: 'text' }],
+    'text is the default display');
+  assert.deepEqual(rows([{ variable: 'atem:program', display: 'sideways' }])[0].display, 'text',
+    'an unknown display falls back rather than failing the save');
+  assert.deepEqual(rows([{ variable: 'x:y', display: 'bar', min: '10', max: '20' }])[0],
+    { variable: 'x:y', display: 'bar', min: 10, max: 20 });
+
+  // A malformed variable THROWS, unlike an unknown key: the row would render a
+  // permanent blank, and save time is the only moment anyone is looking.
+  for (const bad of ['', 'roomState', 'custom:room state', 'a:b:c', 'custom:' + 'x'.repeat(65)]) {
+    assert.throws(() => rows([{ variable: bad }]), /not a Companion variable/, bad || '(empty)');
+  }
+  assert.throws(() => rows(Array.from({ length: 9 }, () => ({ variable: 'custom:a' }))), /at most 8 variables/);
+  assert.throws(() => rows([{ variable: 'custom:a', label: 'x'.repeat(41) }]), /at most 40 characters/);
+  assert.throws(() => rows([{ variable: 'custom:a', ok: 'x'.repeat(121) }]), /at most 120 characters/);
+  assert.throws(() => rows([{ variable: 'custom:a', display: 'bar', min: 5, max: 5 }]), /above its min/);
+  assert.throws(() => rows([{ variable: 'custom:a', display: 'bar', max: 'lots' }]), /must be a number/);
+
+  // Two of them, which no other widget may be — the whole point of the rack.
+  assert.doesNotThrow(() => validateView(view({
+    widgets: [
+      { type: 'companion-variables', x: 0, y: 0, w: 2, h: 2, config: {} },
+      { type: 'companion-variables', x: 2, y: 0, w: 2, h: 2, config: {} },
+    ],
+  })));
+});
+
 test('validateView rejects every malformed layout', () => {
   assert.throws(() => validateView(view({ kind: 'wall' })), /dashboard or display/);
   assert.throws(() => validateView(view({ name: '' })), /1–60 characters/);

@@ -23,6 +23,7 @@ import { isSealed, SEALED_MESSAGE } from './restoreSeal.js';
 import * as deployment from './deployment.js';
 
 import './roomStateWatcher.js'; // registers the room:*:mode topic
+import './companionVariables.js'; // registers the room:*:var:*:* topics
 import './roomHealth.js'; // registers the room:*:health topic
 import './videoWatcher.js'; // registers the room:*:video topic
 import './captionWatcher.js'; // registers the room:*:captions topic

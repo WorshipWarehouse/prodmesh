@@ -3,7 +3,7 @@
 A living snapshot of what's live vs mock and what's next. Update this as things
 change — it's the fastest way for a cold context to know where the project stands.
 The long-term destination lives in [VISION.md](./VISION.md).
-Last updated: 2026-08-23 (v1.3.0 released).
+Last updated: 2026-09-01 (v1.4.0-dev in progress).
 
 ## v1.3.0 at a glance
 
@@ -61,7 +61,7 @@ editor, and the whole thing survived a Sunday.
 | | |
 |---|---|
 | **Views** | dashboards + displays, drag or keyboard editor, per-view scale, station assignment |
-| **Widgets** | clock, countdown, integrations, live viewers, loudness, loudness trend, now & next, room mode, run of show — plus comms and lyrics since (1.3.0-dev) |
+| **Widgets** | clock, countdown, integrations, live viewers, loudness, loudness trend, now & next, room mode, run of show — plus comms and lyrics since (1.3.0-dev), and Companion variables (1.4.0-dev) |
 | **ProPresenter** | slide progress and live **video playback position** on a new refcounted `room:*:video` topic |
 | **Licensing** | MIT — the repo had been public since 2026-08-02 with no licence, i.e. all rights reserved |
 
@@ -202,6 +202,24 @@ Notes:
   `roomHealth.test.js` asserts that against realistic probe text and fails if
   a field is passed through. YouTube is read from the health registry rather
   than probed, because every YouTube request is metered quota.
+  `companion-variables` (1.4.0-dev) is a rack of labelled values read from the
+  room's Companion — up to eight rows per widget, each shown as text, as text
+  with a status bullet, or as a progress bar. Rows name a variable the way
+  Companion does (`custom:doorsOpen`, `internal:time_hms`), and the colours are
+  the operator's: a row lists the values that mean green, amber and red, and
+  anything unlisted stays grey rather than being guessed at. It is the FIRST
+  multi-instance widget (`unique: false`) — two of them are two different
+  racks, identified by their config, which is the case the flag was written
+  for. Each row is its own `room:*:var:<label>:<name>` topic, so eight rows
+  across three screens cost ONE poll loop per room
+  (`server/companionVariables.js`); names are shape-checked and a room may have
+  at most 24 distinct variables watched at once, because subscribing starts
+  work and the names come from stored config. A missing variable, an
+  unreachable Companion and a simulated room read as three different lines,
+  since they send whoever is fixing it to three different places.
+  **Verified live 2026-09-01** against a real Companion (module and custom
+  variables, a 404 typo, two racks side by side, bars tracking a moving value);
+  the settings panel is covered in jsdom but has not yet been used in anger.
   `room-mode` is read-only on purpose: changing mode is a confirm dialog, a
   schedule-override PIN and a permission, which is a control surface rather
   than a tile, and it already has one on the room page. `loudness-trend` and

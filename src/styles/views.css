@@ -600,6 +600,41 @@
 .widgetinspector small { display: block; color: var(--text-dim); line-height: 1.35; }
 .widgetinspector .widgetinspector__check { flex-direction: row; align-items: flex-start; gap: 8px; color: var(--text); }
 .widgetinspector select { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+.widgetinspector input { width: 100%; padding: 7px 8px; border-radius: var(--radius-sm); background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+
+/* One Companion variable's settings. A fieldset per row rather than a flat
+   run of inputs: the panel holds up to eight of these, and without a boundary
+   there is nothing on screen saying which "Green when" belongs to which
+   variable. */
+.cvarsettings {
+  margin: 12px 0;
+  padding: 2px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.cvarsettings legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px;
+  color: var(--text);
+  font-weight: 650;
+  font-size: 0.8rem;
+}
+.cvarsettings legend button,
+.cvarsettings__add {
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tile);
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+.cvarsettings legend button:hover,
+.cvarsettings__add:hover { background: var(--bg-tile-hover); color: var(--text); }
+.cvarsettings__add { width: 100%; padding: 8px; }
+.cvarsettings code { font-size: 0.95em; color: var(--text); }
 
 /* ── Palette ─────────────────────────────────────────────────────────────── */
 

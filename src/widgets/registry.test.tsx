@@ -90,12 +90,14 @@ describe('the registry contract', () => {
   });
 
   it('is one-per-view unless a widget opts out', () => {
-    // Loudness deliberately opts out: an operator may place A-slow and C-slow
-    // meters beside each other from the same analysis source.
+    // Two deliberate opt-outs, for the same reason in different clothes: the
+    // type alone no longer identifies the placement, and its CONFIG does.
+    // Loudness — A-slow and C-slow meters side by side from one analysis
+    // source. Companion variables — two racks of different variables.
+    const many = new Set(['loudness', 'companion-variables']);
     for (const type of widgetTypes) {
-      expect(widgetIsUnique(widgetRegistry[type]), `${type}`).toBe(type !== 'loudness');
+      expect(widgetIsUnique(widgetRegistry[type]), `${type}`).toBe(!many.has(type));
     }
-    expect(widgetIsUnique(widgetRegistry.loudness)).toBe(false);
   });
 
   it('recognises its own type names and rejects others', () => {

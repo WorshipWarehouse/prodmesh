@@ -454,6 +454,44 @@ Other Services facts:
 
 ---
 
+## Bitfocus Companion
+
+The HTTP API is `http://host:8000`. Three paths matter, all probed against a
+real Companion on 2026-09-01:
+
+| Path | Answer |
+|---|---|
+| `GET /api/custom-variable/<name>/value` | the value as `text/html`, no JSON |
+| `GET /api/variable/<label>/<name>/value` | the same, for `$(label:name)` |
+| `GET /api/location/<page>/<row>/<column>/press` (POST) | presses a button |
+
+**`/api/variable/` serves custom variables too** — `custom` is a real label
+there (`/api/variable/custom/roomState/value` answers), so one path could serve
+both. `companion.js` still sends custom variables to their own endpoint,
+because that is the path the room-mode read has always used and therefore the
+one proven against every Companion in the buildings; the unified path is
+verified on one machine only.
+
+**A missing variable is a 404 with the body `Not found`.** Which means the
+machine answered, so it is NOT evidence that Companion is down — the variable
+widget shows those as two different states, and `readVariable` reports health
+green on any HTTP status.
+
+**There is no bulk read.** `/api/variables` is a 404: n variables is n
+requests, which is why `companionVariables.js` polls one loop per room rather
+than one per variable, and caps how many a room may watch.
+
+`GET /api/connections` lists the connection labels (`[{id, label, moduleId,
+enabled, status}]`) — not used yet, but it is what a variable picker would
+be built on instead of asking an operator to type a label.
+
+Every response carries `Access-Control-Allow-Origin: *` and no auth of any
+kind. Anything that can reach the port can press any button, which is the
+reason these reads happen server-side and the reason a Companion belongs on a
+production VLAN.
+
+---
+
 ## Smaart
 
 API v4 is a WebSocket at `ws://host:26000/api/v4/`. Smaart v8 (8.5.2.2) accepts

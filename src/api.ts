@@ -1,6 +1,10 @@
 // Frontend client for the dashboard backend (which proxies to Companion).
 
 import type { Church } from './types';
+// The row shape lives with the widget that renders it; this file mirrors the
+// server's stored config, and a hand-kept second copy of a nested shape is the
+// kind of duplicate that drifts silently.
+import type { CompanionVariableRow } from './widgets/types';
 
 export interface RoomMode {
   id: string;
@@ -1290,6 +1294,7 @@ export interface ViewPlacement {
 
 /** Mirrors the server's per-placement config — the same shape as WidgetConfig. */
 export interface WidgetConfigJson {
+  rows?: CompanionVariableRow[];
   planId?: string;
   timeId?: string;
   slideControls?: boolean;

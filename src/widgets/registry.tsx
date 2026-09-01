@@ -10,6 +10,7 @@
 
 import { CaptionsWidget } from './CaptionsWidget';
 import { ClockWidget } from './ClockWidget';
+import { CompanionVariablesWidget } from './CompanionVariablesWidget';
 import { CountdownWidget } from './CountdownWidget';
 import { NowNextWidget } from './NowNextWidget';
 import { RoomHealthWidget } from './RoomHealthWidget';
@@ -105,6 +106,23 @@ export const widgetRegistry: Record<WidgetType, WidgetDef> = {
     // Two columns because this one shows WORDS. "Sunday Service" in a single
     // cell is either three characters wide or clipped.
     size: { w: 2, h: 1 },
+    defaultSpan: 'third',
+  },
+
+  'companion-variables': {
+    title: 'Companion variables',
+    description: 'Values from the room’s Companion, as text, a status bullet or a bar.',
+    integration: 'companion',
+    component: CompanionVariablesWidget,
+    // Two columns for a label AND its value on one line, two rows because a
+    // rack of one variable is a rack of nothing — the point is several at once.
+    size: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    maxSize: { w: 3, h: 4 },
+    // The first genuinely multi-instance widget, and the one the `unique` flag
+    // was written for: two of these are two different racks of variables, and
+    // their rows are the identity that tells them apart.
+    unique: false,
     defaultSpan: 'third',
   },
 
