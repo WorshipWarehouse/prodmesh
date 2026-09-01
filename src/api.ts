@@ -1294,6 +1294,7 @@ export interface ViewPlacement {
 
 /** Mirrors the server's per-placement config — the same shape as WidgetConfig. */
 export interface WidgetConfigJson {
+  hideHeader?: boolean;
   rows?: CompanionVariableRow[];
   planId?: string;
   timeId?: string;

@@ -293,6 +293,28 @@ describe('ViewEditor', () => {
     });
   });
 
+  it('every widget can hide its header, including ones with nothing else to set', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await openPaletteGroup(user, 'ProdMesh');
+    await user.click(screen.getByRole('button', { name: 'Add Clock' }));
+    await user.click(within(at('clock')).getByRole('button', { name: /Move Clock/ }));
+
+    // The clock has no settings of its own, and the panel used to say exactly
+    // that. Every widget has a header, so every widget now has this.
+    const panel = within(screen.getByText('Widget settings').closest('aside')!);
+    const hide = panel.getByLabelText('Hide the widget header');
+    expect(hide).not.toBeChecked();
+    await user.click(hide);
+    expect(panel.getByLabelText('Hide the widget header')).toBeChecked();
+
+    // The cell keeps its handle: the editor's chrome stands in for the header,
+    // so the widget is still selectable and movable after hiding it.
+    expect(within(at('clock')).getByRole('button', { name: /Move Clock/ })).toBeInTheDocument();
+    expect(at('clock').className).not.toContain('viewcell--bare');
+  });
+
   it('the Companion widget takes its variables from the settings panel', async () => {
     const user = userEvent.setup();
     render(<Harness />);

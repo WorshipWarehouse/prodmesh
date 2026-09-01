@@ -129,6 +129,16 @@
   z-index: 1;
 }
 
+/* A cell whose header is hidden (config.hideHeader, live views only).
+
+   The rule above lifts a widget's status chip OUT of its own flow and onto the
+   header's row — which is exactly right when there is a header and wrong when
+   there is not: the chip would then land on top of the widget's first line.
+   With no strip to sit in, it goes back where the widget put it. */
+.viewcell--bare:not(.viewcell--editing) .wgt__status {
+  position: static;
+}
+
 /* The canvas header is the one consistent, branded title for a widget. A few
    older widgets also render their own icon + name inside the card, which
    produces "Comms / Comms" and "Planning Center Service / Planning Center
