@@ -88,6 +88,35 @@ describe('ViewCanvas', () => {
     expect(dashGrid.style.getPropertyValue('--view-rows')).toBe('8');
   });
 
+  it('a widget can drop its header, and only on a live view', () => {
+    const bare: ViewPlacement = { ...place('a', 'clock', 0, 0), config: { hideHeader: true } };
+    const titled = place('b', 'countdown', 2, 0);
+
+    const { container } = render(
+      <ViewCanvas view={view([bare, titled])} grid={GRID.dashboard} config={{}} />,
+    );
+
+    const cells = [...container.querySelectorAll<HTMLElement>('.viewcell')];
+    expect(cells[0].querySelector('.viewcell__widget-head')).toBeNull();
+    expect(cells[0].className).toContain('viewcell--bare');
+    // Its neighbour is untouched: this is per placement, not per view.
+    expect(cells[1].querySelector('.viewcell__widget-head')).not.toBeNull();
+
+    // In the EDITOR the chrome stands in for the header, so a headerless
+    // widget still has a handle — hiding a header must never be a way to lose
+    // a widget behind its own setting.
+    const editing = render(
+      <ViewCanvas
+        view={view([bare])}
+        grid={GRID.dashboard}
+        config={{}}
+        chromeFor={() => <button type="button">Move Clock</button>}
+      />,
+    ).container;
+    expect(editing.querySelector('.viewcell')!.className).not.toContain('viewcell--bare');
+    expect(screen.getByRole('button', { name: 'Move Clock' })).toBeInTheDocument();
+  });
+
   it('the view’s context overrides a placement’s own, and empty means follow the room', () => {
     const pinned: ViewPlacement = { ...place('a', 'countdown', 0, 0), config: { planId: 'stored', timeId: 'st' } };
 

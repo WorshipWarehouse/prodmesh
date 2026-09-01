@@ -78,6 +78,16 @@ export interface WidgetConfig {
   videoPreview?: boolean;
   aspectRatio?: '16:9' | '4:3' | '1:1';
   slides?: 'current' | 'next' | 'both';
+  /**
+   * Drop the branded title strip above this widget on a LIVE view.
+   *
+   * Not a cosmetic preference so much as a question of what the screen is for:
+   * a booth dashboard wants to know which of two meters it is looking at, and
+   * a foyer wall showing one big clock does not want the word "Clock" over it.
+   * The editor keeps its own handle strip either way — see PlacedWidget — so
+   * hiding this can never make a widget unselectable.
+   */
+  hideHeader?: boolean;
   /** Companion variables, one row each. The only config that is a LIST:
    *  every other widget answers one question, and this one is a rack of
    *  labelled values whose whole point is holding several at once. */

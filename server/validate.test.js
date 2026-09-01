@@ -94,6 +94,19 @@ test('validateView drops unknown widget config keys rather than rejecting', () =
   assert.deepEqual(validateView(view({ widgets: [at('countdown', 0, 0)] })).widgets[0].config, {});
 });
 
+test('validateView keeps the header switch, which every widget has', () => {
+  const config = (over) => validateView(view({
+    widgets: [{ ...at('clock', 0, 0), config: over }],
+  })).widgets[0].config;
+
+  assert.deepEqual(config({ hideHeader: true }), { hideHeader: true });
+  assert.deepEqual(config({ hideHeader: false }), { hideHeader: false });
+  // Same discipline as every other flag: a non-boolean is dropped, not
+  // coerced, so "yes" from a hand-edited layout does not become true.
+  assert.deepEqual(config({ hideHeader: 'yes' }), {});
+  assert.deepEqual(config({}), {});
+});
+
 test('validateView normalizes Companion variable rows and refuses bad ones', () => {
   const rows = (list) => validateView(view({
     widgets: [{ type: 'companion-variables', x: 0, y: 0, w: 2, h: 2, config: { rows: list } }],

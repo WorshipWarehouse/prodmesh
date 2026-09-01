@@ -202,6 +202,17 @@ Notes:
   `roomHealth.test.js` asserts that against realistic probe text and fails if
   a field is passed through. YouTube is read from the health registry rather
   than probed, because every YouTube request is metered quota.
+  Any widget may **hide its title** ("Hide widget title", stored as
+  `hideHeader`, 1.4.0-dev): the branded
+  title strip is the right default on a booth dashboard holding two meters and
+  wrong on a foyer wall showing one big clock. Live views only — the editor
+  always draws its handle strip in the header's place, so hiding one can never
+  make a widget unselectable, and that is why the option is safe to offer per
+  placement rather than per view. It is also the first setting EVERY widget
+  has, so the inspector no longer has a "this widget has no settings" state.
+  One CSS consequence worth knowing: a widget's status chip is normally lifted
+  out of its own flow onto the header's row, so a headerless cell puts it back
+  (`.viewcell--bare`) rather than dropping it on top of the first line.
   `companion-variables` (1.4.0-dev) is a rack of labelled values read from the
   room's Companion — up to eight rows per widget, each shown as text, as text
   with a status bullet, or as a progress bar. Rows name a variable the way

@@ -62,9 +62,15 @@ export function PlacedWidget({
     ? analysisIntegration(source)
     : placement.type === 'captions' ? captionIntegration(captionSource)
       : def?.integration ?? 'prodmesh';
+  // Hiding the header only ever applies to a LIVE cell. In the editor the
+  // chrome takes the header's place, so a headerless widget still has its grab
+  // strip, its remove button and the click target that opens its settings —
+  // which is what stops this option from being a way to lose a widget.
+  const bare = Boolean(config.hideHeader) && !chrome;
+
   return (
     <div
-      className={`viewcell${def ? '' : ' viewcell--unknown'}${chrome ? ' viewcell--editing' : ''}${className ? ` ${className}` : ''}`}
+      className={`viewcell${def ? '' : ' viewcell--unknown'}${chrome ? ' viewcell--editing' : ''}${bare ? ' viewcell--bare' : ''}${className ? ` ${className}` : ''}`}
       style={{
         gridColumn: `${placement.x + 1} / span ${placement.w}`,
         gridRow: `${placement.y + 1} / span ${placement.h}`,
@@ -72,7 +78,7 @@ export function PlacedWidget({
       data-widget={placement.type}
     >
       {chrome}
-      {!chrome && def && (
+      {!chrome && def && !bare && (
         <header className="viewcell__widget-head">
           <IntegrationBrand integration={integration} />
           <span>{title}</span><IntegrationBeta integration={integration} />
