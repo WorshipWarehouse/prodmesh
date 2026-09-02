@@ -7,8 +7,8 @@ describe('companionEmulatorUrl', () => {
       .toBe('http://10.0.0.25:8000/emulator/foh');
   });
 
-  it('uses Companion main when a room has not selected another emulator', () => {
-    expect(companionEmulatorUrl('companion.local')?.pathname).toBe('/emulator/main');
+  it('uses Companion’s emulator picker when a room has not selected one', () => {
+    expect(companionEmulatorUrl('companion.local')?.pathname).toBe('/emulator');
   });
 
   it('refuses malformed surface identifiers', () => {

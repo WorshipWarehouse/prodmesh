@@ -1083,7 +1083,7 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
   return (
     <EditDialog
       title="Bitfocus Companion & modes"
-      help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches. The Emulator ID is the final part of Companion’s emulator URL, for example /emulator/main. It powers the live room control surface and dashboard widget."
+      help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches. The Emulator ID is the final part of Companion’s emulator URL, for example /emulator/foh. Leave it blank to open Companion’s built-in emulator picker. It powers the live room control surface and dashboard widget."
       form={f}
       onClose={onClose}
       wide

@@ -26,7 +26,7 @@ export function CompanionSurface({ roomId, className = '' }: { roomId: string; c
   return (
     <div className={`companion-surface ${className}`.trim()}>
       <div className="companion-surface__bar">
-        <span>Emulator: {connection.emulator || 'main'}</span>
+        <span>{connection.emulator ? `Emulator: ${connection.emulator}` : 'Choose an emulator'}</span>
         <a href={url.href} target="_blank" rel="noopener noreferrer">
           Open in Companion <ExternalLink size={13} aria-hidden />
         </a>
