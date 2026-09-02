@@ -1104,7 +1104,10 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
           <input className="field" inputMode="numeric" placeholder="8000"
             value={draft.port} onChange={(e) => f.patch({ port: e.target.value })} />
         </Field>
-        <Field label="State variable">
+        <Field
+          label="State variable"
+          help="In Companion, open Variables, then Custom Variables, and create or select the variable that holds this room’s mode (for example, roomState). Enter only its name here — roomState, not $(custom:roomState). Set its current value to one of the mode labels configured below."
+        >
           <input className="field" placeholder="roomState" value={draft.variable}
             onChange={(e) => f.patch({ variable: e.target.value })} />
         </Field>
