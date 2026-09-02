@@ -22,6 +22,7 @@ import { Tile } from '../components/Tile';
 import { useChurch } from '../layout/church';
 import { PasswordInput } from '../components/PasswordInput';
 import { CompanionSurface } from '../components/CompanionSurface';
+import { IntegrationTitle } from '../components/IntegrationBrand';
 
 // When a show is live in this room, say so LOUDLY: which service, since when,
 // and one tap to the live Run of Show. (The Home tile already shows LIVE —
@@ -157,6 +158,7 @@ export function RoomStatus() {
     return <div className="pagemsg">Loading…</div>;
   }
 
+  const roomModeEnabled = room.roomModeEnabled !== false;
   const currentMode = room.modes.find((m) => m.id === state.mode) ?? null;
   const inStandby = currentMode?.isStandby ?? false;
   const buttons = room.modes.filter((m) => !m.isStandby || !inStandby);
@@ -189,7 +191,7 @@ export function RoomStatus() {
         </div>
       )}
 
-      {companionEnabled && <>{/* Room Mode changes once at call time and then stays put, so it only
+      {companionEnabled && roomModeEnabled && <>{/* Room Mode changes once at call time and then stays put, so it only
           claims the page while the room is in Standby. Out of Standby it
           collapses to its own answer — the current mode — leaving the console
           to the things used all day. */}
@@ -250,17 +252,22 @@ export function RoomStatus() {
       </Accordion>
       </>}
 
-      {companionEnabled && room.hasCompanion && (
-        <Accordion title="Bitfocus Companion" defaultOpen summary={<span className="acc__chip">Live controls</span>}>
-          <CompanionSurface roomId={roomId} className="companion-surface--room" />
-        </Accordion>
-      )}
-
       {/* Full width: it is the widest content on the page and has no
           neighbour to sit beside now that Room Mode is a full-width panel. */}
       <WidgetGrid>
         <ServicePanel roomId={roomId} />
       </WidgetGrid>
+
+      {companionEnabled && room.hasCompanion && (
+        <Accordion
+          className="acc--companion"
+          title={<IntegrationTitle integration="companion">Bitfocus Companion</IntegrationTitle>}
+          defaultOpen
+          summary={<span className="acc__chip">Live controls</span>}
+        >
+          <CompanionSurface roomId={roomId} className="companion-surface--room" />
+        </Accordion>
+      )}
 
       {tiles.length > 0 && (
         <Accordion

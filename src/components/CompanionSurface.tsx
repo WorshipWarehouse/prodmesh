@@ -1,4 +1,4 @@
-import { ExternalLink, WifiOff } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 import { getRoomConnectivity } from '../api';
 import { EMBED_ALLOW, EMBED_SANDBOX } from '../lib/embed';
 import { companionEmulatorUrl } from '../lib/companion';
@@ -25,15 +25,9 @@ export function CompanionSurface({ roomId, className = '' }: { roomId: string; c
 
   return (
     <div className={`companion-surface ${className}`.trim()}>
-      <div className="companion-surface__bar">
-        <span>{connection.emulator ? `Emulator: ${connection.emulator}` : 'Choose an emulator'}</span>
-        <a href={url.href} target="_blank" rel="noopener noreferrer">
-          Open in Companion <ExternalLink size={13} aria-hidden />
-        </a>
-      </div>
       <iframe
         className="companion-surface__frame"
-        title={`Bitfocus Companion for ${roomId}`}
+        title="Bitfocus Companion controls"
         src={url.href}
         sandbox={EMBED_SANDBOX}
         allow={EMBED_ALLOW}

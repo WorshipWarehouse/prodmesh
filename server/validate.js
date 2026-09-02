@@ -16,8 +16,8 @@ export function validateRooms(rooms) {
     if (!room.id) fail(`${where} is missing an id.`);
     if (room.id !== key) fail(`${where} id "${room.id}" must match its key "${key}".`);
     if (!room.name) fail(`${where} is missing a name.`);
-    if (!Array.isArray(room.modes) || room.modes.length === 0) {
-      fail(`${where} must have a non-empty modes array.`);
+    if (!Array.isArray(room.modes)) {
+      fail(`${where} must have a modes array.`);
     }
 
     if (!room.mock) {

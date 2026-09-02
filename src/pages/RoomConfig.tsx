@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ChevronRight, RefreshCw, Trash2 } from 'lucide-react';
 import { Checkbox } from '../components/Checkbox';
+import { Switch } from '../components/Switch';
 import { HelpTip } from '../components/HelpTip';
 import { PasswordInput } from '../components/PasswordInput';
 import { SelectField } from '../components/SelectField';
@@ -15,6 +16,7 @@ import { useQuery } from '../lib/useQuery';
 import { allIds, slugId } from '../lib/topology';
 import {
   getEnabledIntegrations,
+  getCompanionEmulators,
   getRoomConnectivity,
   getRoomConnectivityStatus,
   getRooms,
@@ -1013,6 +1015,7 @@ interface ModeDraft {
 
 interface CompanionDraft {
   mock: boolean;
+  roomMode: boolean;
   host: string;
   port: string;
   variable: string;
@@ -1036,6 +1039,7 @@ function toModeDraft(m: ModeConfig): ModeDraft {
 function toCompanionDraft(cfg: CompanionConfig | null): CompanionDraft {
   return {
     mock: cfg ? cfg.mock : true,
+    roomMode: cfg?.roomMode !== false,
     host: cfg?.host ?? '',
     port: cfg?.port != null ? String(cfg.port) : '',
     variable: cfg?.variable ?? '',
@@ -1050,10 +1054,11 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
   const f = useDraft(toCompanionDraft(initial), async (d) => {
     const stored = await saveCompanion(roomId, {
       mock: d.mock,
+      ...(d.roomMode ? {} : { roomMode: false }),
       host: d.host || undefined,
       port: d.port === '' ? undefined : Number(d.port),
       variable: d.variable || undefined,
-      emulator: d.emulator || undefined,
+      ...(d.emulator ? { emulator: d.emulator } : {}),
       modes: d.modes.map((m) => ({
         id: m.id,
         label: m.label,
@@ -1069,6 +1074,12 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
     return toCompanionDraft(stored);
   });
   const { draft } = f;
+  const emulatorQuery = useQuery(
+    draft.host && !draft.mock ? `companion-emulators:${roomId}:${draft.host}:${draft.port}` : null,
+    () => getCompanionEmulators(roomId),
+    { staleMs: 30_000 },
+  );
+  const emulators = emulatorQuery.data?.emulators ?? [];
   const setMode = (i: number, patch: Partial<ModeDraft>) =>
     f.setDraft((d) => ({ ...d, modes: d.modes.map((m, j) => (j === i ? { ...m, ...patch } : m)) }));
   const moveMode = (i: number, dir: -1 | 1) =>
@@ -1083,19 +1094,18 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
   return (
     <EditDialog
       title="Bitfocus Companion & modes"
-      help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches. The Emulator ID is the final part of Companion’s emulator URL, for example /emulator/foh. Leave it blank to open Companion’s built-in emulator picker. It powers the live room control surface and dashboard widget."
       form={f}
       onClose={onClose}
       wide
     >
       <FormRow>
-        <Checkbox
-          label={<>Simulated
-            <HelpTip text="No Companion yet — room state is kept in memory so every screen still works. Untick when this room's Companion has the state variable and buttons set up." />
-          </>}
-          checked={draft.mock}
-          onChange={(e) => f.patch({ mock: e.target.checked })}
+        <Switch
+          label="Enable Room Mode"
+          checked={draft.roomMode}
+          onChange={(e) => f.patch({ roomMode: e.target.checked })}
         />
+      </FormRow>
+      <FormRow>
         <Field label="Host" width="grow">
           <input className="field" placeholder="e.g. 192.168.1.100" value={draft.host}
             onChange={(e) => f.patch({ host: e.target.value })} />
@@ -1104,19 +1114,26 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
           <input className="field" inputMode="numeric" placeholder="8000"
             value={draft.port} onChange={(e) => f.patch({ port: e.target.value })} />
         </Field>
-        <Field
-          label="State variable"
-          help="In Companion, open Variables, then Custom Variables, and create or select the variable that holds this room’s mode (for example, roomState). Enter only its name here — roomState, not $(custom:roomState). Set its current value to one of the mode labels configured below."
-        >
+        <Field label="State variable">
           <input className="field" placeholder="roomState" value={draft.variable}
             onChange={(e) => f.patch({ variable: e.target.value })} />
         </Field>
-        <Field label="Emulator ID">
-          <input className="field" placeholder="main" value={draft.emulator}
-            onChange={(e) => f.patch({ emulator: e.target.value })} />
+      </FormRow>
+      <FormRow>
+        <Field label="Companion emulator">
+          <select className="field" value={draft.emulator} disabled={!draft.host || draft.mock || emulatorQuery.loading}
+            onChange={(e) => f.patch({ emulator: e.target.value })}>
+            <option value="">{emulatorQuery.loading ? 'Loading emulators…' : 'Choose an emulator'}</option>
+            {draft.emulator && !emulators.some((emulator) => emulator.id === draft.emulator) &&
+              <option value={draft.emulator}>{draft.emulator} (currently selected)</option>}
+            {emulators.map((emulator) => <option key={emulator.id} value={emulator.id}>{emulator.name}</option>)}
+          </select>
         </Field>
+        {emulatorQuery.error && <span className="settings__error">Couldn’t load Companion emulators. Check the host and Companion version.</span>}
       </FormRow>
 
+      {draft.roomMode && <>
+      <p className="settings__muted">Room Mode buttons — add only the controls this room needs. There is no fixed six-button layout.</p>
       {draft.modes.map((m, i) => (
         <FormRow card key={i}>
           <Field label="Color" width="xs">
@@ -1167,6 +1184,7 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
           page: '', row: '', column: '', isStandby: false,
         }],
       }))}>+ Add mode</button>
+      </>}
     </EditDialog>
   );
 }
