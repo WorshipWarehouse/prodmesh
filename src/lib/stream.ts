@@ -137,6 +137,7 @@ export const roomTopic = {
   captions: (roomId: string) => `room:${roomId}:captions`,
   lyrics: (roomId: string) => `room:${roomId}:lyrics`,
   proPresenter: (roomId: string) => `room:${roomId}:propresenter`,
+  obs: (roomId: string) => `room:${roomId}:obs`,
 };
 
 /**

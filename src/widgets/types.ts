@@ -76,6 +76,10 @@ export interface WidgetConfig {
   destinationLinks?: boolean;
   /** Render an active YouTube destination inside the Restream widget. */
   videoPreview?: boolean;
+  /** Show the optional administrator-supplied OBS program preview image. */
+  obsPreview?: boolean;
+  /** Reveal secondary OBS health figures such as CPU and disk headroom. */
+  obsDetails?: boolean;
   aspectRatio?: '16:9' | '4:3' | '1:1';
   slides?: 'current' | 'next' | 'both';
   /**
@@ -181,6 +185,7 @@ export type WidgetType =
   | 'loudness-trend'
   | 'viewers'
   | 'restream'
+  | 'obs-health'
   | 'resi-stream'
   | 'resi-health'
   | 'resi-viewers'
