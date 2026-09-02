@@ -224,6 +224,9 @@
   height: 100%;
 }
 
+.viewcell[data-widget="companion-emulator"] { padding: 0; gap: 0; }
+.viewcell[data-widget="companion-emulator"] .viewcell__body { gap: 0; }
+
 /* A compact Now & Next cell used to hide the end of an item title with an
    ellipsis. The canvas gives every widget its actual selected dimensions, so
    use available lines rather than discarding content. */

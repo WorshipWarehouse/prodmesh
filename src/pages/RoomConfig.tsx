@@ -1016,6 +1016,7 @@ interface CompanionDraft {
   host: string;
   port: string;
   variable: string;
+  emulator: string;
   modes: ModeDraft[];
 }
 
@@ -1038,6 +1039,7 @@ function toCompanionDraft(cfg: CompanionConfig | null): CompanionDraft {
     host: cfg?.host ?? '',
     port: cfg?.port != null ? String(cfg.port) : '',
     variable: cfg?.variable ?? '',
+    emulator: cfg?.emulator ?? '',
     modes: (cfg?.modes ?? []).map(toModeDraft),
   };
 }
@@ -1051,6 +1053,7 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
       host: d.host || undefined,
       port: d.port === '' ? undefined : Number(d.port),
       variable: d.variable || undefined,
+      emulator: d.emulator || undefined,
       modes: d.modes.map((m) => ({
         id: m.id,
         label: m.label,
@@ -1080,7 +1083,7 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
   return (
     <EditDialog
       title="Bitfocus Companion & modes"
-      help="The room's Bitfocus Companion install. Each mode presses a Bitfocus Companion button (page/row/column) and shows as active when the state variable matches its value. Every Bitfocus Companion lays its buttons out differently — set each mode's location to match this room's."
+      help="The room's Bitfocus Companion install. Each mode presses a Companion button (page/row/column) and shows as active when the state variable matches. The Emulator ID is the final part of Companion’s emulator URL, for example /emulator/main. It powers the live room control surface and dashboard widget."
       form={f}
       onClose={onClose}
       wide
@@ -1104,6 +1107,10 @@ function CompanionDialog({ roomId, initial, onSaved, onClose }: {
         <Field label="State variable">
           <input className="field" placeholder="roomState" value={draft.variable}
             onChange={(e) => f.patch({ variable: e.target.value })} />
+        </Field>
+        <Field label="Emulator ID">
+          <input className="field" placeholder="main" value={draft.emulator}
+            onChange={(e) => f.patch({ emulator: e.target.value })} />
         </Field>
       </FormRow>
 

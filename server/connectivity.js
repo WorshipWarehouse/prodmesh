@@ -283,6 +283,11 @@ export function validateCompanion(input) {
   const variable = String(input.variable ?? '').trim();
   if (variable.length > 60) throw new Error('variable must be at most 60 characters');
   if (variable) out.variable = variable;
+  const emulator = String(input.emulator ?? '').trim();
+  if (emulator && !/^[a-z0-9_-]{1,80}$/i.test(emulator)) {
+    throw new Error('Companion emulator ID must be letters, digits, - or _ (max 80)');
+  }
+  if (emulator) out.emulator = emulator;
   if (!out.mock) {
     if (!out.host) throw new Error('A live (non-simulated) room needs a Companion host');
     if (!out.variable) throw new Error('A live (non-simulated) room needs a state variable');
@@ -341,6 +346,7 @@ export function companionFromRoom(room) {
     ...(room.companion?.host ? { host: room.companion.host } : {}),
     ...(room.companion?.port != null ? { port: room.companion.port } : {}),
     ...(room.state?.variable ? { variable: room.state.variable } : {}),
+    ...(room.companion?.emulator ? { emulator: room.companion.emulator } : {}),
     modes: room.modes,
   };
 }
@@ -349,7 +355,7 @@ export function companionFromRoom(room) {
 function applyCompanion(room, stored) {
   room.mock = stored.mock;
   room.companion = stored.host
-    ? { host: stored.host, ...(stored.port != null ? { port: stored.port } : {}) }
+    ? { host: stored.host, ...(stored.port != null ? { port: stored.port } : {}), ...(stored.emulator ? { emulator: stored.emulator } : {}) }
     : {};
   room.state = { variable: stored.variable };
   room.modes = stored.modes;

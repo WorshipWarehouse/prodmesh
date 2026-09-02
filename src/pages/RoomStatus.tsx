@@ -21,6 +21,7 @@ import { Accordion } from '../components/Accordion';
 import { Tile } from '../components/Tile';
 import { useChurch } from '../layout/church';
 import { PasswordInput } from '../components/PasswordInput';
+import { CompanionSurface } from '../components/CompanionSurface';
 
 // When a show is live in this room, say so LOUDLY: which service, since when,
 // and one tap to the live Run of Show. (The Home tile already shows LIVE —
@@ -248,6 +249,12 @@ export function RoomStatus() {
         </div>
       </Accordion>
       </>}
+
+      {companionEnabled && room.hasCompanion && (
+        <Accordion title="Bitfocus Companion" defaultOpen summary={<span className="acc__chip">Live controls</span>}>
+          <CompanionSurface roomId={roomId} className="companion-surface--room" />
+        </Accordion>
+      )}
 
       {/* Full width: it is the widest content on the page and has no
           neighbour to sit beside now that Room Mode is a full-width panel. */}

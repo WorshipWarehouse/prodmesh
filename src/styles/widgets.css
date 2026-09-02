@@ -63,6 +63,16 @@
   font-size: 0.85rem;
 }
 
+/* Companion provides the live control UI. Give it all available space, while
+   keeping a clear escape hatch for touch operators who prefer its full page. */
+.companion-surface { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); }
+.companion-surface__bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 9px; color: var(--text-dim); font-size: .72rem; border-bottom: 1px solid var(--border); }
+.companion-surface__bar a { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.companion-surface__frame { width: 100%; height: 100%; min-height: 0; border: 0; background: #111; }
+.companion-surface--widget { min-height: 0; }
+.companion-surface--room { height: min(70vh, 760px); }
+.companion-surface--empty { min-height: 120px; place-items: center; grid-template-columns: auto auto; gap: 8px; padding: 16px; color: var(--text-dim); }
+
 /* ProPresenter console: compact enough for a booth, but all state remains
    textual when the thumbnail endpoint cannot supply an image. */
 .ppwidget { min-height: 0; color: var(--text); }

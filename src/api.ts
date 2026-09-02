@@ -656,6 +656,8 @@ export interface CompanionConfig {
   host?: string;
   port?: number;
   variable?: string;
+  /** ID of the Companion emulator surface for this room. Blank means main. */
+  emulator?: string;
   modes: ModeConfig[];
 }
 
