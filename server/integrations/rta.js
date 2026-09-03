@@ -124,6 +124,13 @@ function sampleFrom(data, cfg, state) {
   const spl = cfg.metric ? frame.metrics?.[cfg.metric] : frame.slow_db;
   if (typeof spl !== 'number') return null;
   const sample = { ts: Date.now(), spl: Math.round(spl * 10) / 10 };
+  const centers = Array.isArray(frame.centers_hz) ? frame.centers_hz : [];
+  const bands = Array.isArray(frame.bands_db) ? frame.bands_db : [];
+  if (centers.length && centers.length === bands.length) {
+    const spectrum = centers.map((hz, index) => ({ hz, db: bands[index] }))
+      .filter(({ hz, db }) => typeof hz === 'number' && hz > 0 && typeof db === 'number' && Number.isFinite(db));
+    if (spectrum.length) sample.spectrum = spectrum;
+  }
   const ca = frame.metrics?.ca;
   if (typeof ca === 'number') {
     sample.ca = Math.round(ca * 10) / 10;
