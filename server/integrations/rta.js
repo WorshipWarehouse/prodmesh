@@ -125,7 +125,14 @@ function readingsFrom(frame) {
     const source = frame.spl?.[weighting] ?? frame.spl?.[weighting.toLowerCase()];
     for (const response of RESPONSES) {
       const key = response === 'Fast' ? 'fast' : 'slow';
-      const value = source?.[`${key}_db`] ?? source?.[key];
+      // Current RTA releases group each response beneath its weighting:
+      //   spl: { A: { fast_db, slow_db }, ... }
+      // An earlier concurrent-readings build grouped the inverse way:
+      //   spl: { fast_db: { a, b, c, z }, slow_db: { a, b, c, z } }
+      // Accept both while deployments upgrade independently.
+      const value = source?.[`${key}_db`] ?? source?.[key]
+        ?? frame.spl?.[`${key}_db`]?.[weighting]
+        ?? frame.spl?.[`${key}_db`]?.[weighting.toLowerCase()];
       if (typeof value === 'number' && Number.isFinite(value)) readings[`SPL ${weighting} ${response}`] = round(value);
     }
   }
