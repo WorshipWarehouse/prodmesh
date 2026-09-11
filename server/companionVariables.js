@@ -90,11 +90,12 @@ function idle(roomId, ms, signal) {
  * `status` is what the widget shows when there is no value, and the three
  * cases are genuinely different to whoever has to fix them: `missing` is a
  * typo in the widget's own config, `offline` is Companion or the network, and
- * `simulated` is a room that was never wired to a Companion at all. Collapsing
- * them into "—" would send an operator to the wrong machine.
+ * `unconfigured` is a room that has no Companion set up at all. Collapsing
+ * them into "—" would send an operator to the wrong machine. Nothing here ever
+ * invents a value: a variable a real Companion did not answer is absent.
  */
 async function read(room, label, name) {
-  if (room.mock || !room.companion?.host) return { value: null, status: 'simulated' };
+  if (!room.companion?.host) return { value: null, status: 'unconfigured' };
   try {
     const value = await readVariable(room.companion, label, name);
     return { value: value.slice(0, MAX_VALUE), status: 'ok' };
@@ -146,11 +147,11 @@ async function loop(roomId, signal) {
     const now = watched.get(roomId);
     if (now && [...now.keys()].some((key) => now.get(key) === null)) continue;
 
-    // A simulated room keeps its timer and touches no network (see read()).
-    // Ending the loop instead would be cheaper and is not worth the hole it
-    // leaves: a room switched out of mock in Admin would then have nothing
-    // running to notice, and every screen watching it would stay simulated
-    // until somebody reloaded.
+    // A room with no Companion yet keeps its timer and touches no network (see
+    // read()). Ending the loop instead would be cheaper and is not worth the
+    // hole it leaves: a room whose Companion is configured in Admin would then
+    // have nothing running to notice, and every screen watching it would stay
+    // blank until somebody reloaded.
     await idle(roomId, POLL_MS, signal);
   }
 }

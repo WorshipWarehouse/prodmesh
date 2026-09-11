@@ -15,7 +15,7 @@ import type { WidgetProps } from './types';
 // to say about YouTube, and a permanent grey dot for it is the noise that
 // teaches people to stop reading the dots.
 
-const ORDER = { down: 0, unknown: 1, mock: 2, ok: 3 } as const;
+const ORDER = { down: 0, unknown: 1, ok: 1, down: 0, unknown: 2 } as const;
 
 export function RoomHealthWidget({ roomId }: WidgetProps) {
   const health = useTopic<RoomHealth>(roomTopic.health(roomId));
@@ -40,11 +40,11 @@ export function RoomHealthWidget({ roomId }: WidgetProps) {
   const down = list.filter((i) => i.state === 'down').length;
   const unknown = list.filter((i) => i.state === 'unknown').length;
 
-  const summary = down
-    ? `${down} down`
-    : unknown
-      ? `${unknown} not checked`
-      : 'All good';
+const summary = down
+  ? `${down} down`
+  : unknown
+    ? 'Not checked yet'
+    : 'All good';
   const zone = down ? 'down' : unknown ? 'unknown' : 'ok';
 
   return (
@@ -77,6 +77,6 @@ export function RoomHealthWidget({ roomId }: WidgetProps) {
 const STATE_TEXT = {
   ok: 'Responding',
   down: 'Not responding',
-  mock: 'Simulated',
+  mock: 'Not checked yet',
   unknown: 'Not checked yet',
 } as const;

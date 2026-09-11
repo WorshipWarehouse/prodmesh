@@ -45,13 +45,13 @@ describe('RoomHealthWidget', () => {
     // see has to be at the top rather than wherever it happened to land.
     show();
     await push(at([
-      i('planningCenter', 'Planning Center', 'ok'),
-      i('companion', 'Companion', 'mock'),
-      i('analysis', 'Analysis', 'unknown'),
       i('proPresenter', 'ProPresenter', 'down'),
+      i('planningCenter', 'Planning Center', 'ok'),
+      i('analysis', 'Analysis', 'unknown'),
+      i('companion', 'Companion', 'unknown'),
     ]));
     await screen.findByText('1 down');
-    expect(names()).toEqual(['ProPresenter', 'Analysis', 'Companion', 'Planning Center']);
+    expect(names()).toEqual(['ProPresenter', 'Planning Center', 'Analysis', 'Companion']);
   });
 
   it('distinguishes not-contacted-yet from broken', async () => {
@@ -75,7 +75,7 @@ describe('RoomHealthWidget', () => {
       i('planningCenter', 'Planning Center', 'ok'),
     ]));
     expect(await screen.findByText('Not responding')).toBeInTheDocument();
-    expect(screen.getByText('Simulated')).toBeInTheDocument();
+    expect(screen.getByText('Not checked yet')).toBeInTheDocument();
     expect(screen.getByText('Responding')).toBeInTheDocument();
   });
 
