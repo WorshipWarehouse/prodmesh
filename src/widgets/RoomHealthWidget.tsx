@@ -15,7 +15,7 @@ import type { WidgetProps } from './types';
 // to say about YouTube, and a permanent grey dot for it is the noise that
 // teaches people to stop reading the dots.
 
-const ORDER = { down: 0, unknown: 1, ok: 1, down: 0, unknown: 2 } as const;
+const ORDER = { down: 0, unknown: 1, mock: 1, ok: 2 } as const;
 
 export function RoomHealthWidget({ roomId }: WidgetProps) {
   const health = useTopic<RoomHealth>(roomTopic.health(roomId));
