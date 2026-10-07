@@ -88,7 +88,7 @@ describe('AppShell identity and Admin navigation', () => {
     expect(screen.getByRole('link', { name: 'Integrations' })).toHaveAttribute('href', '/admin/integrations');
     expect(screen.getByRole('link', { name: 'Stations' })).toHaveAttribute('href', '/admin/stations');
     expect(screen.getByRole('link', { name: 'Checklists' })).toHaveAttribute('href', '/admin/checklists');
-    expect(screen.getByRole('button', { name: /Sam Rivera/ }).querySelector('img')).toHaveAttribute(
+    expect((await screen.findByRole('button', { name: /Sam Rivera/ })).querySelector('img')).toHaveAttribute(
       'src',
       authenticated.user?.avatarUrl,
     );
