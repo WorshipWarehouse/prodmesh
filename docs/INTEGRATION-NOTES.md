@@ -186,6 +186,16 @@ playing.
   slide action. Keep the last mapped item as a baseline.
 - **Zero-slide "shell" presentations** (a placeholder like "Message") cannot be
   activated at all.
+- **Slide thumbnails are zero-based**, the same `index` as `slide_index` and
+  the trigger routes: `GET /v1/presentation/{uuid}/thumbnail/{index}`. A `+1`
+  shipped on 2026-08-13 on the belief that the endpoint was one-based, and
+  every slide in the production console drew the NEXT slide's image (#42: an
+  intro slide showing verse 1's text, an image-only presentation losing its
+  first image). The giveaway was a retry that only ever fired for the last
+  slide. Probed live on 21.4 (2026-09-10): a 14-slide song answers thumbnails
+  0–13 and 404s at 14, and thumbnail 0 is its blank intro while 1 is verse 1.
+  Agrees with the 7.9 OpenAPI spec and two independent clients that draw the
+  live slide. Not yet probed on 21.1.
 
 Trigger endpoints: `GET /v1/playlist/focused/{index}/trigger`,
 `GET /v1/trigger/next`, `GET /v1/presentation/active/{i}/trigger`.
@@ -452,6 +462,29 @@ Other Services facts:
   Fetch items with `include=item_notes`.
 - A room can host multiple service types; map rooms to an array and merge.
 
+### Services LIVE — probed against a real account 2026-09-10
+
+`/service_types/:st/plans/:plan/live` answers a `Live` resource whose actions
+are exactly `go_to_next_item`, `go_to_previous_item` and `toggle_control`, plus
+read links. **There is no way to end a Services LIVE session.** "Stop" can only
+mean releasing control.
+
+**`toggle_control` is a toggle.** From a token that does not hold control it
+TAKES control; from one that does, it releases. So releasing blindly is a bug
+waiting for the Sunday a volunteer takes Services LIVE over by hand — the
+release would snatch it straight back. Check first: the `controller`
+relationship is a `Person`, and `GET /services/v2/me` answers the token's own
+`Person`, so "we hold it" is `controller.id === me.id`.
+
+`syncServicesLive` POSTs to `/live` when a GET comes back empty. The next
+Sunday plan probed already answered a `Live` resource, with no controller.
+
+ProdMesh drives Services LIVE only while a show is running. The first mapped
+item takes control, each forward item advances it (never backward — an
+accidental ProPresenter click must not rewind it mid-service), and `endShow`
+releases it — after any in-flight sync settles, because a sync that reads
+"nobody controls this" just after the release would take control right back.
+
 ---
 
 ## Bitfocus Companion
@@ -479,7 +512,12 @@ green on any HTTP status.
 
 **There is no bulk read.** `/api/variables` is a 404: n variables is n
 requests, which is why `companionVariables.js` polls one loop per room rather
-than one per variable, and caps how many a room may watch.
+than one per variable, and caps how many a room may watch. How often is
+bounded the same way (#24): each saved variables widget picks a refresh from a
+fixed menu (1, 2, 4 or 10 seconds, 4 by default), a variable is read at the
+fastest refresh of any saved widget showing it, and a room's widgets together
+may not ask for more than 8 reads a second, refused when the dashboard is
+saved. A full rack of 24 variables at the default is 6 a second.
 
 `GET /api/connections` lists the connection labels (`[{id, label, moduleId,
 enabled, status}]`) — not used yet, but it is what a variable picker would

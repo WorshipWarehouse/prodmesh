@@ -17,7 +17,7 @@ maintainer has.
 | | |
 |---|---|
 | **ProdMesh RTA** | A live 1/3-octave spectrum widget reading the analyzer's own bands, plus concurrent A/B/C/Z Fast and Slow readings. Fast frames now aggregate to one energy-equivalent row per second — a service records ~5,400 rows rather than one per frame — and a row carries a `peak` beside its Leq, because averaging a second of samples buried transients by ~12 dB |
-| **OBS Studio** | Per-room host/port/password and a read-only health widget: stream, recording, audio, frames, scene, bitrate. Read-only by design; it cannot control OBS. **Not verified against a real OBS — see below** |
+| **OBS Studio** | Per-room host/port/password and a read-only health widget: stream, recording, audio, frames, scene, bitrate. Read-only by design; it cannot control OBS. **Beta: not verified against a real OBS — see below** |
 | **Bitfocus Companion** | Companion variables on a dashboard; an emulator-surface picker read from Companion's tRPC API; and Room Mode is now optional per room, so a church can run our mode model, Companion's own surface, both, or neither |
 | **Widget placement** | Shrink-to-fit — the editor walks candidate sizes biggest-first instead of refusing a half-empty grid. `minSize` is a *claim* that a widget renders acceptably that small, not a layout hint, so a widget that has not been designed small does not declare one |
 | **One admin identity** (ADR 0012) | The admin PIN is the `admin` account's PIN rather than a second bypass beside the account system |
@@ -47,10 +47,9 @@ maintainer has.
 
 ### Known gaps
 
-- **OBS is not labelled Beta**, though by the rule above it should be — Resi is
-  the only integration currently carrying the mark. Either OBS gets the label
-  before v1.4.0 is tagged, or somebody points it at a real OBS and records what
-  they saw.
+- **OBS ships labelled Beta** (decided 2026-09-11), beside Resi, by the rule
+  above: nobody here has run it against a real OBS. It graduates when somebody
+  does and records what they saw in INTEGRATION-NOTES.
 - **The Companion emulator surface has no lockout, PIN or audit trail.** That
   is inherent, not a defect: the browser talks straight to Companion, which has
   no auth of its own, so a press there skips the `rooms.mode.change`
@@ -217,8 +216,10 @@ Notes:
   between services); falls back to PC clock math otherwise.
 - **Show automation** (per event, Event Detail → Show Automation widget): pick the
   PC item that **autostarts** the show when ProPresenter lands on it (edge-triggered,
-  so "Pre-Service Slides" can loop between services harmlessly) and the item whose
-  **last slide auto-completes** it. Autostart picks the right service time by clock,
+  so "Pre-Service Slides" can loop between services harmlessly) — or **Scheduled
+  time**, which starts each service time on the clock and needs no ProPresenter
+  (fires up to 30 min late if ProdMesh was down, never twice for one service) —
+  and the item whose **last slide auto-completes** it. Autostart picks the right service time by clock,
   skipping already-completed ones; a per-room watcher polls PP only inside the arm
   window (2h before first service → 1h after last), zero browsers required. Manual
   **PC→PP mapping overrides** per event handle drifted orders (stored in SQLite
@@ -309,7 +310,10 @@ Notes:
   anything unlisted stays grey rather than being guessed at. It is the FIRST
   multi-instance widget (`unique: false`) — two of them are two different
   racks, identified by their config, which is the case the flag was written
-  for. Each row is its own `room:*:var:<label>:<name>` topic, so eight rows
+  for. Each widget has one Refresh setting for all its rows (1, 2, 4 or 10
+  seconds, 4 by default); a variable is read at the fastest refresh of any
+  saved widget showing it, and a room's Companion widgets share a budget of 8
+  reads a second, refused at save (#24). Each row is its own `room:*:var:<label>:<name>` topic, so eight rows
   across three screens cost ONE poll loop per room
   (`server/companionVariables.js`); names are shape-checked and a room may have
   at most 24 distinct variables watched at once, because subscribing starts

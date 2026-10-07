@@ -51,7 +51,7 @@ describe('RoomHealthWidget', () => {
       i('companion', 'Companion', 'unknown'),
     ]));
     await screen.findByText('1 down');
-    expect(names()).toEqual(['ProPresenter', 'Planning Center', 'Analysis', 'Companion']);
+    expect(names()).toEqual(['ProPresenter', 'Analysis', 'Companion', 'Planning Center']);
   });
 
   it('distinguishes not-contacted-yet from broken', async () => {
@@ -75,7 +75,7 @@ describe('RoomHealthWidget', () => {
       i('planningCenter', 'Planning Center', 'ok'),
     ]));
     expect(await screen.findByText('Not responding')).toBeInTheDocument();
-    expect(screen.getByText('Not checked yet')).toBeInTheDocument();
+    expect(screen.getByText('Simulated')).toBeInTheDocument();
     expect(screen.getByText('Responding')).toBeInTheDocument();
   });
 

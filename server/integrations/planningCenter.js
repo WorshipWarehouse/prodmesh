@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getSecret } from '../secrets.js';
-import { report } from '../health.js';
+import { outage, report } from '../health.js';
 
 const BASE = 'https://api.planningcenteronline.com/services/v2';
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -88,7 +88,9 @@ async function pcGet(path) {
     return body;
   } catch (err) {
     report('planningCenter', false, String(err.message ?? err));
-    throw err;
+    // Tagged so the fallbacks upstream can tell Planning Center being down
+    // from a bug in what we do with its answer (see health.js).
+    throw outage(err, 'planningCenter');
   }
 }
 
@@ -99,7 +101,7 @@ async function pcPost(path, body = undefined) {
     if (!res.ok) throw new Error(`Planning Center ${path} → HTTP ${res.status}`);
     report('planningCenter', true);
     return res.status === 204 ? null : res.json().catch(() => null);
-  } catch (err) { report('planningCenter', false, String(err.message ?? err)); throw err; }
+  } catch (err) { report('planningCenter', false, String(err.message ?? err)); throw outage(err, 'planningCenter'); }
 }
 
 // ── Normalizers (JSON:API → our clean shapes) — field names verified live ─────
@@ -470,6 +472,40 @@ export async function syncServicesLive(serviceType, planId, targetItemId) {
   if (!next) throw new Error('Planning Center did not provide a next-item action');
   for (let i = 0; i < steps; i += 1) await pcPost(next);
   return { state: 'synced', itemId: targetItemId };
+}
+
+/** Is this Live resource controlled by the person this token belongs to?
+ *  Exported for tests, which have no Planning Center to ask. */
+export function holdsControl(live, meId) {
+  const controller = live?.relationships?.controller?.data;
+  return Boolean(controller && meId && String(controller.id) === String(meId));
+}
+
+/**
+ * Let go of Services LIVE when the show that took it ends.
+ *
+ * Planning Center has no way to END a Services LIVE session. Probed against a
+ * real account 2026-09-10: the only actions on the resource are
+ * go_to_next_item, go_to_previous_item and toggle_control. So "stop" can only
+ * mean releasing control.
+ *
+ * And toggle_control is a TOGGLE — called by a token that does not hold
+ * control, it TAKES it. If somebody took Services LIVE over by hand
+ * mid-service, releasing blindly at the end would snatch it straight back from
+ * them. So this only toggles when the controller is provably the person this
+ * token belongs to, which `/me` answers.
+ */
+export async function releaseServicesLive(serviceType, planId) {
+  if (!isConfigured()) return { state: 'skipped' };
+  const prefix = `/service_types/${pcId(serviceType.id, 'service type id')}/plans/${pcId(planId, 'plan id')}`;
+  const [body, me] = await Promise.all([pcGet(`${prefix}/live?include=controller`), pcGet('/me')]);
+  const live = Array.isArray(body?.data) ? body.data[0] : body?.data;
+  if (!live) return { state: 'none' };
+  if (!holdsControl(live, me?.data?.id)) return { state: 'not-ours' };
+  const toggle = typeof live.links?.toggle_control === 'string' ? live.links.toggle_control.replace(BASE, '') : null;
+  if (!toggle) throw new Error('Planning Center did not offer a way to release Services LIVE control');
+  await pcPost(toggle);
+  return { state: 'released' };
 }
 
 /** Series artwork + plan notes for the Event Detail page.

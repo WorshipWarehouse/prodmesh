@@ -6,6 +6,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { standardModes } from './rooms.config.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,8 +20,7 @@ const health = await import('./health.js');
 const { readActive } = await import('./integrations/proPresenter.js');
 const { fakeProPresenter } = await import('./integrations/fakeProPresenter.js');
 
-// north-youth is the simulated room — flipped live (mock:false) to exercise
-// the Companion-down path, exactly like showStream.test.js does.
+// Configure an unused loopback port to exercise Companion transport failure.
 const ROOM = 'north-youth';
 settings.setPins({ admin: 'admin1234', override: '9999' });
 
@@ -101,8 +101,7 @@ test('GET /api/system/health: starts empty, shows a dead Companion after a faile
   await new Promise((r) => probe.close(r));
 
   const original = conn.getCompanion(ROOM);
-  assert.equal(original.mock, true);
-  conn.setCompanion(ROOM, { ...original, mock: false, host: '127.0.0.1', port: deadPort });
+  conn.setCompanion(ROOM, { host: '127.0.0.1', port: deadPort, variable: 'roomState', modes: standardModes() });
   try {
     const { token } = await (
       await fetch(`${base}/api/auth/admin`, {
@@ -190,6 +189,48 @@ test('a caller abort is not a ProPresenter failure', async () => {
     ctl.abort(); // show ended / view closed
     await assert.rejects(readActive({ host: '127.0.0.1', port: srv.port() }, ctl.signal));
     assert.equal(health.snapshot()[key], undefined); // nothing reported
+  } finally {
+    await srv.close();
+  }
+});
+
+// ── Outage or bug (#41) ──────────────────────────────────────────────────────
+
+test('unexpected() ignores outages and logs a bug with its stack, once a minute per place', (t) => {
+  health.reset();
+  const errors = t.mock.method(console, 'error', () => {});
+  const down = health.outage(new Error('fetch failed'), 'planningCenter');
+  assert.equal(health.unexpected('autostart north-main', down), false, 'report() already logged the outage');
+
+  const bug = new TypeError("Cannot read properties of undefined (reading 'attributes')");
+  assert.equal(health.unexpected('autostart north-main', bug, 1_000), true);
+  assert.equal(health.unexpected('autostart north-main', bug, 30_000), false, 'the same bug, within the minute');
+  assert.equal(health.unexpected('show north-main', bug, 30_000), true, 'a different place gets its own line');
+  assert.equal(health.unexpected('autostart north-main', bug, 61_001), true, 'and it comes back after a minute');
+  assert.equal(errors.mock.callCount(), 3);
+  assert.match(errors.mock.calls[0].arguments[0], /^\[autostart north-main\] unexpected error — TypeError: Cannot read/);
+});
+
+test('survive() always hands back the fallback, and logs only a bug', async (t) => {
+  health.reset();
+  const errors = t.mock.method(console, 'error', () => {});
+  const offline = await Promise.reject(health.outage(new Error('HTTP 503'), 'planningCenter'))
+    .catch(health.survive([], 'plan lookup'));
+  assert.deepEqual(offline, []);
+  assert.equal(errors.mock.callCount(), 0);
+
+  const broken = await Promise.reject(new TypeError('normalizePlan is broken')).catch(health.survive([], 'plan lookup'));
+  assert.deepEqual(broken, [], 'a bug still takes the fallback, so a service carries on');
+  assert.equal(errors.mock.callCount(), 1, 'but it is not silent');
+});
+
+test('a ProPresenter transport failure arrives tagged as an outage', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const srv = await fakeProPresenter();
+  try {
+    srv.failNextRequests(Infinity);
+    const err = await readActive({ host: '127.0.0.1', port: srv.port() }).catch((e) => e);
+    assert.ok(health.isOutage(err), `expected an outage, got ${err}`);
   } finally {
     await srv.close();
   }
