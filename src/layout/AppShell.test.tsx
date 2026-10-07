@@ -7,6 +7,8 @@ import type { AuthStatus } from '../api';
 
 const api = vi.hoisted(() => ({
   getAbout: vi.fn(),
+  getSundayInbox: vi.fn(async () => ({ threads: [], manage: false })),
+  getStreamTicket: vi.fn(async () => ({ ticket: 'test-ticket' })),
   getAuthStatus: vi.fn(),
   getConfig: vi.fn(),
   logoutAdmin: vi.fn(),
@@ -68,6 +70,14 @@ describe('AppShell identity and Admin navigation', () => {
     });
     api.getAuthStatus.mockResolvedValue(authenticated);
     api.logoutAdmin.mockResolvedValue(undefined);
+  });
+
+  it('shows a Sunday Team navigation badge even in the collapsed rail', async () => {
+    localStorage.setItem('prodmesh.sidebar', 'rail');
+    api.getSundayInbox.mockResolvedValueOnce({ threads: [{ unread: 3 }], manage: false } as never);
+    renderShell();
+    const badge = await screen.findByLabelText('3 unread messages');
+    expect(badge.closest('a')).toHaveAttribute('href', '/messages');
   });
 
   it('shows Admin subnavigation and the Planning Center avatar', async () => {
